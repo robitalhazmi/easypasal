@@ -17,7 +17,7 @@
 
 - [x] **T0.1** 👤 Create public GitHub repo `easypasal` (Apache-2.0, README stub, `.gitignore`) (commit `d6993c8`)
   - AC: repo exists, license file present, cloned locally in Antigravity
-- [x] **T0.2** 👤 Check the name "EasyPasal" on GitHub, PyPI, and a web search; record result in `docs/decision-log.md`
+- [x] **T0.2** 👤 Check the name "EasyPasal" on GitHub, PyPI, and a web search; record result in `docs/decision-log.md` (commit `429e4eb`)
   - AC: decision noted (keep or rename)
 - [x] **T0.3** 🤖 Scaffold project: `pyproject.toml`, uv, ruff, pytest, pre-commit, `Makefile`, folder structure from plan §11 (commit `8efcf33`)
   - AC: `make setup && make test` passes on a clean clone
