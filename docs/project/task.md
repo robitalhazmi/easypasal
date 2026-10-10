@@ -25,7 +25,7 @@
   - AC: first CI run is green
 - [x] **T0.5** 🤝 Verify current models/versions/licenses (generator shortlist incl. Indonesian-tuned, embeddings); record in `docs/decision-log.md` (commit `5994144`)
   - AC: shortlist of 2–4 generators and 2–3 embedding models with license + size notes
-- [x] **T0.6** 🤝 Verify free Hugging Face Space limits, Colab/Kaggle GPU quotas, and VPS suitability for the log collector
+- [x] **T0.6** 🤝 Verify free Hugging Face Space limits, Colab/Kaggle GPU quotas, and VPS suitability for the log collector (commit `e3b1c38`)
   - AC: constraints recorded in `docs/architecture.md`
 - [ ] **T0.7** 👤 Choose regulations for the corpus (15–30 docs, four themes) and confirm current status/amendments
   - AC: `data/corpus_manifest.csv` filled (title, number/year, issuer, URL, retrieval date, status, language)
