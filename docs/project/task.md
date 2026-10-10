@@ -15,7 +15,7 @@
 
 ## Phase 0 — Setup and verification (P0)
 
-- [ ] **T0.1** 👤 Create public GitHub repo `easypasal` (Apache-2.0, README stub, `.gitignore`)
+- [x] **T0.1** 👤 Create public GitHub repo `easypasal` (Apache-2.0, README stub, `.gitignore`) (commit `d6993c8`)
   - AC: repo exists, license file present, cloned locally in Antigravity
 - [ ] **T0.2** 👤 Check the name "EasyPasal" on GitHub, PyPI, and a web search; record result in `docs/decision-log.md`
   - AC: decision noted (keep or rename)
