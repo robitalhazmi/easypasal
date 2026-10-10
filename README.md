@@ -1,0 +1,116 @@
+# EasyPasal
+
+[![CI](https://github.com/robit/easypasal/actions/workflows/ci.yml/badge.svg)](https://github.com/robit/easypasal/actions/workflows/ci.yml)
+[![License: Apache-2.0](https://img.shields.io/badge/License-Apache_2.0-blue.svg)](LICENSE)
+[![Python 3.11+](https://img.shields.io/badge/python-3.11+-blue.svg)](https://www.python.org/downloads/)
+
+> **Evaluated, cited answers on Indonesian financial regulation.**
+
+---
+
+> [!IMPORTANT]
+> **Independence Notice:** EasyPasal is an independent portfolio project. It is not affiliated with, endorsed by, or representing the Financial Services Authority (OJK), Bank Indonesia (BI), or OCBC Indonesia, and it does not provide legal advice.
+
+---
+
+## Overview
+
+EasyPasal is an evaluation-first, citation-grounded RAG assistant designed to answer Indonesian financial regulation questions (Bahasa Indonesia + English) from official public OJK and Bank Indonesia documents. Built like a production LLM system, it emphasizes:
+
+- **Grounded or Silent:** Answers must cite exact regulation, article (*pasal*), and clause (*ayat*), or explicitly abstain.
+- **Evaluation Gate in CI:** Every change is benchmarked against an author-labeled gold evaluation set; no variant is promoted without passing deterministic metric thresholds and paired statistical tests.
+- **Efficient & Free Stack:** Runs locally on CPU (4-bit GGUF via `llama.cpp`), lightweight VPS monitoring (SQLite + Evidently), and free Colab/Kaggle GPU pipelines for vLLM benchmarks, prompt optimization (DSPy/GEPA), and QLoRA fine-tuning.
+
+---
+
+## Results & Evaluation (Centerpiece)
+
+| Variant | Recall@5 | Citation Recall | Faithfulness | Abstention Acc. | p95 Latency (CPU) | Status / Decision |
+|---|---|---|---|---|---|---|
+| **Baseline (M1)** | *TBD* | *TBD* | *TBD* | *TBD* | *TBD* | In development |
+| **Best of E1–E4** | *TBD* | *TBD* | *TBD* | *TBD* | *TBD* | Upcoming |
+| **+ GEPA Prompt (E5)** | *TBD* | *TBD* | *TBD* | *TBD* | *TBD* | Upcoming |
+| **+ QLoRA (E7)** | *TBD* | *TBD* | *TBD* | *TBD* | *TBD* | Stretch |
+
+*Note: All results will be measured on a held-out test split with bootstrap confidence intervals. No numbers are fabricated.*
+
+---
+
+## Quickstart
+
+### Prerequisites
+- Linux / macOS with Python 3.11+
+- [`uv`](https://docs.astral.sh/uv/) package manager
+- (Optional) Docker & docker-compose
+
+### Installation & Setup
+
+```bash
+# Clone the repository
+git clone https://github.com/robit/easypasal.git
+cd easypasal
+
+# Set up virtual environment, dependencies, and pre-commit hooks
+make setup
+
+# Run linting and test suite
+make lint
+make test
+```
+
+### Key Makefile Targets
+
+| Target | Description |
+|---|---|
+| `make setup` | Create virtual environment, sync dependencies with `uv`, install pre-commit |
+| `make lint` | Run code quality checks (`ruff`, formatting, `mypy` typing) |
+| `make test` | Run pytest suite with coverage |
+| `make check` | Run all lint and test checks |
+| `make ingest` | Fetch and parse corpus from manifest (Phase 1) |
+| `make index` | Build dense (Qdrant) and sparse (BM25) indexes (Phase 1) |
+| `make serve` | Run local FastAPI + Gradio interface (Phase 1) |
+| `make eval` | Run evaluation harness on gold set (Phase 3) |
+| `make bench` | Run local CPU latency benchmark |
+
+---
+
+## Repository Structure
+
+```
+easypasal/
+├── README.md                    # Project pitch, results table, quickstart
+├── LICENSE                      # Apache-2.0
+├── pyproject.toml / uv.lock     # Tooling and dependency declarations
+├── Makefile                     # Standard developer commands
+├── docker-compose.yml           # Local multi-service demo deployment
+├── .github/workflows/ci.yml     # Automated lint, test, and smoke eval gate
+├── configs/                     # System and experiment variant configurations
+├── data/
+│   ├── corpus_manifest.csv      # In-force regulation metadata and sources
+│   ├── README.md                # Data provenance and licensing guide
+│   └── gold/                    # Labeled gold evaluation splits (train/dev/test)
+├── src/easypasal/
+│   ├── ingest/                  # PDF download, parsing, and structure-aware chunking
+│   ├── index/                   # Embeddings, Qdrant vector store, and BM25 index
+│   ├── retrieval/               # Hybrid retrieval and Reciprocal Rank Fusion
+│   ├── generation/              # Citation-grounded prompts, LLM client, parsing
+│   ├── guardrails/              # Scope, prompt injection checks, routing
+│   ├── api/                     # FastAPI service and structured request logging
+│   └── ui/                      # Gradio interface
+├── eval/
+│   ├── metrics/                 # Deterministic and LLM-judged metrics
+│   ├── judge_calibration/       # Human-vs-judge calibration data
+│   ├── reports/                 # Evaluation metric plots and tables
+│   └── run_eval.py              # Offline evaluation runner
+├── experiments/                 # Tracked experiments (E1 chunking ... E5 GEPA, E7 QLoRA)
+├── benchmarks/vllm/             # vLLM serving benchmark scripts & results
+├── monitoring/                  # Lightweight VPS log collector & drift reports
+├── docs/                        # Architecture, decision log, stakeholder memo, runbook
+└── tests/                       # Unit and integration test suite
+```
+
+---
+
+## License
+
+This project is licensed under the [Apache-2.0 License](LICENSE).
