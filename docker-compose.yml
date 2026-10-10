@@ -1,0 +1,24 @@
+services:
+  app:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    ports:
+      - "8000:8000"
+    environment:
+      - EASYPASAL_ENV=production
+      - LOG_COLLECTOR_URL=http://collector:8001
+      - LOG_COLLECTOR_TOKEN=dev_token
+    depends_on:
+      - collector
+
+  collector:
+    image: python:3.11-slim
+    command: python -m http.server 8001
+    ports:
+      - "8001:8001"
+    volumes:
+      - sqlite_data:/data
+
+volumes:
+  sqlite_data:

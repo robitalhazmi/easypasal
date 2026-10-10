@@ -1,0 +1,82 @@
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+build/
+develop-eggs/
+dist/
+downloads/
+eggs/
+.eggs/
+lib/
+lib64/
+parts/
+sdist/
+var/
+wheels/
+share/python-wheels/
+*.egg-info/
+.installed.cfg
+*.egg
+MANIFEST
+
+# Virtual Environments
+.venv/
+env/
+venv/
+ENV/
+env.bak/
+venv.bak/
+
+# Environment Variables & Secrets
+.env
+.env.*
+!.env.example
+
+# Testing & Coverage
+.pytest_cache/
+.coverage
+.coverage.*
+htmlcov/
+coverage.xml
+*.cover
+*.py,cover
+.hypothesis/
+
+# Linting & Typing
+.ruff_cache/
+.mypy_cache/
+.dmypy.json
+dmypy.json
+
+# Raw PDF and Large Corpus Artifacts (Keep manifest committed, not large raw binary PDFs)
+data/raw/
+*.pdf
+!data/**/*.pdf
+
+# Indexes and Model Checkpoints
+qdrant_storage/
+*.qdrant
+models/*.gguf
+models/*.bin
+models/*.safetensors
+*.gguf
+
+# Experiment Tracking & Logs
+mlruns/
+mlruns.db
+.mlflow/
+*.log
+logs/
+data/sqlite/*.db
+
+# IDE & OS
+.DS_Store
+Thumbs.db
+.idea/
+.vscode/
+*.swp
+*.swo
+*~
