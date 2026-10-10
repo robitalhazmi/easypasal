@@ -27,7 +27,7 @@
   - AC: shortlist of 2–4 generators and 2–3 embedding models with license + size notes
 - [x] **T0.6** 🤝 Verify free Hugging Face Space limits, Colab/Kaggle GPU quotas, and VPS suitability for the log collector (commit `e3b1c38`)
   - AC: constraints recorded in `docs/architecture.md`
-- [x] **T0.7** 👤 Choose regulations for the corpus (15–30 docs, four themes) and confirm current status/amendments
+- [x] **T0.7** 👤 Choose regulations for the corpus (15–30 docs, four themes) and confirm current status/amendments (commit `4cab609`)
   - AC: `data/corpus_manifest.csv` filled (title, number/year, issuer, URL, retrieval date, status, language)
 
 ## Phase 1 — Ingestion and baseline RAG (P0)
