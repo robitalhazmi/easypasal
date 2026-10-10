@@ -19,9 +19,9 @@
   - AC: repo exists, license file present, cloned locally in Antigravity
 - [ ] **T0.2** 👤 Check the name "EasyPasal" on GitHub, PyPI, and a web search; record result in `docs/decision-log.md`
   - AC: decision noted (keep or rename)
-- [ ] **T0.3** 🤖 Scaffold project: `pyproject.toml`, uv, ruff, pytest, pre-commit, `Makefile`, folder structure from plan §11
+- [x] **T0.3** 🤖 Scaffold project: `pyproject.toml`, uv, ruff, pytest, pre-commit, `Makefile`, folder structure from plan §11 (commit `8efcf33`)
   - AC: `make setup && make test` passes on a clean clone
-- [ ] **T0.4** 🤖 Add GitHub Actions skeleton (lint + tests)
+- [x] **T0.4** 🤖 Add GitHub Actions skeleton (lint + tests) (commit `6f9ce82`)
   - AC: first CI run is green
 - [ ] **T0.5** 🤝 Verify current models/versions/licenses (generator shortlist incl. Indonesian-tuned, embeddings); record in `docs/decision-log.md`
   - AC: shortlist of 2–4 generators and 2–3 embedding models with license + size notes
@@ -159,3 +159,6 @@ If time runs short, descope in this order and record it as future work: **E7 QLo
 | Date | Update |
 |---|---|
 | 2026-10-10 | Plan, task list, and walkthrough created. |
+| 2026-10-10 | T0.1: Added Apache-2.0 LICENSE and README stub (commit `d6993c8`). |
+| 2026-10-10 | T0.3: Scaffolded project directory structure, `pyproject.toml` with uv, ruff, mypy, pytest, pre-commit, `Makefile`, and initial smoke test (commit `8efcf33`). |
+| 2026-10-10 | T0.4: Added GitHub Actions CI workflow for lint and test (commit `6f9ce82`). |
