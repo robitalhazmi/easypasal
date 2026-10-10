@@ -23,7 +23,7 @@
   - AC: `make setup && make test` passes on a clean clone
 - [x] **T0.4** 🤖 Add GitHub Actions skeleton (lint + tests) (commit `6f9ce82`)
   - AC: first CI run is green
-- [x] **T0.5** 🤝 Verify current models/versions/licenses (generator shortlist incl. Indonesian-tuned, embeddings); record in `docs/decision-log.md`
+- [x] **T0.5** 🤝 Verify current models/versions/licenses (generator shortlist incl. Indonesian-tuned, embeddings); record in `docs/decision-log.md` (commit `5994144`)
   - AC: shortlist of 2–4 generators and 2–3 embedding models with license + size notes
 - [ ] **T0.6** 🤝 Verify free Hugging Face Space limits, Colab/Kaggle GPU quotas, and VPS suitability for the log collector
   - AC: constraints recorded in `docs/architecture.md`
