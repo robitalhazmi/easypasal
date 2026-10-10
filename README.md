@@ -1,6 +1,6 @@
 # EasyPasal
 
-[![CI](https://github.com/robit/easypasal/actions/workflows/ci.yml/badge.svg)](https://github.com/robit/easypasal/actions/workflows/ci.yml)
+[![CI](https://github.com/robitalhazmi/easypasal/actions/workflows/ci.yml/badge.svg)](https://github.com/robitalhazmi/easypasal/actions/workflows/ci.yml)
 [![License: Apache-2.0](https://img.shields.io/badge/License-Apache_2.0-blue.svg)](LICENSE)
 [![Python 3.11+](https://img.shields.io/badge/python-3.11+-blue.svg)](https://www.python.org/downloads/)
 
@@ -47,7 +47,7 @@ EasyPasal is an evaluation-first, citation-grounded RAG assistant designed to an
 
 ```bash
 # Clone the repository
-git clone https://github.com/robit/easypasal.git
+git clone https://github.com/robitalhazmi/easypasal.git
 cd easypasal
 
 # Set up virtual environment, dependencies, and pre-commit hooks
