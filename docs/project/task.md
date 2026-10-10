@@ -1,7 +1,7 @@
 # EasyPasal — Task List
 
 > Source of truth for progress. Companion to `implementation_plan.md` (the *what and why*) and `walkthrough.md` (the *how to work and present it*).
-> Grouped by **phase** (not by week). Target finish **2026-10-24**; application deadline **2026-10-31**.
+> Grouped by **phase**.
 
 **Legend**
 - `[ ]` not started · `[/]` in progress · `[x]` done · `[~]` descoped (note why)

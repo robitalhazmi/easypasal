@@ -164,10 +164,8 @@ Summarize in three bullets for a Risk/Compliance reader: what shipped, what the 
 
 ---
 
-## Final pre-submission checklist
+## Final checklist
 - [ ] README, memo, decision log, and reproduce guide published
 - [ ] All links work when logged out
 - [ ] Demo video recorded
-- [ ] Resume and LinkedIn updated and consistent with the repo
 - [ ] Honest-claims audit completed
-- [ ] Application submitted (target 2026-10-28, deadline 2026-10-31)

@@ -4,7 +4,7 @@
 >
 > **Tagline for README:** *Evaluated, cited answers on Indonesian financial regulation.*
 >
-> **Status:** Draft v1 · Created 2026-10-10 · Target finish **2026-10-24** · Application deadline **2026-10-31**
+> **Status:** Draft v1 · Created 2026-10-10
 >
 > **Independence notice (must appear in README + UI):** EasyPasal is an independent portfolio project. It is not affiliated with, endorsed by, or representing OJK or Bank Indonesia, and it does not provide legal advice.
 
@@ -336,8 +336,6 @@ easypasal/
 
 ## 12. Milestones (recommended schedule)
 
-> You'll work when you're free, so dates are guidance. The **hard line** is a finished, public, honest project before 2026-10-28, leaving buffer before the 2026-10-31 deadline.
-
 | Milestone | Target date | Outcome |
 |---|---|---|
 | M0 Setup + corpus | Oct 10–11 | Repo, tooling, CI skeleton, corpus manifest, models shortlist verified |
@@ -349,7 +347,6 @@ easypasal/
 | M6 Monitoring + deploy | Oct 23 | Live demo + log collector + dashboard working |
 | M7 QLoRA (stretch) | Oct 23–24 | E7 done, or explicitly descoped |
 | M8 Polish | Oct 24 | README, memo, decision log, demo video, reproduce guide complete |
-| Buffer + apply | Oct 25–30 | Resume update, final checks, submit by **Oct 28 target** |
 
 ### Priority tiers (cut line if time runs short)
 - **P0 (must ship):** corpus, baseline RAG, gold set, eval harness, CI gate, live demo, monitoring, stakeholder memo, decision log (E1–E4).
