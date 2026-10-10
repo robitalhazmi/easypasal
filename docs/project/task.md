@@ -23,7 +23,7 @@
   - AC: `make setup && make test` passes on a clean clone
 - [x] **T0.4** 🤖 Add GitHub Actions skeleton (lint + tests) (commit `6f9ce82`)
   - AC: first CI run is green
-- [ ] **T0.5** 🤝 Verify current models/versions/licenses (generator shortlist incl. Indonesian-tuned, embeddings); record in `docs/decision-log.md`
+- [x] **T0.5** 🤝 Verify current models/versions/licenses (generator shortlist incl. Indonesian-tuned, embeddings); record in `docs/decision-log.md`
   - AC: shortlist of 2–4 generators and 2–3 embedding models with license + size notes
 - [ ] **T0.6** 🤝 Verify free Hugging Face Space limits, Colab/Kaggle GPU quotas, and VPS suitability for the log collector
   - AC: constraints recorded in `docs/architecture.md`
@@ -160,3 +160,4 @@ If time runs short, descope in this order and record it as future work: **E7 QLo
 | 2026-10-10 | T0.3: Scaffolded project directory structure, `pyproject.toml` with uv, ruff, mypy, pytest, pre-commit, `Makefile`, and initial smoke test (commit `8efcf33`). |
 | 2026-10-10 | T0.4: Added GitHub Actions CI workflow for lint and test (commit `6f9ce82`). |
 | 2026-10-10 | T0.2: Verified name "EasyPasal" on GitHub, PyPI, and web; decision recorded in `docs/decision-log.md`. |
+| 2026-10-10 | T0.5: Verified model shortlists, parameter sizes, GGUF RAM requirements, and licenses in `docs/decision-log.md`. |
