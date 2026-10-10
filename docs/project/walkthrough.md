@@ -140,7 +140,7 @@ Summarize in three bullets for a Risk/Compliance reader: what shipped, what the 
 
 ### D3. Questions to ask them
 - How are LLM changes currently evaluated and approved with Risk and Compliance?
-- What does the path from experiment to production look like for AI at OCBC Indonesia?
+- What does the path from experiment to production look like for AI at Banking Industry?
 - Which banking use cases are the first priority for the team?
 
 ---
@@ -156,7 +156,7 @@ Summarize in three bullets for a Risk/Compliance reader: what shipped, what the 
 **Avoid**
 - Real customer/production-scale claims, real A/B tests on users, or "fine-tuned for banking" if E7 is small.
 - Any metric you cannot regenerate with a documented command.
-- Implying affiliation with OJK, Bank Indonesia, or OCBC.
+- Implying affiliation with OJK or Bank Indonesia.
 
 **Always include**
 - The independence notice and "not legal advice" disclaimer in the README and UI.

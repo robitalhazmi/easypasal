@@ -144,11 +144,8 @@
 
 ## Phase 9 — Application packaging (P0)
 
-- [ ] **T9.1** 👤 Update resume for the OCBC Data Scientist role: lead with ML/LLM systems, evaluation, fraud detection, thesis results; add EasyPasal
-- [ ] **T9.2** 👤 Update LinkedIn headline/About/Featured with the repo and demo link
-- [ ] **T9.3** 👤 Prepare a 20-minute walkthrough using `walkthrough.md` Part C and practice once aloud
-- [ ] **T9.4** 👤 Final check of every link (repo, demo, docs, video) from a logged-out browser
-- [ ] **T9.5** 👤 Submit the application (target **2026-10-28**; hard deadline **2026-10-31**)
+- [ ] **T9.1** 👤 Prepare a 20-minute walkthrough using `walkthrough.md` Part C and practice once aloud
+- [ ] **T9.2** 👤 Final check of every link (repo, demo, docs, video) from a logged-out browser
 
 ---
 

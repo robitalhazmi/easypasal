@@ -6,7 +6,7 @@
 >
 > **Status:** Draft v1 · Created 2026-10-10 · Target finish **2026-10-24** · Application deadline **2026-10-31**
 >
-> **Independence notice (must appear in README + UI):** EasyPasal is an independent portfolio project. It is not affiliated with, endorsed by, or representing OJK, Bank Indonesia, or OCBC Indonesia, and it does not provide legal advice.
+> **Independence notice (must appear in README + UI):** EasyPasal is an independent portfolio project. It is not affiliated with, endorsed by, or representing OJK or Bank Indonesia, and it does not provide legal advice.
 
 ---
 
