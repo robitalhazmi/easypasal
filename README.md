@@ -9,7 +9,7 @@
 ---
 
 > [!IMPORTANT]
-> **Independence Notice:** EasyPasal is an independent portfolio project. It is not affiliated with, endorsed by, or representing the Financial Services Authority (OJK), Bank Indonesia (BI), or OCBC Indonesia, and it does not provide legal advice.
+> **Independence Notice:** EasyPasal is an independent portfolio project. It is not affiliated with, endorsed by, or representing the Financial Services Authority (OJK) or Bank Indonesia (BI), and it does not provide legal advice.
 
 ---
 
