@@ -27,7 +27,7 @@
   - AC: shortlist of 2–4 generators and 2–3 embedding models with license + size notes
 - [x] **T0.6** 🤝 Verify free Hugging Face Space limits, Colab/Kaggle GPU quotas, and VPS suitability for the log collector (commit `e3b1c38`)
   - AC: constraints recorded in `docs/architecture.md`
-- [ ] **T0.7** 👤 Choose regulations for the corpus (15–30 docs, four themes) and confirm current status/amendments
+- [x] **T0.7** 👤 Choose regulations for the corpus (15–30 docs, four themes) and confirm current status/amendments
   - AC: `data/corpus_manifest.csv` filled (title, number/year, issuer, URL, retrieval date, status, language)
 
 ## Phase 1 — Ingestion and baseline RAG (P0)
@@ -162,3 +162,4 @@ If time runs short, descope in this order and record it as future work: **E7 QLo
 | 2026-10-10 | T0.2: Verified name "EasyPasal" on GitHub, PyPI, and web; decision recorded in `docs/decision-log.md`. |
 | 2026-10-10 | T0.5: Verified model shortlists, parameter sizes, GGUF RAM requirements, and licenses in `docs/decision-log.md`. |
 | 2026-10-10 | T0.6: Verified free HF Space specs, Colab/Kaggle GPU quotas, and VPS memory budget in `docs/architecture.md`. |
+| 2026-10-10 | T0.7: Curated 16 verified regulations across 4 banking themes in `data/corpus_manifest.csv`. |
