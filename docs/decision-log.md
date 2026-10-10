@@ -58,3 +58,9 @@ All local generators run quantized via 4-bit GGUF (`Q4_K_M`) using `llama.cpp` o
 #### 3. LLM-as-Judge Candidates (Colab / Kaggle Free GPU - Phase 3 & 5)
 - Primary Judge: `Qwen/Qwen2.5-7B-Instruct` / `Qwen2.5-14B-Instruct` (Apache-2.0)
 - Secondary Calibration Judge: `meta-llama/Llama-3.1-8B-Instruct` (Llama 3.1 Community)
+
+#### 4. Decision Models & Fast Classifiers (Guardrails, NLI & E7 Router Candidates)
+| Model Architecture | Params | License | Primary Use Case |
+|---|---|---|---|
+| **`jaredpalmer/kev-0.8b` / `kev-4b`** | 0.8B / 4B | Apache-2.0 | Single-pass prefill routing, prompt injection triage, scope checks |
+| **Qwen2.5 + LoRA Pointer/Classification Head** | 0.5B / 1.5B | Apache-2.0 | Indonesian domain question classification & post-hoc citation NLI entailment (E7) |
