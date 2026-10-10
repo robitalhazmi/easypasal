@@ -162,4 +162,4 @@ If time runs short, descope in this order and record it as future work: **E7 QLo
 | 2026-10-10 | T0.2: Verified name "EasyPasal" on GitHub, PyPI, and web; decision recorded in `docs/decision-log.md`. |
 | 2026-10-10 | T0.5: Verified model shortlists, parameter sizes, GGUF RAM requirements, and licenses in `docs/decision-log.md`. |
 | 2026-10-10 | T0.6: Verified free HF Space specs, Colab/Kaggle GPU quotas, and VPS memory budget in `docs/architecture.md`. |
-| 2026-10-10 | T0.7: Curated 16 verified regulations across 4 banking themes in `data/corpus_manifest.csv`. |
+| 2026-10-10 | T0.7: Curated 21 verified regulations across 5 themes (added Bursa Efek Indonesia / Pasar Modal) in `data/corpus_manifest.csv`. |
