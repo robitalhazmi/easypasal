@@ -25,7 +25,7 @@
   - AC: first CI run is green
 - [x] **T0.5** 🤝 Verify current models/versions/licenses (generator shortlist incl. Indonesian-tuned, embeddings); record in `docs/decision-log.md` (commit `5994144`)
   - AC: shortlist of 2–4 generators and 2–3 embedding models with license + size notes
-- [ ] **T0.6** 🤝 Verify free Hugging Face Space limits, Colab/Kaggle GPU quotas, and VPS suitability for the log collector
+- [x] **T0.6** 🤝 Verify free Hugging Face Space limits, Colab/Kaggle GPU quotas, and VPS suitability for the log collector
   - AC: constraints recorded in `docs/architecture.md`
 - [ ] **T0.7** 👤 Choose regulations for the corpus (15–30 docs, four themes) and confirm current status/amendments
   - AC: `data/corpus_manifest.csv` filled (title, number/year, issuer, URL, retrieval date, status, language)
@@ -161,3 +161,4 @@ If time runs short, descope in this order and record it as future work: **E7 QLo
 | 2026-10-10 | T0.4: Added GitHub Actions CI workflow for lint and test (commit `6f9ce82`). |
 | 2026-10-10 | T0.2: Verified name "EasyPasal" on GitHub, PyPI, and web; decision recorded in `docs/decision-log.md`. |
 | 2026-10-10 | T0.5: Verified model shortlists, parameter sizes, GGUF RAM requirements, and licenses in `docs/decision-log.md`. |
+| 2026-10-10 | T0.6: Verified free HF Space specs, Colab/Kaggle GPU quotas, and VPS memory budget in `docs/architecture.md`. |
