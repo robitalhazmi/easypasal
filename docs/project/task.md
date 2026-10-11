@@ -32,7 +32,7 @@
 
 ## Phase 1 — Ingestion and baseline RAG (P0)
 
-- [ ] **T1.1** 🤖 Download script that fetches corpus files from manifest URLs, stores hashes
+- [x] **T1.1** 🤖 Download script that fetches corpus files from manifest URLs, stores hashes
   - AC: `make ingest` reproduces the raw corpus locally (raw PDFs not committed if licensing/size unclear)
 - [ ] **T1.2** 🤖 PDF parsing with PyMuPDF; handle headers/footers, hyphenation, and numbering
   - AC: text extraction spot-checked on 5 documents

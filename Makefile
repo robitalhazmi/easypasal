@@ -38,8 +38,7 @@ clean:
 	find . -type d -name "__pycache__" -exec rm -rf {} +
 
 ingest:
-	@echo "Ingestion pipeline not yet implemented (scheduled for Phase 1 / T1.1)."
-	@exit 1
+	uv run python -m easypasal.ingest.download --update-hashes
 
 index:
 	@echo "Indexing pipeline not yet implemented (scheduled for Phase 1 / T1.4)."
