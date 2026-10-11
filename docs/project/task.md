@@ -44,7 +44,7 @@
   - AC: retrieval returns top-k with scores and metadata
 - [x] **T1.6** 🤝 Generation module: local small model via llama.cpp/Ollama, citation-required prompt, abstain behavior, language matching (commit `4e8b7c0`)
   - AC: answers 10 hand-picked questions with citations; abstains on 3 out-of-corpus questions
-- [ ] **T1.7** 🤖 Post-hoc citation verification (cited pasal must exist in retrieved set)
+- [x] **T1.7** 🤖 Post-hoc citation verification (cited pasal must exist in retrieved set) (commit `582c8ee`)
   - AC: unit tests for pass/fail cases
 - [ ] **T1.8** 🤖 FastAPI service (`/ask`, `/health`) and request-ID logging
   - AC: `curl` example in README works
