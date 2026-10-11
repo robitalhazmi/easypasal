@@ -40,7 +40,7 @@
   - AC: unit tests on sample articles; each chunk carries doc_id, pasal, ayat, status, source URL
 - [x] **T1.4** 🤖 Embedding + Qdrant index + BM25 index build (`make index`) (commit `4f4fe08`)
   - AC: index builds on laptop CPU; index size and build time logged
-- [ ] **T1.5** 🤖 Hybrid retrieval with RRF fusion
+- [x] **T1.5** 🤖 Hybrid retrieval with RRF fusion (commit `66d0a85`)
   - AC: retrieval returns top-k with scores and metadata
 - [ ] **T1.6** 🤝 Generation module: local small model via llama.cpp/Ollama, citation-required prompt, abstain behavior, language matching
   - AC: answers 10 hand-picked questions with citations; abstains on 3 out-of-corpus questions
