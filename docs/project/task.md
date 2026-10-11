@@ -36,7 +36,7 @@
   - AC: `make ingest` reproduces the raw corpus locally (raw PDFs not committed if licensing/size unclear)
 - [x] **T1.2** 🤖 PDF parsing with PyMuPDF; handle headers/footers, hyphenation, and numbering (commit `e842702`)
   - AC: text extraction spot-checked on 5 documents
-- [ ] **T1.3** 🤖 Structure-aware chunker (Bab → Bagian → Pasal → Ayat) with metadata; plus fixed-size baseline chunker
+- [x] **T1.3** 🤖 Structure-aware chunker (Bab → Bagian → Pasal → Ayat) with metadata; plus fixed-size baseline chunker (commit `20aca0e`)
   - AC: unit tests on sample articles; each chunk carries doc_id, pasal, ayat, status, source URL
 - [ ] **T1.4** 🤖 Embedding + Qdrant index + BM25 index build (`make index`)
   - AC: index builds on laptop CPU; index size and build time logged
