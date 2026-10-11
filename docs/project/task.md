@@ -42,7 +42,7 @@
   - AC: index builds on laptop CPU; index size and build time logged
 - [x] **T1.5** 🤖 Hybrid retrieval with RRF fusion (commit `66d0a85`)
   - AC: retrieval returns top-k with scores and metadata
-- [ ] **T1.6** 🤝 Generation module: local small model via llama.cpp/Ollama, citation-required prompt, abstain behavior, language matching
+- [x] **T1.6** 🤝 Generation module: local small model via llama.cpp/Ollama, citation-required prompt, abstain behavior, language matching (commit `4e8b7c0`)
   - AC: answers 10 hand-picked questions with citations; abstains on 3 out-of-corpus questions
 - [ ] **T1.7** 🤖 Post-hoc citation verification (cited pasal must exist in retrieved set)
   - AC: unit tests for pass/fail cases
