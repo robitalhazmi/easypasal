@@ -402,9 +402,8 @@ def test_acceptance_criteria_10_in_corpus_and_3_out_of_corpus() -> None:
     assert len(OUT_OF_CORPUS_QUESTIONS) == 3
     for idx, ooc_q in enumerate(OUT_OF_CORPUS_QUESTIONS, start=1):
         res = pipeline.ask(ooc_q)
-        assert (
-            res.abstained is True
-        ), f"Out-of-corpus question OOC{idx} did not abstain: {res.answer}"
+        err_msg = f"Out-of-corpus question OOC{idx} did not abstain: {res.answer}"
+        assert res.abstained is True, err_msg
         assert check_abstention(res.answer, language=res.language) is True
 
 

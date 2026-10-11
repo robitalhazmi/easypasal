@@ -1,7 +1,7 @@
 # EasyPasal — Stakeholder Memo: Risk & Compliance Overview
 
-> **Target Audience:** Product Owners, Risk Officers, and Compliance Stakeholders  
-> **Status:** Draft / Outline  
+> **Target Audience:** Product Owners, Risk Officers, and Compliance Stakeholders
+> **Status:** Draft / Outline
 
 ## 1. Executive Summary
 *(High-level overview of what the system does, key safeguards, and release readiness.)*
