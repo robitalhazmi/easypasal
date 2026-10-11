@@ -38,7 +38,7 @@
   - AC: text extraction spot-checked on 5 documents
 - [x] **T1.3** 🤖 Structure-aware chunker (Bab → Bagian → Pasal → Ayat) with metadata; plus fixed-size baseline chunker (commit `20aca0e`)
   - AC: unit tests on sample articles; each chunk carries doc_id, pasal, ayat, status, source URL
-- [ ] **T1.4** 🤖 Embedding + Qdrant index + BM25 index build (`make index`)
+- [x] **T1.4** 🤖 Embedding + Qdrant index + BM25 index build (`make index`) (commit `4f4fe08`)
   - AC: index builds on laptop CPU; index size and build time logged
 - [ ] **T1.5** 🤖 Hybrid retrieval with RRF fusion
   - AC: retrieval returns top-k with scores and metadata
