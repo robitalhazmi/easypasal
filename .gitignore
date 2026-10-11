@@ -53,10 +53,12 @@ dmypy.json
 
 # Raw PDF and Large Corpus Artifacts (Keep manifest committed, not large raw binary PDFs)
 data/raw/
+data/parsed/
+data/chunks/
 *.pdf
-!data/**/*.pdf
 
 # Indexes and Model Checkpoints
+data/index/
 qdrant_storage/
 *.qdrant
 models/*.gguf

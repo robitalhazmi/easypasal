@@ -58,6 +58,31 @@ make lint
 make test
 ```
 
+### Running the REST API Service
+
+Start the local FastAPI service on port 8000:
+```bash
+make serve
+# Or specify a custom provider:
+# uv run python -m easypasal.api.app --host 0.0.0.0 --port 8000 --provider mock
+```
+
+Verify service readiness:
+```bash
+curl -s http://localhost:8000/health
+```
+
+Ask a regulatory question with automatic citation verification and request tracking:
+```bash
+curl -s -X POST http://localhost:8000/ask \
+  -H "Content-Type: application/json" \
+  -H "X-Request-ID: req-example-001" \
+  -d '{"question": "Berapa batas waktu penanganan pengaduan konsumen menurut POJK 22 Tahun 2023?"}'
+```
+
+Interactive OpenAPI documentation is accessible at `http://localhost:8000/docs` (Swagger UI) and `http://localhost:8000/redoc`.
+
+
 ### Key Makefile Targets
 
 | Target | Description |

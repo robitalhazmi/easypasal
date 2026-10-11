@@ -32,21 +32,21 @@
 
 ## Phase 1 — Ingestion and baseline RAG (P0)
 
-- [ ] **T1.1** 🤖 Download script that fetches corpus files from manifest URLs, stores hashes
+- [x] **T1.1** 🤖 Download script that fetches corpus files from manifest URLs, stores hashes (commit `ceee5ba`)
   - AC: `make ingest` reproduces the raw corpus locally (raw PDFs not committed if licensing/size unclear)
-- [ ] **T1.2** 🤖 PDF parsing with PyMuPDF; handle headers/footers, hyphenation, and numbering
+- [x] **T1.2** 🤖 PDF parsing with PyMuPDF; handle headers/footers, hyphenation, and numbering (commit `e842702`)
   - AC: text extraction spot-checked on 5 documents
-- [ ] **T1.3** 🤖 Structure-aware chunker (Bab → Bagian → Pasal → Ayat) with metadata; plus fixed-size baseline chunker
+- [x] **T1.3** 🤖 Structure-aware chunker (Bab → Bagian → Pasal → Ayat) with metadata; plus fixed-size baseline chunker (commit `20aca0e`)
   - AC: unit tests on sample articles; each chunk carries doc_id, pasal, ayat, status, source URL
-- [ ] **T1.4** 🤖 Embedding + Qdrant index + BM25 index build (`make index`)
+- [x] **T1.4** 🤖 Embedding + Qdrant index + BM25 index build (`make index`) (commit `4f4fe08`)
   - AC: index builds on laptop CPU; index size and build time logged
-- [ ] **T1.5** 🤖 Hybrid retrieval with RRF fusion
+- [x] **T1.5** 🤖 Hybrid retrieval with RRF fusion (commit `66d0a85`)
   - AC: retrieval returns top-k with scores and metadata
-- [ ] **T1.6** 🤝 Generation module: local small model via llama.cpp/Ollama, citation-required prompt, abstain behavior, language matching
+- [x] **T1.6** 🤝 Generation module: local small model via llama.cpp/Ollama, citation-required prompt, abstain behavior, language matching (commit `4e8b7c0`)
   - AC: answers 10 hand-picked questions with citations; abstains on 3 out-of-corpus questions
-- [ ] **T1.7** 🤖 Post-hoc citation verification (cited pasal must exist in retrieved set)
+- [x] **T1.7** 🤖 Post-hoc citation verification (cited pasal must exist in retrieved set) (commit `582c8ee`)
   - AC: unit tests for pass/fail cases
-- [ ] **T1.8** 🤖 FastAPI service (`/ask`, `/health`) and request-ID logging
+- [x] **T1.8** 🤖 FastAPI service (`/ask`, `/health`) and request-ID logging (commit `7d50a29`)
   - AC: `curl` example in README works
 
 ## Phase 2 — Gold evaluation set (P0)
