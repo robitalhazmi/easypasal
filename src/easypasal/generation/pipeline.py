@@ -59,6 +59,7 @@ class RAGPipeline:
     def ask(
         self,
         question: str,
+        language: str | None = None,
         top_k: int = 5,
         mode: str = "hybrid",
         status_filter: str | None = "berlaku",
@@ -72,6 +73,7 @@ class RAGPipeline:
 
         Args:
             question: User query in Indonesian or English.
+            language: Optional language code ('id' or 'en'). Detected automatically if omitted.
             top_k: Number of relevant regulatory passages to retrieve.
             mode: Retrieval strategy ('hybrid', 'dense', or 'bm25').
             status_filter: Regulation status constraint (default: 'berlaku').
@@ -88,7 +90,7 @@ class RAGPipeline:
         clean_question = question.strip()
 
         # 1. Detect Question Language
-        lang = detect_language(clean_question)
+        lang = language if language is not None else detect_language(clean_question)
 
         # 2. Retrieve Candidate Passages
         retrieval_res = self.retriever.retrieve(

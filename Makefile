@@ -51,8 +51,7 @@ index:
 	uv run python -m easypasal.index.build --strategy structure_aware
 
 serve:
-	@echo "Serving pipeline not yet implemented (scheduled for Phase 1 / T1.8)."
-	@exit 1
+	uv run python -m easypasal.api.app --host 0.0.0.0 --port 8000
 
 eval:
 	@echo "Evaluation runner not yet implemented (scheduled for Phase 3 / T3.2)."
