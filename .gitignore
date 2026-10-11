@@ -58,6 +58,7 @@ data/chunks/
 *.pdf
 
 # Indexes and Model Checkpoints
+data/index/
 qdrant_storage/
 *.qdrant
 models/*.gguf

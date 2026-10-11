@@ -48,8 +48,7 @@ chunk:
 	uv run python -m easypasal.ingest.chunker --strategy fixed_size
 
 index:
-	@echo "Indexing pipeline not yet implemented (scheduled for Phase 1 / T1.4)."
-	@exit 1
+	uv run python -m easypasal.index.build --strategy structure_aware
 
 serve:
 	@echo "Serving pipeline not yet implemented (scheduled for Phase 1 / T1.8)."
