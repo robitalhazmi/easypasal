@@ -40,6 +40,9 @@ clean:
 ingest:
 	uv run python -m easypasal.ingest.download --update-hashes
 
+parse:
+	uv run python -m easypasal.ingest.parser
+
 index:
 	@echo "Indexing pipeline not yet implemented (scheduled for Phase 1 / T1.4)."
 	@exit 1

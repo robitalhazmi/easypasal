@@ -34,7 +34,7 @@
 
 - [x] **T1.1** 🤖 Download script that fetches corpus files from manifest URLs, stores hashes (commit `ceee5ba`)
   - AC: `make ingest` reproduces the raw corpus locally (raw PDFs not committed if licensing/size unclear)
-- [ ] **T1.2** 🤖 PDF parsing with PyMuPDF; handle headers/footers, hyphenation, and numbering
+- [x] **T1.2** 🤖 PDF parsing with PyMuPDF; handle headers/footers, hyphenation, and numbering
   - AC: text extraction spot-checked on 5 documents
 - [ ] **T1.3** 🤖 Structure-aware chunker (Bab → Bagian → Pasal → Ayat) with metadata; plus fixed-size baseline chunker
   - AC: unit tests on sample articles; each chunk carries doc_id, pasal, ayat, status, source URL
