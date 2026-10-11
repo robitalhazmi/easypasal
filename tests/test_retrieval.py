@@ -1,0 +1,400 @@
+"""Tests for hybrid retrieval, Reciprocal Rank Fusion (RRF), and candidate ranking."""
+
+from __future__ import annotations
+
+from pathlib import Path
+from typing import Any
+
+import pytest
+
+from easypasal.index.bm25 import BM25Index, BM25SearchResult
+from easypasal.index.embeddings import EmbeddingBackend
+from easypasal.index.vector_store import QdrantVectorStore, VectorSearchResult
+from easypasal.retrieval.fusion import reciprocal_rank_fusion
+from easypasal.retrieval.models import RetrievalResult
+from easypasal.retrieval.retriever import HybridRetriever
+
+
+class DummyEmbeddingBackend(EmbeddingBackend):
+    """Deterministic embedding backend for unit testing without downloading models."""
+
+    def __init__(self, dimension: int = 4) -> None:
+        self._dim = dimension
+
+    def embed_documents(self, texts: list[str], batch_size: int = 64) -> list[list[float]]:
+        # Map words to simple deterministic vector components
+        _ = batch_size
+        return [self.embed_query(t) for t in texts]
+
+    def embed_query(self, query: str) -> list[float]:
+        # Simple bag-of-words coordinate mapper for testing
+        q = query.lower()
+        vec = [0.1, 0.1, 0.1, 0.1]
+        if "konsumen" in q:
+            vec[0] = 0.9
+        if "modal" in q:
+            vec[1] = 0.9
+        if "bank" in q:
+            vec[2] = 0.8
+        return vec
+
+    @property
+    def dimension(self) -> int:
+        return self._dim
+
+    @property
+    def model_name(self) -> str:
+        return "dummy-test-embed"
+
+
+def _make_vector_result(
+    chunk_id: str,
+    score: float,
+    status: str = "berlaku",
+    pasal: str = "1",
+) -> VectorSearchResult:
+    citation_label = f"POJK 1 Tahun 2024, Pasal {pasal}"
+    doc_id = "POJK_1_Tahun_2024"
+    doc_number = "POJK 1 Tahun 2024"
+    ayat = "1"
+    text = f"Isi pengujian untuk pasal {pasal}."
+    payload: dict[str, Any] = {
+        "chunk_id": chunk_id,
+        "citation_label": citation_label,
+        "doc_id": doc_id,
+        "doc_number": doc_number,
+        "doc_title": "Peraturan Uji Coba",
+        "year": 2024,
+        "issuer": "OJK",
+        "status": status,
+        "source_url": "https://example.com/pojk1.pdf",
+        "pasal": pasal,
+        "ayat": ayat,
+        "text": text,
+        "raw_content": f"Isi pasal {pasal}.",
+    }
+    return VectorSearchResult(
+        chunk_id=chunk_id,
+        point_id="00000000-0000-0000-0000-000000000001",
+        score=score,
+        citation_label=citation_label,
+        doc_id=doc_id,
+        doc_number=doc_number,
+        pasal=pasal,
+        ayat=ayat,
+        status=status,
+        text=text,
+        payload=payload,
+    )
+
+
+def _make_bm25_result(
+    chunk_id: str,
+    score: float,
+    status: str = "berlaku",
+    pasal: str = "1",
+) -> BM25SearchResult:
+    citation_label = f"POJK 1 Tahun 2024, Pasal {pasal}"
+    doc_id = "POJK_1_Tahun_2024"
+    doc_number = "POJK 1 Tahun 2024"
+    ayat = "1"
+    text = f"Isi pengujian untuk pasal {pasal}."
+    payload: dict[str, Any] = {
+        "chunk_id": chunk_id,
+        "citation_label": citation_label,
+        "doc_id": doc_id,
+        "doc_number": doc_number,
+        "doc_title": "Peraturan Uji Coba",
+        "year": 2024,
+        "issuer": "OJK",
+        "status": status,
+        "source_url": "https://example.com/pojk1.pdf",
+        "pasal": pasal,
+        "ayat": ayat,
+        "text": text,
+        "raw_content": f"Isi pasal {pasal}.",
+    }
+    return BM25SearchResult(
+        chunk_id=chunk_id,
+        score=score,
+        citation_label=citation_label,
+        doc_id=doc_id,
+        doc_number=doc_number,
+        pasal=pasal,
+        ayat=ayat,
+        status=status,
+        text=text,
+        payload=payload,
+    )
+
+
+def test_rrf_mathematical_precision() -> None:
+    """Verify exact analytical RRF score calculation against theoretical values."""
+    # chunk_A is Rank 1 in Dense, Rank 2 in BM25
+    dense_res = [_make_vector_result("chunk_A", 0.95)]
+    bm25_res = [_make_bm25_result("chunk_B", 15.0), _make_bm25_result("chunk_A", 12.0)]
+
+    # Expected for chunk_A: 1/(60+1) + 1/(60+2) = 1/61 + 1/62 ~= 0.01639344 + 0.01612903 = 0.03252247
+    # Expected for chunk_B: 1/(60+1) = 1/61 ~= 0.01639344
+    fused = reciprocal_rank_fusion(
+        dense_results=dense_res,
+        bm25_results=bm25_res,
+        k_rrf=60,
+        dense_weight=1.0,
+        bm25_weight=1.0,
+        top_k=5,
+    )
+
+    assert len(fused) == 2
+    assert fused[0].chunk_id == "chunk_A"
+    assert fused[0].score == pytest.approx(0.032522, abs=1e-5)
+    assert fused[0].dense_rank == 1
+    assert fused[0].dense_score == 0.95
+    assert fused[0].bm25_rank == 2
+    assert fused[0].bm25_score == 12.0
+
+    assert fused[1].chunk_id == "chunk_B"
+    assert fused[1].score == pytest.approx(0.016393, abs=1e-5)
+    assert fused[1].dense_rank is None
+    assert fused[1].bm25_rank == 1
+
+
+def test_rrf_weights_and_ranking() -> None:
+    """Verify that weighting adjusts relative rank priority between channels."""
+    dense_res = [_make_vector_result("dense_star", 0.90)]
+    bm25_res = [_make_bm25_result("sparse_star", 20.0)]
+
+    # If bm25_weight is 3x dense_weight, sparse_star should rank higher despite identical rank 1
+    fused = reciprocal_rank_fusion(
+        dense_results=dense_res,
+        bm25_results=bm25_res,
+        k_rrf=60,
+        dense_weight=1.0,
+        bm25_weight=3.0,
+    )
+
+    assert len(fused) == 2
+    assert fused[0].chunk_id == "sparse_star"
+    assert fused[1].chunk_id == "dense_star"
+
+
+def test_rrf_edge_cases() -> None:
+    """Verify edge cases such as empty lists, top_k limits, and bad parameters."""
+    # Both empty
+    assert reciprocal_rank_fusion([], []) == []
+
+    # top_k <= 0
+    res = [_make_vector_result("c1", 0.8)]
+    assert reciprocal_rank_fusion(res, [], top_k=0) == []
+    assert reciprocal_rank_fusion(res, [], top_k=-1) == []
+
+    # Invalid k_rrf
+    with pytest.raises(ValueError, match="k_rrf must be positive"):
+        reciprocal_rank_fusion(res, [], k_rrf=0)
+
+
+def test_hybrid_retriever_in_memory() -> None:
+    """Verify HybridRetriever operations across all modes using in-memory components."""
+    qdrant = QdrantVectorStore(path=":memory:")
+    backend = DummyEmbeddingBackend(dimension=4)
+    collection = "easypasal_test"
+
+    chunks: list[dict[str, Any]] = [
+        {
+            "chunk_id": "test_chunk_1",
+            "citation_label": "POJK 1 Tahun 2024, Pasal 1",
+            "doc_id": "POJK_1_2024",
+            "doc_number": "POJK 1 Tahun 2024",
+            "doc_title": "Pelindungan Konsumen",
+            "year": 2024,
+            "issuer": "OJK",
+            "status": "berlaku",
+            "source_url": "https://example.com/1.pdf",
+            "pasal": "1",
+            "ayat": "1",
+            "text": "PUJK wajib menjamin pelindungan konsumen jasa keuangan.",
+            "raw_content": "PUJK wajib menjamin pelindungan konsumen.",
+        },
+        {
+            "chunk_id": "test_chunk_2",
+            "citation_label": "POJK 2 Tahun 2024, Pasal 5",
+            "doc_id": "POJK_2_2024",
+            "doc_number": "POJK 2 Tahun 2024",
+            "doc_title": "Permodalan Bank",
+            "year": 2024,
+            "issuer": "OJK",
+            "status": "berlaku",
+            "source_url": "https://example.com/2.pdf",
+            "pasal": "5",
+            "ayat": "1",
+            "text": "Modal inti minimum bank umum sebesar Rp3 triliun.",
+            "raw_content": "Modal inti minimum bank umum sebesar Rp3 triliun.",
+        },
+        {
+            "chunk_id": "test_chunk_3",
+            "citation_label": "POJK 3 Tahun 2020, Pasal 10",
+            "doc_id": "POJK_3_2020",
+            "doc_number": "POJK 3 Tahun 2020",
+            "doc_title": "Ketentuan Lama Dicabut",
+            "year": 2020,
+            "issuer": "OJK",
+            "status": "dicabut",
+            "source_url": "https://example.com/3.pdf",
+            "pasal": "10",
+            "ayat": "1",
+            "text": "Ketentuan pencabutan modal dan perlindungan masa lalu.",
+            "raw_content": "Ketentuan masa lalu.",
+        },
+    ]
+
+    # 1. Populate in-memory Qdrant
+    qdrant.init_collection(collection_name=collection, dimension=backend.dimension)
+    vectors = backend.embed_documents([c["text"] for c in chunks])
+    qdrant.upsert_chunks(collection_name=collection, chunks=chunks, vectors=vectors)
+
+    # 2. Populate BM25
+    bm25 = BM25Index.build_from_chunks(chunks)
+
+    # 3. Instantiate HybridRetriever
+    retriever = HybridRetriever(
+        qdrant_store=qdrant,
+        bm25_index=bm25,
+        embedding_backend=backend,
+        collection_name=collection,
+    )
+
+    # A. Test Hybrid Mode
+    res_hybrid = retriever.retrieve("pelindungan konsumen PUJK", top_k=2, mode="hybrid")
+    assert isinstance(res_hybrid, RetrievalResult)
+    assert res_hybrid.mode == "hybrid"
+    assert len(res_hybrid.chunks) == 2
+    assert res_hybrid.chunks[0].chunk_id == "test_chunk_1"
+    assert res_hybrid.chunks[0].citation_label == "POJK 1 Tahun 2024, Pasal 1"
+    assert res_hybrid.duration_ms >= 0.0
+
+    # B. Test Dense Only Mode
+    res_dense = retriever.retrieve("modal minimum bank", top_k=2, mode="dense")
+    assert res_dense.mode == "dense"
+    assert res_dense.chunks[0].chunk_id == "test_chunk_2"
+    assert res_dense.chunks[0].dense_rank == 1
+
+    # C. Test BM25 Only Mode
+    res_bm25 = retriever.retrieve("konsumen jasa keuangan", top_k=2, mode="bm25")
+    assert res_bm25.mode == "bm25"
+    assert res_bm25.chunks[0].chunk_id == "test_chunk_1"
+    assert res_bm25.chunks[0].bm25_rank == 1
+
+    # D. Test Status Filter ('berlaku' should exclude test_chunk_3)
+    res_filtered = retriever.retrieve(
+        "modal perlindungan masa lalu",
+        top_k=5,
+        mode="hybrid",
+        status_filter="berlaku",
+    )
+    returned_ids = {c.chunk_id for c in res_filtered.chunks}
+    assert "test_chunk_3" not in returned_ids
+
+    # E. Test Empty Query
+    res_empty = retriever.retrieve("   ", top_k=5)
+    assert res_empty.chunks == []
+    assert res_empty.total_candidates == 0
+
+    # F. Test Unsupported Mode
+    with pytest.raises(ValueError, match="Unsupported retrieval mode"):
+        retriever.retrieve("query", mode="unknown_mode")
+
+
+def test_package_exports() -> None:
+    """Verify that easypasal.retrieval properly exports all symbols."""
+    import easypasal.retrieval as ret
+
+    assert hasattr(ret, "HybridRetriever")
+    assert hasattr(ret, "RetrievedChunk")
+    assert hasattr(ret, "RetrievalResult")
+    assert hasattr(ret, "reciprocal_rank_fusion")
+    assert hasattr(ret, "DEFAULT_K_RRF")
+
+
+def test_retriever_from_paths_not_found(tmp_path: Path) -> None:
+    """Verify FileNotFoundError when indices are missing."""
+    empty_dir = tmp_path / "empty_index"
+    empty_dir.mkdir()
+
+    with pytest.raises(FileNotFoundError, match="Qdrant directory does not exist"):
+        HybridRetriever.from_paths(index_dir=empty_dir)
+
+
+def test_real_index_retrieval_if_available() -> None:
+    """Integration test against actual on-disk index if already built."""
+    qdrant_dir = Path("data/index/qdrant")
+    bm25_file = Path("data/index/bm25/structure_aware_model.pkl")
+
+    if not qdrant_dir.exists() or not bm25_file.exists():
+        pytest.skip("Full on-disk indices not present; skipping real index probe.")
+
+    retriever = HybridRetriever.from_paths(index_dir="data/index", strategy="structure_aware")
+    try:
+        # Warm-up inference loads ONNX runtime session
+        _ = retriever.retrieve("warmup", top_k=1, mode="hybrid")
+        res = retriever.retrieve(
+            "pelindungan konsumen dan penanganan pengaduan", top_k=3, mode="hybrid"
+        )
+
+        assert len(res.chunks) == 3
+        assert res.total_candidates > 0
+        assert res.duration_ms < 500.0  # Warm hybrid search should be sub-500ms on CPU
+        for chunk in res.chunks:
+            assert chunk.citation_label
+            assert chunk.status in ("berlaku", "diubah", "dicabut")
+            assert chunk.score > 0.0
+    finally:
+        retriever.close()
+
+
+def test_retriever_cli(monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]) -> None:
+    """Verify that retriever CLI executes and prints formatted results."""
+    import sys
+
+    from easypasal.retrieval.models import RetrievedChunk
+    from easypasal.retrieval.retriever import main
+
+    test_chunk = RetrievedChunk(
+        chunk_id="test_c1",
+        score=0.032,
+        citation_label="POJK 1 Tahun 2024, Pasal 1",
+        doc_id="POJK_1_2024",
+        doc_number="POJK 1 Tahun 2024",
+        status="berlaku",
+        text="Isi peraturan uji coba.",
+        dense_rank=1,
+        dense_score=0.9,
+        bm25_rank=1,
+        bm25_score=15.0,
+    )
+    mock_result = RetrievalResult(
+        query="konsumen",
+        mode="hybrid",
+        chunks=[test_chunk],
+        total_candidates=1,
+        dense_count=1,
+        bm25_count=1,
+        duration_ms=12.5,
+    )
+
+    class MockRetriever:
+        def retrieve(self, *_args: Any, **_kwargs: Any) -> RetrievalResult:
+            return mock_result
+
+    monkeypatch.setattr(
+        HybridRetriever, "from_paths", classmethod(lambda _cls, **_kwargs: MockRetriever())
+    )
+    monkeypatch.setattr(
+        sys, "argv", ["retriever.py", "--query", "konsumen", "--mode", "hybrid", "--top-k", "1"]
+    )
+
+    main()
+    captured = capsys.readouterr()
+    assert "QUERY: konsumen" in captured.out
+    assert "POJK 1 Tahun 2024, Pasal 1" in captured.out
+    assert "Dense #1" in captured.out
+    assert "BM25 #1" in captured.out
