@@ -46,7 +46,7 @@
   - AC: answers 10 hand-picked questions with citations; abstains on 3 out-of-corpus questions
 - [x] **T1.7** 🤖 Post-hoc citation verification (cited pasal must exist in retrieved set) (commit `582c8ee`)
   - AC: unit tests for pass/fail cases
-- [ ] **T1.8** 🤖 FastAPI service (`/ask`, `/health`) and request-ID logging
+- [x] **T1.8** 🤖 FastAPI service (`/ask`, `/health`) and request-ID logging (commit `7d50a29`)
   - AC: `curl` example in README works
 
 ## Phase 2 — Gold evaluation set (P0)
