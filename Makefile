@@ -53,6 +53,9 @@ index:
 serve:
 	uv run python -m easypasal.api.app --host 0.0.0.0 --port 8000
 
+label-helper:
+	uv run python -m eval.labeling_helper --sample
+
 eval:
 	@echo "Evaluation runner not yet implemented (scheduled for Phase 3 / T3.2)."
 	@exit 1
