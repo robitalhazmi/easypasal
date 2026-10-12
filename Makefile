@@ -66,8 +66,7 @@ agreement:
 	uv run python -m eval.compute_self_agreement --evaluate
 
 eval:
-	@echo "Evaluation runner not yet implemented (scheduled for Phase 3 / T3.2)."
-	@exit 1
+	uv run python -m eval.run_eval --dataset data/gold/dev.jsonl
 
 bench:
 	@echo "Benchmark runner not yet implemented (scheduled for Phase 5 / T5.2)."

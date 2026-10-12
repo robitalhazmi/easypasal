@@ -36,6 +36,13 @@ if TYPE_CHECKING:
         recall_at_k,
         reciprocal_rank,
     )
+    from eval.run_eval import (
+        CategoryEvalSummary,
+        EvalReport,
+        ItemEvalResult,
+        evaluate_retrieval,
+        log_to_mlflow,
+    )
     from eval.split_eval import (
         split_dataset,
         stratified_split,
@@ -48,8 +55,11 @@ if TYPE_CHECKING:
 __all__ = [
     "AbstentionMetrics",
     "AgreementReport",
+    "CategoryEvalSummary",
     "CitationMetrics",
+    "EvalReport",
     "GoldItem",
+    "ItemEvalResult",
     "PassageRecord",
     "RetrievalMetrics",
     "ValidationReport",
@@ -65,11 +75,13 @@ __all__ = [
     "compute_retrieval_metrics",
     "draft_candidate_questions",
     "evaluate_agreement",
+    "evaluate_retrieval",
     "filter_passages",
     "generate_blank_template",
     "generate_draft_items_batch",
     "hit_at_k",
     "load_passages",
+    "log_to_mlflow",
     "ndcg_at_k",
     "recall_at_k",
     "reciprocal_rank",
@@ -125,6 +137,14 @@ _METRIC_SYMBOLS = {
     "reciprocal_rank",
 }
 
+_RUNNER_SYMBOLS = {
+    "CategoryEvalSummary",
+    "EvalReport",
+    "ItemEvalResult",
+    "evaluate_retrieval",
+    "log_to_mlflow",
+}
+
 
 def __getattr__(name: str) -> object:
     if name in _HELPER_SYMBOLS:
@@ -147,4 +167,8 @@ def __getattr__(name: str) -> object:
         import eval.metrics as _metrics
 
         return getattr(_metrics, name)
+    if name in _RUNNER_SYMBOLS:
+        import eval.run_eval as _runner
+
+        return getattr(_runner, name)
     raise AttributeError(f"module {__name__!r} has no attribute {name!r}")

@@ -69,6 +69,8 @@ models/*.safetensors
 # Experiment Tracking & Logs
 mlruns/
 mlruns.db
+mlflow.db
+*.db
 .mlflow/
 *.log
 logs/
