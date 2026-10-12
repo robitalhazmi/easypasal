@@ -270,11 +270,11 @@ def main() -> int:
     """CLI entrypoint for dataset validation."""
     parser = argparse.ArgumentParser(description="Validate EasyPasal gold evaluation dataset.")
     parser.add_argument(
-        "dataset",
+        "datasets",
         type=Path,
-        nargs="?",
-        default=Path("data/gold/gold_dataset.jsonl"),
-        help="Path to JSONL dataset file.",
+        nargs="*",
+        default=[],
+        help="Path(s) to JSONL dataset file(s).",
     )
     parser.add_argument(
         "--index-meta",
@@ -285,8 +285,8 @@ def main() -> int:
     parser.add_argument(
         "--min-items",
         type=int,
-        default=100,
-        help="Minimum required item count.",
+        default=None,
+        help="Minimum required item count (defaults to 100 for gold_dataset, 35 for dev, 50 for test).",
     )
     parser.add_argument(
         "--allow-unverified",
@@ -297,15 +297,31 @@ def main() -> int:
     args = parser.parse_args()
     logging.basicConfig(level=logging.INFO, format="%(levelname)s: %(message)s")
 
-    report = validate_gold_dataset(
-        dataset_path=args.dataset,
-        meta_path=args.index_meta,
-        min_items=args.min_items,
-        require_verified_status=not args.allow_unverified,
-    )
+    target_files = args.datasets if args.datasets else [Path("data/gold/gold_dataset.jsonl")]
+    all_passed = True
 
-    print_validation_report(report, args.dataset)
-    return 0 if report.is_valid else 1
+    for target_path in target_files:
+        if args.min_items is not None:
+            min_count = args.min_items
+        elif "dev" in target_path.name.lower():
+            min_count = 35
+        elif "test" in target_path.name.lower():
+            min_count = 50
+        else:
+            min_count = 100
+
+        report = validate_gold_dataset(
+            dataset_path=target_path,
+            meta_path=args.index_meta,
+            min_items=min_count,
+            require_verified_status=not args.allow_unverified,
+        )
+
+        print_validation_report(report, target_path)
+        if not report.is_valid:
+            all_passed = False
+
+    return 0 if all_passed else 1
 
 
 if __name__ == "__main__":

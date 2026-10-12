@@ -56,8 +56,11 @@ serve:
 label-helper:
 	uv run python -m eval.labeling_helper --sample
 
+split-eval:
+	uv run python -m eval.split_eval --input data/gold/gold_dataset.jsonl --output-dir data/gold/ --seed 42
+
 validate-gold:
-	uv run python -m eval.validate_gold data/gold/gold_dataset.jsonl
+	uv run python -m eval.validate_gold data/gold/gold_dataset.jsonl data/gold/dev.jsonl data/gold/test.jsonl
 
 eval:
 	@echo "Evaluation runner not yet implemented (scheduled for Phase 3 / T3.2)."

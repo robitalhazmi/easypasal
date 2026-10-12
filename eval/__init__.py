@@ -13,6 +13,10 @@ if TYPE_CHECKING:
         load_passages,
         save_draft_item,
     )
+    from eval.split_eval import (
+        split_dataset,
+        stratified_split,
+    )
     from eval.validate_gold import (
         ValidationReport,
         validate_gold_dataset,
@@ -28,6 +32,8 @@ __all__ = [
     "generate_draft_items_batch",
     "load_passages",
     "save_draft_item",
+    "split_dataset",
+    "stratified_split",
     "validate_gold_dataset",
 ]
 
@@ -47,6 +53,11 @@ _VALIDATOR_SYMBOLS = {
     "validate_gold_dataset",
 }
 
+_SPLITTER_SYMBOLS = {
+    "split_dataset",
+    "stratified_split",
+}
+
 
 def __getattr__(name: str) -> object:
     if name in _HELPER_SYMBOLS:
@@ -57,4 +68,8 @@ def __getattr__(name: str) -> object:
         import eval.validate_gold as _validator
 
         return getattr(_validator, name)
+    if name in _SPLITTER_SYMBOLS:
+        import eval.split_eval as _splitter
+
+        return getattr(_splitter, name)
     raise AttributeError(f"module {__name__!r} has no attribute {name!r}")
