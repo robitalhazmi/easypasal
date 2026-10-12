@@ -55,7 +55,7 @@
   - AC: guide committed
 - [x] **T2.2** 🤖 Build labeling helper (script that shows a source passage and a blank item template; optional model-drafted candidate questions) (commit `ea8b623`)
   - AC: helper runs locally; drafts are clearly marked "unverified"
-- [ ] **T2.3** 👤 Label ≥100 items (target 150–200) across all categories incl. unanswerable, superseded, adversarial, and an English slice
+- [x] **T2.3** 👤 Label ≥100 items (target 150–200) across all categories incl. unanswerable, superseded, adversarial, and an English slice (commit `e839796`)
   - AC: JSONL validated against schema; every gold citation checked against the source text
 - [ ] **T2.4** 🤖 Create train/dev/test splits (stratified by category, fixed seed) and a schema validator
   - AC: `make validate-gold` passes; split sizes reported
