@@ -62,6 +62,9 @@ split-eval:
 validate-gold:
 	uv run python -m eval.validate_gold data/gold/gold_dataset.jsonl data/gold/dev.jsonl data/gold/test.jsonl
 
+agreement:
+	uv run python -m eval.compute_self_agreement --evaluate
+
 eval:
 	@echo "Evaluation runner not yet implemented (scheduled for Phase 3 / T3.2)."
 	@exit 1

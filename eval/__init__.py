@@ -3,6 +3,10 @@
 from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
+    from eval.compute_self_agreement import (
+        AgreementReport,
+        evaluate_agreement,
+    )
     from eval.labeling_helper import (
         GoldItem,
         PassageRecord,
@@ -23,10 +27,12 @@ if TYPE_CHECKING:
     )
 
 __all__ = [
+    "AgreementReport",
     "GoldItem",
     "PassageRecord",
     "ValidationReport",
     "draft_candidate_questions",
+    "evaluate_agreement",
     "filter_passages",
     "generate_blank_template",
     "generate_draft_items_batch",
@@ -58,6 +64,11 @@ _SPLITTER_SYMBOLS = {
     "stratified_split",
 }
 
+_AGREEMENT_SYMBOLS = {
+    "AgreementReport",
+    "evaluate_agreement",
+}
+
 
 def __getattr__(name: str) -> object:
     if name in _HELPER_SYMBOLS:
@@ -72,4 +83,8 @@ def __getattr__(name: str) -> object:
         import eval.split_eval as _splitter
 
         return getattr(_splitter, name)
+    if name in _AGREEMENT_SYMBOLS:
+        import eval.compute_self_agreement as _agreement
+
+        return getattr(_agreement, name)
     raise AttributeError(f"module {__name__!r} has no attribute {name!r}")
