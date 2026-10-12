@@ -57,7 +57,7 @@
   - AC: helper runs locally; drafts are clearly marked "unverified"
 - [x] **T2.3** 👤 Label ≥100 items (target 150–200) across all categories incl. unanswerable, superseded, adversarial, and an English slice (commit `e839796`)
   - AC: JSONL validated against schema; every gold citation checked against the source text
-- [ ] **T2.4** 🤖 Create train/dev/test splits (stratified by category, fixed seed) and a schema validator
+- [x] **T2.4** 🤖 Create train/dev/test splits (stratified by category, fixed seed) and a schema validator (commit `6c6e0cb`)
   - AC: `make validate-gold` passes; split sizes reported
 - [ ] **T2.5** 👤 Re-label a 20% sample after a few days; compute self-agreement
   - AC: agreement rate recorded in `docs/eval-methodology.md`
