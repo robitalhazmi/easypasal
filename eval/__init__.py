@@ -17,6 +17,25 @@ if TYPE_CHECKING:
         load_passages,
         save_draft_item,
     )
+    from eval.metrics import (
+        AbstentionMetrics,
+        CitationMetrics,
+        RetrievalMetrics,
+        abstention_accuracy,
+        abstention_f1,
+        abstention_precision,
+        abstention_recall,
+        citation_f1,
+        citation_precision,
+        citation_recall,
+        compute_abstention_metrics,
+        compute_citation_metrics,
+        compute_retrieval_metrics,
+        hit_at_k,
+        ndcg_at_k,
+        recall_at_k,
+        reciprocal_rank,
+    )
     from eval.split_eval import (
         split_dataset,
         stratified_split,
@@ -27,16 +46,33 @@ if TYPE_CHECKING:
     )
 
 __all__ = [
+    "AbstentionMetrics",
     "AgreementReport",
+    "CitationMetrics",
     "GoldItem",
     "PassageRecord",
+    "RetrievalMetrics",
     "ValidationReport",
+    "abstention_accuracy",
+    "abstention_f1",
+    "abstention_precision",
+    "abstention_recall",
+    "citation_f1",
+    "citation_precision",
+    "citation_recall",
+    "compute_abstention_metrics",
+    "compute_citation_metrics",
+    "compute_retrieval_metrics",
     "draft_candidate_questions",
     "evaluate_agreement",
     "filter_passages",
     "generate_blank_template",
     "generate_draft_items_batch",
+    "hit_at_k",
     "load_passages",
+    "ndcg_at_k",
+    "recall_at_k",
+    "reciprocal_rank",
     "save_draft_item",
     "split_dataset",
     "stratified_split",
@@ -69,6 +105,26 @@ _AGREEMENT_SYMBOLS = {
     "evaluate_agreement",
 }
 
+_METRIC_SYMBOLS = {
+    "AbstentionMetrics",
+    "CitationMetrics",
+    "RetrievalMetrics",
+    "abstention_accuracy",
+    "abstention_f1",
+    "abstention_precision",
+    "abstention_recall",
+    "citation_f1",
+    "citation_precision",
+    "citation_recall",
+    "compute_abstention_metrics",
+    "compute_citation_metrics",
+    "compute_retrieval_metrics",
+    "hit_at_k",
+    "ndcg_at_k",
+    "recall_at_k",
+    "reciprocal_rank",
+}
+
 
 def __getattr__(name: str) -> object:
     if name in _HELPER_SYMBOLS:
@@ -87,4 +143,8 @@ def __getattr__(name: str) -> object:
         import eval.compute_self_agreement as _agreement
 
         return getattr(_agreement, name)
+    if name in _METRIC_SYMBOLS:
+        import eval.metrics as _metrics
+
+        return getattr(_metrics, name)
     raise AttributeError(f"module {__name__!r} has no attribute {name!r}")
