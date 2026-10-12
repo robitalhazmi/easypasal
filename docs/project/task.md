@@ -59,7 +59,7 @@
   - AC: JSONL validated against schema; every gold citation checked against the source text
 - [x] **T2.4** 🤖 Create train/dev/test splits (stratified by category, fixed seed) and a schema validator (commit `6c6e0cb`)
   - AC: `make validate-gold` passes; split sizes reported
-- [ ] **T2.5** 👤 Re-label a 20% sample after a few days; compute self-agreement
+- [x] **T2.5** 👤 Re-label a 20% sample after a few days; compute self-agreement (commit `e897fee`)
   - AC: agreement rate recorded in `docs/eval-methodology.md`
 
 ## Phase 3 — Evaluation harness and CI gate (P0)
