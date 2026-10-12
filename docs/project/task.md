@@ -66,7 +66,7 @@
 
 - [x] **T3.1** 🤖 Deterministic metrics: Recall@k, MRR, nDCG, citation precision/recall, abstention accuracy (commit `89912df`)
   - AC: unit-tested on toy examples with known answers
-- [ ] **T3.2** 🤖 Eval runner (`make eval`) producing a results table + per-category breakdown + MLflow run
+- [x] **T3.2** 🤖 Eval runner (`make eval`) producing a results table + per-category breakdown + MLflow run (commit `afbea31`)
   - AC: one command runs the full retrieval eval on `dev`
 - [ ] **T3.3** 🤝 LLM-judged metrics (faithfulness, correctness) using RAGAS/DeepEval-style prompts with a stronger open-weight judge on free GPU
   - AC: judged eval runs on Colab/Kaggle; outputs saved
