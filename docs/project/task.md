@@ -68,7 +68,7 @@
   - AC: unit-tested on toy examples with known answers
 - [x] **T3.2** 🤖 Eval runner (`make eval`) producing a results table + per-category breakdown + MLflow run (commit `afbea31`)
   - AC: one command runs the full retrieval eval on `dev`
-- [ ] **T3.3** 🤝 LLM-judged metrics (faithfulness, correctness) using RAGAS/DeepEval-style prompts with a stronger open-weight judge on free GPU
+- [x] **T3.3** 🤝 LLM-judged metrics (faithfulness, correctness) using RAGAS/DeepEval-style prompts with a stronger open-weight judge on free GPU (commit `31a1c30`)
   - AC: judged eval runs on Colab/Kaggle; outputs saved
 - [ ] **T3.4** 👤 Judge calibration: hand-label 30–40 outputs, compare with judge, report agreement
   - AC: calibration section in `docs/eval-methodology.md`
@@ -163,3 +163,4 @@ If time runs short, descope in this order and record it as future work: **E7 QLo
 | 2026-10-10 | T0.5: Verified model shortlists, parameter sizes, GGUF RAM requirements, and licenses in `docs/decision-log.md`. |
 | 2026-10-10 | T0.6: Verified free HF Space specs, Colab/Kaggle GPU quotas, and VPS memory budget in `docs/architecture.md`. |
 | 2026-10-10 | T0.7: Curated 21 verified regulations across 5 themes (added Bursa Efek Indonesia / Pasar Modal) in `data/corpus_manifest.csv`. |
+| 2026-10-13 | T3.3: Implemented LLM-judged metrics (faithfulness, correctness), Colab/Kaggle 4-bit GPU runner, and 35-item calibration export (commit `31a1c30`). |
