@@ -167,9 +167,9 @@ def test_evaluate_agreement_on_actual_dataset() -> None:
     report: AgreementReport = evaluate_agreement(ORIGINAL_PATH, RELABEL_PATH)
 
     assert report.total_items == 20
-    assert (
-        report.abstention_agreement >= 0.95
-    ), f"Abstention agreement {report.abstention_agreement} < 0.95"
+    assert report.abstention_agreement >= 0.95, (
+        f"Abstention agreement {report.abstention_agreement} < 0.95"
+    )
     assert report.cohens_kappa >= 0.85, f"Cohen's Kappa {report.cohens_kappa} < 0.85"
     assert report.citation_jaccard >= 0.85, f"Citation Jaccard {report.citation_jaccard} < 0.85"
     assert report.token_f1 >= 0.80, f"Token F1 {report.token_f1} < 0.80"
