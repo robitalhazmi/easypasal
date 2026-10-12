@@ -64,7 +64,7 @@
 
 ## Phase 3 — Evaluation harness and CI gate (P0)
 
-- [ ] **T3.1** 🤖 Deterministic metrics: Recall@k, MRR, nDCG, citation precision/recall, abstention accuracy
+- [x] **T3.1** 🤖 Deterministic metrics: Recall@k, MRR, nDCG, citation precision/recall, abstention accuracy (commit `89912df`)
   - AC: unit-tested on toy examples with known answers
 - [ ] **T3.2** 🤖 Eval runner (`make eval`) producing a results table + per-category breakdown + MLflow run
   - AC: one command runs the full retrieval eval on `dev`
