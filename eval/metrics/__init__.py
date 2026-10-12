@@ -1,4 +1,4 @@
-"""Metrics package: deterministic retrieval, citation, and abstention metrics."""
+"""Metrics package: deterministic retrieval, citation, abstention, and LLM-judged metrics."""
 
 from __future__ import annotations
 
@@ -21,6 +21,20 @@ from eval.metrics.citations import (
     extract_article_key,
     normalize_citation,
 )
+from eval.metrics.judge import (
+    BaseJudgeBackend,
+    CorrectnessResult,
+    FaithfulnessResult,
+    JudgedRecord,
+    MockJudgeBackend,
+    OpenAICompatibleJudgeBackend,
+    TransformersJudgeBackend,
+    build_correctness_prompt,
+    build_faithfulness_prompt,
+    evaluate_correctness,
+    evaluate_faithfulness,
+    evaluate_judged_item,
+)
 from eval.metrics.retrieval import (
     RetrievalMetrics,
     compute_retrieval_metrics,
@@ -35,13 +49,22 @@ from eval.metrics.retrieval import (
 
 __all__ = [
     "AbstentionMetrics",
+    "BaseJudgeBackend",
     "CitationMetrics",
+    "CorrectnessResult",
+    "FaithfulnessResult",
+    "JudgedRecord",
+    "MockJudgeBackend",
+    "OpenAICompatibleJudgeBackend",
     "RetrievalMetrics",
+    "TransformersJudgeBackend",
     "abstention_accuracy",
     "abstention_f1",
     "abstention_precision",
     "abstention_recall",
     "abstention_specificity",
+    "build_correctness_prompt",
+    "build_faithfulness_prompt",
     "citation_f1",
     "citation_precision",
     "citation_recall",
@@ -50,6 +73,9 @@ __all__ = [
     "compute_confusion_matrix",
     "compute_retrieval_metrics",
     "dcg_at_k",
+    "evaluate_correctness",
+    "evaluate_faithfulness",
+    "evaluate_judged_item",
     "extract_article_key",
     "hit_at_k",
     "idcg_at_k",
