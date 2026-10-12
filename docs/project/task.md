@@ -51,7 +51,7 @@
 
 ## Phase 2 — Gold evaluation set (P0)
 
-- [ ] **T2.1** 👤 Write labeling guide: categories, answer style, citation format (`docs/eval-methodology.md`)
+- [x] **T2.1** 👤 Write labeling guide: categories, answer style, citation format (`docs/eval-methodology.md`) (commit `19ac4f8`)
   - AC: guide committed
 - [ ] **T2.2** 🤖 Build labeling helper (script that shows a source passage and a blank item template; optional model-drafted candidate questions)
   - AC: helper runs locally; drafts are clearly marked "unverified"
