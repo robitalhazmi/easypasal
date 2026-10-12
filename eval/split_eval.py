@@ -24,13 +24,14 @@ DEFAULT_SEED = 42
 DEFAULT_DEV_RATIO = 0.4
 
 
-def load_gold_items(dataset_path: Path) -> list[GoldItem]:
+def load_gold_items(dataset_path: Path | str) -> list[GoldItem]:
     """Load and validate all GoldItems from a JSONL file."""
-    if not dataset_path.exists():
-        raise FileNotFoundError(f"Dataset file does not exist: {dataset_path}")
+    path = Path(dataset_path)
+    if not path.exists():
+        raise FileNotFoundError(f"Dataset file does not exist: {path}")
 
     items: list[GoldItem] = []
-    with open(dataset_path, encoding="utf-8") as f:
+    with open(path, encoding="utf-8") as f:
         for line_num, line in enumerate(f, start=1):
             line_str = line.strip()
             if not line_str:
@@ -39,7 +40,7 @@ def load_gold_items(dataset_path: Path) -> list[GoldItem]:
                 item_dict = json.loads(line_str)
                 items.append(GoldItem.model_validate(item_dict))
             except Exception as err:
-                raise ValueError(f"Error parsing line {line_num} in {dataset_path}: {err}") from err
+                raise ValueError(f"Error parsing line {line_num} in {path}: {err}") from err
 
     return items
 
