@@ -51,15 +51,15 @@
 
 ## Phase 2 — Gold evaluation set (P0)
 
-- [ ] **T2.1** 👤 Write labeling guide: categories, answer style, citation format (`docs/eval-methodology.md`)
+- [x] **T2.1** 👤 Write labeling guide: categories, answer style, citation format (`docs/eval-methodology.md`) (commit `19ac4f8`)
   - AC: guide committed
-- [ ] **T2.2** 🤖 Build labeling helper (script that shows a source passage and a blank item template; optional model-drafted candidate questions)
+- [x] **T2.2** 🤖 Build labeling helper (script that shows a source passage and a blank item template; optional model-drafted candidate questions) (commit `ea8b623`)
   - AC: helper runs locally; drafts are clearly marked "unverified"
-- [ ] **T2.3** 👤 Label ≥100 items (target 150–200) across all categories incl. unanswerable, superseded, adversarial, and an English slice
+- [x] **T2.3** 👤 Label ≥100 items (target 150–200) across all categories incl. unanswerable, superseded, adversarial, and an English slice (commit `e839796`)
   - AC: JSONL validated against schema; every gold citation checked against the source text
-- [ ] **T2.4** 🤖 Create train/dev/test splits (stratified by category, fixed seed) and a schema validator
+- [x] **T2.4** 🤖 Create train/dev/test splits (stratified by category, fixed seed) and a schema validator (commit `6c6e0cb`)
   - AC: `make validate-gold` passes; split sizes reported
-- [ ] **T2.5** 👤 Re-label a 20% sample after a few days; compute self-agreement
+- [x] **T2.5** 👤 Re-label a 20% sample after a few days; compute self-agreement (commit `e897fee`)
   - AC: agreement rate recorded in `docs/eval-methodology.md`
 
 ## Phase 3 — Evaluation harness and CI gate (P0)

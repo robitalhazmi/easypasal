@@ -53,6 +53,18 @@ index:
 serve:
 	uv run python -m easypasal.api.app --host 0.0.0.0 --port 8000
 
+label-helper:
+	uv run python -m eval.labeling_helper --sample
+
+split-eval:
+	uv run python -m eval.split_eval --input data/gold/gold_dataset.jsonl --output-dir data/gold/ --seed 42
+
+validate-gold:
+	uv run python -m eval.validate_gold data/gold/gold_dataset.jsonl data/gold/dev.jsonl data/gold/test.jsonl
+
+agreement:
+	uv run python -m eval.compute_self_agreement --evaluate
+
 eval:
 	@echo "Evaluation runner not yet implemented (scheduled for Phase 3 / T3.2)."
 	@exit 1
