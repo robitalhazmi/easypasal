@@ -12,6 +12,13 @@ from eval.metrics.abstention import (
     compute_abstention_metrics,
     compute_confusion_matrix,
 )
+from eval.metrics.bootstrap import (
+    BootstrapCI,
+    PairedComparisonResult,
+    bootstrap_ci,
+    paired_bootstrap_comparison,
+    paired_permutation_test,
+)
 from eval.metrics.citations import (
     CitationMetrics,
     citation_f1,
@@ -50,12 +57,14 @@ from eval.metrics.retrieval import (
 __all__ = [
     "AbstentionMetrics",
     "BaseJudgeBackend",
+    "BootstrapCI",
     "CitationMetrics",
     "CorrectnessResult",
     "FaithfulnessResult",
     "JudgedRecord",
     "MockJudgeBackend",
     "OpenAICompatibleJudgeBackend",
+    "PairedComparisonResult",
     "RetrievalMetrics",
     "TransformersJudgeBackend",
     "abstention_accuracy",
@@ -63,6 +72,7 @@ __all__ = [
     "abstention_precision",
     "abstention_recall",
     "abstention_specificity",
+    "bootstrap_ci",
     "build_correctness_prompt",
     "build_faithfulness_prompt",
     "citation_f1",
@@ -81,6 +91,8 @@ __all__ = [
     "idcg_at_k",
     "ndcg_at_k",
     "normalize_citation",
+    "paired_bootstrap_comparison",
+    "paired_permutation_test",
     "precision_at_k",
     "recall_at_k",
     "reciprocal_rank",

@@ -72,7 +72,7 @@
   - AC: judged eval runs on Colab/Kaggle; outputs saved
 - [x] **T3.4** 👤 Judge calibration: hand-label 30–40 outputs, compare with judge, report agreement (commit `3dea475`)
   - AC: calibration section in `docs/eval-methodology.md`
-- [ ] **T3.5** 🤖 Bootstrap confidence intervals + paired comparison utility
+- [x] **T3.5** 🤖 Bootstrap confidence intervals + paired comparison utility
   - AC: variant comparison output includes CIs
 - [ ] **T3.6** 🤖 CI smoke eval (≈30 fixed items, retrieval + deterministic metrics, no GPU) with stored baseline and thresholds
   - AC: a deliberately broken retrieval change makes CI fail (demonstrate and keep as a test)

@@ -1,4 +1,4 @@
-.PHONY: help setup lint format test check clean ingest index serve eval bench
+.PHONY: help setup lint format test check clean ingest index serve eval compare bench
 
 help:
 	@echo "EasyPasal Development Commands:"
@@ -11,6 +11,7 @@ help:
 	@echo "  make index   - Build Qdrant vector store and BM25 sparse index (Phase 1)"
 	@echo "  make serve   - Start the FastAPI service and Gradio UI locally (Phase 1)"
 	@echo "  make eval    - Run the evaluation harness on the gold evaluation set (Phase 3)"
+	@echo "  make compare - Compare baseline and candidate runs with bootstrap CIs (Phase 3)"
 	@echo "  make bench   - Run CPU inference latency benchmark (Phase 5)"
 	@echo "  make clean   - Remove cache directories and temporary build artifacts"
 
@@ -73,6 +74,9 @@ eval-judged:
 
 calibrate:
 	uv run python -m eval.compute_judge_calibration
+
+compare:
+	uv run python -m eval.compare_variants --baseline data/eval_outputs/eval_baseline.json --candidate data/eval_outputs/eval_candidate.json
 
 bench:
 	@echo "Benchmark runner not yet implemented (scheduled for Phase 5 / T5.2)."

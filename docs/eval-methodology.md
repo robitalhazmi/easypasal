@@ -457,3 +457,73 @@ Across the 35 calibrated inquiries, only **1 item** exhibited a scoring divergen
 The calibration experiment demonstrates:
 1. **100% agreement on legal abstention enforcement:** The automated judge never hallucinated or rewarded an improper answer on adversarial/unanswerable queries.
 2. **0.0149 Faithfulness MAE and 0.0014 Correctness MAE:** Confirms that automated scores can be trusted as high-fidelity gates for CI and pipeline optimization.
+
+---
+
+## 12. Statistical Inference: Bootstrap Confidence Intervals & Paired Significance Testing (T3.5)
+
+### 12.1 Motivation & Experimental Rigor
+
+When comparing RAG pipeline architectures and hyperparameter configurations (e.g. chunking strategies in E1, embedding models in E2, hybrid retriever ratios in E3, or prompt engineering in E5), raw sample mean metric differences (such as $+3.2\%$ Recall@5) can be susceptible to sample variance on finite evaluation splits ($N = 40$ in dev).
+
+To ensure that observed pipeline improvements represent genuine architectural gains rather than sampling artifacts, EasyPasal implements rigorous non-parametric statistical inference:
+1. **Empirical uncertainty quantification:** Estimating 95% Confidence Intervals (CIs) for all evaluation metrics.
+2. **Paired hypothesis testing:** Evaluating whether paired differences $\Delta_i = x_{i,\text{cand}} - x_{i,\text{base}}$ are statistically distinguishable from null variation ($p < 0.05$).
+3. **Effect size scaling:** Quantifying normalized magnitude with paired Cohen's $d_z$.
+
+---
+
+### 12.2 Percentile Bootstrap Confidence Intervals
+
+For any metric $M$ observed over sample $X = [x_1, \dots, x_N]$, the non-parametric percentile bootstrap generates an empirical distribution of the mean without distributional assumptions:
+
+1. Draw $B = 2{,}000$ bootstrap replicates with replacement: $X^{*b} \sim \text{Multinomial}(N, X)$.
+2. Compute sample mean for each replicate: $\bar{x}^{*b} = \frac{1}{N} \sum_{i=1}^N x_i^{*b}$.
+3. For confidence level $1 - \alpha = 0.95$, the interval is given by the empirical percentiles:
+   $$\text{CI}_{95\%} = \left[ Q\left(\frac{\alpha}{2}\right), Q\left(1 - \frac{\alpha}{2}\right) \right] = \left[ Q(0.025), Q(0.975) \right]$$
+
+Implemented in [`eval/metrics/bootstrap.py`](file:///home/robit/Documents/Project/easypasal/eval/metrics/bootstrap.py) via vectorized NumPy arrays and pinned random seeds for exact determinism.
+
+---
+
+### 12.3 Paired Permutation Test & Cohen's $d_z$
+
+For paired pipeline comparisons on identical query items $(A_i, B_i)$ where $\Delta_i = B_i - A_i$:
+
+- **Null Hypothesis ($H_0$):** The distribution of differences is symmetric about zero ($\mu_\Delta = 0$).
+- **Monte Carlo Sign-Flip Permutation Test ($P = 5{,}000$ iterations):**
+  Under $H_0$, the assignment of baseline vs. candidate for inquiry $i$ is exchangeable. In each iteration $m$, signs $s_i \in \{-1, +1\}$ are assigned with equal probability:
+  $$\bar{\Delta}^{*m} = \frac{1}{N} \sum_{i=1}^N s_i \cdot \Delta_i$$
+  The two-sided empirical $p$-value with continuity correction is:
+  $$p = \frac{1 + \sum_{m=1}^P \mathbb{I}(|\bar{\Delta}^{*m}| \ge |\bar{\Delta}_{\text{obs}}|)}{P + 1}$$
+
+- **Paired Cohen's $d_z$ Effect Size:**
+  $$d_z = \frac{\bar{\Delta}}{s_\Delta} = \frac{\bar{\Delta}}{\sqrt{\frac{1}{N-1} \sum_{i=1}^N (\Delta_i - \bar{\Delta})^2}}$$
+  Standard interpretation: $|d_z| \ge 0.2$ (small), $|d_z| \ge 0.5$ (medium), $|d_z| \ge 0.8$ (large).
+
+---
+
+### 12.4 Significance Determination & Terminal Reporting
+
+A metric difference is determined to be statistically significant if and only if:
+1. Two-sided permutation test $p < 0.05$, **and**
+2. The 95% bootstrap CI of the paired difference $\Delta$ does not enclose zero ($0 \notin [\text{lower}_\Delta, \text{upper}_\Delta]$).
+
+Badges are rendered in the comparison report:
+- `✅ SIG GAIN`: Statistically significant improvement ($\bar{\Delta} > 0$ for quality, $\bar{\Delta} < 0$ for latency).
+- `❌ REGRESSION`: Statistically significant deterioration.
+- `ℹ️ NEUTRAL`: Difference is within expected statistical sampling variation.
+
+### 12.5 Command-Line Usage
+
+Compare two evaluation runs:
+```bash
+# Compare offline retrieval runs (or judged runs)
+uv run python -m eval.compare_variants \
+  --baseline data/eval_outputs/eval_baseline.json \
+  --candidate data/eval_outputs/eval_candidate.json \
+  --output data/eval_outputs/comparison_report.json
+
+# Or using Makefile shortcut
+make compare
+```
