@@ -3,6 +3,14 @@
 from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
+    from eval.compute_judge_calibration import (
+        CalibratedItem,
+        CalibrationDiscrepancy,
+        CategoryCalibrationSummary,
+        JudgeCalibrationReport,
+        evaluate_calibration,
+        load_calibrated_items,
+    )
     from eval.compute_self_agreement import (
         AgreementReport,
         evaluate_agreement,
@@ -66,6 +74,9 @@ __all__ = [
     "AbstentionMetrics",
     "AgreementReport",
     "BaseJudgeBackend",
+    "CalibratedItem",
+    "CalibrationDiscrepancy",
+    "CategoryCalibrationSummary",
     "CategoryEvalSummary",
     "CitationMetrics",
     "CorrectnessResult",
@@ -73,6 +84,7 @@ __all__ = [
     "FaithfulnessResult",
     "GoldItem",
     "ItemEvalResult",
+    "JudgeCalibrationReport",
     "JudgedRecord",
     "MockJudgeBackend",
     "OpenAICompatibleJudgeBackend",
@@ -92,6 +104,7 @@ __all__ = [
     "compute_retrieval_metrics",
     "draft_candidate_questions",
     "evaluate_agreement",
+    "evaluate_calibration",
     "evaluate_correctness",
     "evaluate_faithfulness",
     "evaluate_judged_item",
@@ -100,6 +113,7 @@ __all__ = [
     "generate_blank_template",
     "generate_draft_items_batch",
     "hit_at_k",
+    "load_calibrated_items",
     "load_passages",
     "log_to_mlflow",
     "ndcg_at_k",
@@ -135,6 +149,15 @@ _SPLITTER_SYMBOLS = {
 _AGREEMENT_SYMBOLS = {
     "AgreementReport",
     "evaluate_agreement",
+}
+
+_CALIBRATION_SYMBOLS = {
+    "CalibratedItem",
+    "CalibrationDiscrepancy",
+    "CategoryCalibrationSummary",
+    "JudgeCalibrationReport",
+    "evaluate_calibration",
+    "load_calibrated_items",
 }
 
 _METRIC_SYMBOLS = {
@@ -193,6 +216,10 @@ def __getattr__(name: str) -> object:
         import eval.compute_self_agreement as _agreement
 
         return getattr(_agreement, name)
+    if name in _CALIBRATION_SYMBOLS:
+        import eval.compute_judge_calibration as _calibration
+
+        return getattr(_calibration, name)
     if name in _METRIC_SYMBOLS:
         import eval.metrics as _metrics
 

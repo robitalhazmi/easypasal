@@ -68,6 +68,12 @@ agreement:
 eval:
 	uv run python -m eval.run_eval --dataset data/gold/dev.jsonl
 
+eval-judged:
+	uv run python -m eval.run_judged_eval --dataset data/gold/dev.jsonl
+
+calibrate:
+	uv run python -m eval.compute_judge_calibration
+
 bench:
 	@echo "Benchmark runner not yet implemented (scheduled for Phase 5 / T5.2)."
 	@exit 1
