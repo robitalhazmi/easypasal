@@ -527,3 +527,49 @@ uv run python -m eval.compare_variants \
 # Or using Makefile shortcut
 make compare
 ```
+
+---
+
+## 13. CI Smoke Evaluation Gate & Regression Prevention (T3.6)
+
+### 13.1 Motivation & Design Goals
+
+To protect the EasyPasal legal RAG system from silent regressions during iterative development and PR reviews, we implement an automated **CI smoke evaluation gate**:
+1. **Zero-GPU & Sub-Second Execution**: Runs entirely on CPU in $< 3$ seconds, enabling execution on every pull request within GitHub Actions standard runners.
+2. **Fixed Stratified Inquiries ($N = 30$)**: A dedicated, committed evaluation split ([`data/gold/smoke.jsonl`](file:///home/robit/Documents/Project/easypasal/data/gold/smoke.jsonl)) containing 25 answerable and 5 unanswerable/adversarial queries representing all 9 regulatory categories.
+3. **Committed Baseline Anchor**: Candidate runs are evaluated against a stored reference run ([`data/eval_outputs/smoke_baseline.json`](file:///home/robit/Documents/Project/easypasal/data/eval_outputs/smoke_baseline.json)).
+4. **Hard Gating & CI Exit Codes**: Any regression exceeding the allowable tolerance fails the CI check with exit code `1`.
+
+---
+
+### 13.2 Regression Thresholds & Gate Specifications
+
+| Gate Check | Formula / Threshold | Target Value | Action on Breach |
+|---|---|:---:|:---:|
+| **Recall@5 Regression Gate** | $\text{Recall@5}_{\text{cand}} \ge \text{Recall@5}_{\text{base}} - \Delta_{\text{tol}}$ | $\ge 0.1900$ | ❌ Block PR (Exit 1) |
+| **Recall@5 Absolute Floor** | $\text{Recall@5}_{\text{cand}} \ge \text{Floor}_{\text{min}}$ | $\ge 0.1800$ | ❌ Block PR (Exit 1) |
+| **MRR Regression Gate** | $\text{MRR}_{\text{cand}} \ge \text{MRR}_{\text{base}} - \Delta_{\text{tol}}$ | $\ge 0.0767$ | ❌ Block PR (Exit 1) |
+| **MRR Absolute Floor** | $\text{MRR}_{\text{cand}} \ge \text{Floor}_{\text{min}}$ | $\ge 0.0800$ | ❌ Block PR (Exit 1) |
+| **Abstention Accuracy Gate** | $\text{Accuracy}_{\text{unanswerable}} \ge 0.90$ | $\ge 90.0\%$ | ❌ Block PR (Exit 1) |
+| **p95 Latency Ceiling Gate** | $p95_{\text{latency}} \le 1{,}000\text{ ms}$ | $\le 1{,}000\text{ ms}$ | ❌ Block PR (Exit 1) |
+
+---
+
+### 13.3 Deliberately Broken Retrieval Test (Acceptance Criterion)
+
+To mathematically prove that the CI gate reliably catches broken retrieval pipelines before they can merge into `main`, [`tests/test_smoke_eval.py`](file:///home/robit/Documents/Project/easypasal/tests/test_smoke_eval.py) contains permanent test cases:
+1. **Empty/Irrelevant Chunks**: Injects a broken retriever returning empty or ungrounded chunks. Verifies that Recall@5 drops to $0.0$, violates the regression threshold, raises `CIGateFailureError`, and causes `eval.smoke_eval` CLI to exit with code `1`.
+2. **Hallucinated Adversarial Answers**: Injects a retriever claiming relevance on unanswerable/adversarial queries. Verifies that the abstention gate immediately fails.
+3. **Latency Spikes**: Injects artificial delay to confirm that latency violations trigger gate failure.
+
+---
+
+### 13.4 Developer & CI Usage
+
+```bash
+# Run the CI smoke evaluation gate locally
+uv run python -m eval.smoke_eval
+
+# Or via Makefile shortcut
+make smoke-eval
+```

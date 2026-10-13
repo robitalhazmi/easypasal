@@ -74,7 +74,7 @@
   - AC: calibration section in `docs/eval-methodology.md`
 - [x] **T3.5** 🤖 Bootstrap confidence intervals + paired comparison utility
   - AC: variant comparison output includes CIs
-- [ ] **T3.6** 🤖 CI smoke eval (≈30 fixed items, retrieval + deterministic metrics, no GPU) with stored baseline and thresholds
+- [x] **T3.6** 🤖 CI smoke eval (≈30 fixed items, retrieval + deterministic metrics, no GPU) with stored baseline and thresholds
   - AC: a deliberately broken retrieval change makes CI fail (demonstrate and keep as a test)
 
 ## Phase 4 — Core experiments E1–E4 (P0)

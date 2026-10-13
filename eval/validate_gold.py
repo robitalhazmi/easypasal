@@ -307,6 +307,8 @@ def main() -> int:
             min_count = 35
         elif "test" in target_path.name.lower():
             min_count = 50
+        elif "smoke" in target_path.name.lower():
+            min_count = 25
         else:
             min_count = 100
 

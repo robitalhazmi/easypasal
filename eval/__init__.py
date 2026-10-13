@@ -66,6 +66,13 @@ if TYPE_CHECKING:
         evaluate_retrieval,
         log_to_mlflow,
     )
+    from eval.smoke_eval import (
+        CIGateFailureError,
+        GateCheck,
+        SmokeGateResult,
+        evaluate_smoke_gate,
+        load_smoke_baseline,
+    )
     from eval.split_eval import (
         split_dataset,
         stratified_split,
@@ -80,6 +87,7 @@ __all__ = [
     "AgreementReport",
     "BaseJudgeBackend",
     "BootstrapCI",
+    "CIGateFailureError",
     "CalibratedItem",
     "CalibrationDiscrepancy",
     "CategoryCalibrationSummary",
@@ -88,6 +96,7 @@ __all__ = [
     "CorrectnessResult",
     "EvalReport",
     "FaithfulnessResult",
+    "GateCheck",
     "GoldItem",
     "ItemEvalResult",
     "JudgeCalibrationReport",
@@ -97,6 +106,7 @@ __all__ = [
     "PairedComparisonResult",
     "PassageRecord",
     "RetrievalMetrics",
+    "SmokeGateResult",
     "TransformersJudgeBackend",
     "ValidationReport",
     "abstention_accuracy",
@@ -117,12 +127,14 @@ __all__ = [
     "evaluate_faithfulness",
     "evaluate_judged_item",
     "evaluate_retrieval",
+    "evaluate_smoke_gate",
     "filter_passages",
     "generate_blank_template",
     "generate_draft_items_batch",
     "hit_at_k",
     "load_calibrated_items",
     "load_passages",
+    "load_smoke_baseline",
     "log_to_mlflow",
     "ndcg_at_k",
     "paired_bootstrap_comparison",
@@ -214,6 +226,15 @@ _RUNNER_SYMBOLS = {
 }
 
 
+_SMOKE_SYMBOLS = {
+    "CIGateFailureError",
+    "GateCheck",
+    "SmokeGateResult",
+    "evaluate_smoke_gate",
+    "load_smoke_baseline",
+}
+
+
 def __getattr__(name: str) -> object:
     if name in _HELPER_SYMBOLS:
         import eval.labeling_helper as _helper
@@ -243,4 +264,8 @@ def __getattr__(name: str) -> object:
         import eval.run_eval as _runner
 
         return getattr(_runner, name)
+    if name in _SMOKE_SYMBOLS:
+        import eval.smoke_eval as _smoke
+
+        return getattr(_smoke, name)
     raise AttributeError(f"module {__name__!r} has no attribute {name!r}")
