@@ -43,6 +43,9 @@ jobs:
       - name: Run Pytest Test Suite
         run: uv run pytest tests/ -v --cov=src/easypasal --cov-report=xml --cov-report=term
 
+      - name: Run CI Smoke Evaluation Gate
+        run: uv run python -m eval.smoke_eval
+
       - name: Upload coverage artifact
         if: matrix.python-version == '3.12'
         uses: actions/upload-artifact@v4

@@ -1,0 +1,136 @@
+{
+  "timestamp": "2026-10-13T00:08:35.345866+00:00",
+  "total_items": 35,
+  "overall_metrics": {
+    "faithfulness": {
+      "binary_agreement_rate": 0.9714,
+      "cohens_kappa": 0.0,
+      "pabak": 0.9429,
+      "mae": 0.0149,
+      "pearson_r": 0.0
+    },
+    "correctness": {
+      "binary_agreement_rate": 1.0,
+      "cohens_kappa": 1.0,
+      "pabak": 1.0,
+      "mae": 0.0014,
+      "pearson_r": 1.0
+    }
+  },
+  "gates": {
+    "kappa_gate_passed": true,
+    "mae_gate_passed": true
+  },
+  "categories": {
+    "adversarial_jailbreak": {
+      "category": "adversarial_jailbreak",
+      "total_items": 2,
+      "mean_judge_faithfulness": 1.0,
+      "mean_human_faithfulness": 1.0,
+      "faithfulness_mae": 0.0,
+      "mean_judge_correctness": 1.0,
+      "mean_human_correctness": 1.0,
+      "correctness_mae": 0.0,
+      "binary_agreement_rate": 1.0
+    },
+    "cross_article_synthesis": {
+      "category": "cross_article_synthesis",
+      "total_items": 5,
+      "mean_judge_faithfulness": 1.0,
+      "mean_human_faithfulness": 1.0,
+      "faithfulness_mae": 0.0,
+      "mean_judge_correctness": 1.0,
+      "mean_human_correctness": 1.0,
+      "correctness_mae": 0.0,
+      "binary_agreement_rate": 1.0
+    },
+    "definitional": {
+      "category": "definitional",
+      "total_items": 4,
+      "mean_judge_faithfulness": 1.0,
+      "mean_human_faithfulness": 1.0,
+      "faithfulness_mae": 0.0,
+      "mean_judge_correctness": 1.0,
+      "mean_human_correctness": 0.9875,
+      "correctness_mae": 0.0125,
+      "binary_agreement_rate": 1.0
+    },
+    "english_slice": {
+      "category": "english_slice",
+      "total_items": 4,
+      "mean_judge_faithfulness": 0.87,
+      "mean_human_faithfulness": 1.0,
+      "faithfulness_mae": 0.13,
+      "mean_judge_correctness": 1.0,
+      "mean_human_correctness": 1.0,
+      "correctness_mae": 0.0,
+      "binary_agreement_rate": 0.75
+    },
+    "factual_direct": {
+      "category": "factual_direct",
+      "total_items": 4,
+      "mean_judge_faithfulness": 1.0,
+      "mean_human_faithfulness": 1.0,
+      "faithfulness_mae": 0.0,
+      "mean_judge_correctness": 1.0,
+      "mean_human_correctness": 1.0,
+      "correctness_mae": 0.0,
+      "binary_agreement_rate": 1.0
+    },
+    "obligation_and_prohibition": {
+      "category": "obligation_and_prohibition",
+      "total_items": 4,
+      "mean_judge_faithfulness": 1.0,
+      "mean_human_faithfulness": 1.0,
+      "faithfulness_mae": 0.0,
+      "mean_judge_correctness": 1.0,
+      "mean_human_correctness": 1.0,
+      "correctness_mae": 0.0,
+      "binary_agreement_rate": 1.0
+    },
+    "sanctions_and_enforcement": {
+      "category": "sanctions_and_enforcement",
+      "total_items": 4,
+      "mean_judge_faithfulness": 1.0,
+      "mean_human_faithfulness": 1.0,
+      "faithfulness_mae": 0.0,
+      "mean_judge_correctness": 1.0,
+      "mean_human_correctness": 1.0,
+      "correctness_mae": 0.0,
+      "binary_agreement_rate": 1.0
+    },
+    "superseded_trap": {
+      "category": "superseded_trap",
+      "total_items": 4,
+      "mean_judge_faithfulness": 1.0,
+      "mean_human_faithfulness": 1.0,
+      "faithfulness_mae": 0.0,
+      "mean_judge_correctness": 1.0,
+      "mean_human_correctness": 1.0,
+      "correctness_mae": 0.0,
+      "binary_agreement_rate": 1.0
+    },
+    "unanswerable_out_of_scope": {
+      "category": "unanswerable_out_of_scope",
+      "total_items": 4,
+      "mean_judge_faithfulness": 1.0,
+      "mean_human_faithfulness": 1.0,
+      "faithfulness_mae": 0.0,
+      "mean_judge_correctness": 1.0,
+      "mean_human_correctness": 1.0,
+      "correctness_mae": 0.0,
+      "binary_agreement_rate": 1.0
+    }
+  },
+  "discrepancies": [
+    {
+      "item_id": "gold_097",
+      "category": "english_slice",
+      "metric": "faithfulness",
+      "judge_score": 0.48,
+      "human_score": 1.0,
+      "diff": 0.52,
+      "reason": "Cross-lingual wording mismatch: mock judge penalizes English translation against Indonesian statute."
+    }
+  ]
+}

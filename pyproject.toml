@@ -29,6 +29,7 @@ dev = [
     "ruff>=0.8.0",
     "mypy>=1.13.0",
     "pre-commit>=4.0.0",
+    "mlflow>=3.17.0",
 ]
 
 [build-system]
@@ -59,6 +60,9 @@ ignore = [
     "E501", # line length handled by ruff format
 ]
 
+[tool.ruff.lint.per-file-ignores]
+"*.ipynb" = ["E402"]
+
 [tool.ruff.lint.isort]
 known-first-party = ["easypasal"]
 
@@ -77,6 +81,10 @@ warn_unused_ignores = true
 [[tool.mypy.overrides]]
 module = "tests.*"
 disallow_untyped_defs = false
+
+[[tool.mypy.overrides]]
+module = ["torch", "transformers"]
+ignore_missing_imports = true
 
 [tool.pytest.ini_options]
 minversion = "8.0"

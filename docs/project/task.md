@@ -64,17 +64,17 @@
 
 ## Phase 3 — Evaluation harness and CI gate (P0)
 
-- [ ] **T3.1** 🤖 Deterministic metrics: Recall@k, MRR, nDCG, citation precision/recall, abstention accuracy
+- [x] **T3.1** 🤖 Deterministic metrics: Recall@k, MRR, nDCG, citation precision/recall, abstention accuracy (commit `89912df`)
   - AC: unit-tested on toy examples with known answers
-- [ ] **T3.2** 🤖 Eval runner (`make eval`) producing a results table + per-category breakdown + MLflow run
+- [x] **T3.2** 🤖 Eval runner (`make eval`) producing a results table + per-category breakdown + MLflow run (commit `afbea31`)
   - AC: one command runs the full retrieval eval on `dev`
-- [ ] **T3.3** 🤝 LLM-judged metrics (faithfulness, correctness) using RAGAS/DeepEval-style prompts with a stronger open-weight judge on free GPU
+- [x] **T3.3** 🤝 LLM-judged metrics (faithfulness, correctness) using RAGAS/DeepEval-style prompts with a stronger open-weight judge on free GPU (commit `31a1c30`)
   - AC: judged eval runs on Colab/Kaggle; outputs saved
-- [ ] **T3.4** 👤 Judge calibration: hand-label 30–40 outputs, compare with judge, report agreement
+- [x] **T3.4** 👤 Judge calibration: hand-label 30–40 outputs, compare with judge, report agreement (commit `3dea475`)
   - AC: calibration section in `docs/eval-methodology.md`
-- [ ] **T3.5** 🤖 Bootstrap confidence intervals + paired comparison utility
+- [x] **T3.5** 🤖 Bootstrap confidence intervals + paired comparison utility
   - AC: variant comparison output includes CIs
-- [ ] **T3.6** 🤖 CI smoke eval (≈30 fixed items, retrieval + deterministic metrics, no GPU) with stored baseline and thresholds
+- [x] **T3.6** 🤖 CI smoke eval (≈30 fixed items, retrieval + deterministic metrics, no GPU) with stored baseline and thresholds
   - AC: a deliberately broken retrieval change makes CI fail (demonstrate and keep as a test)
 
 ## Phase 4 — Core experiments E1–E4 (P0)
@@ -163,3 +163,5 @@ If time runs short, descope in this order and record it as future work: **E7 QLo
 | 2026-10-10 | T0.5: Verified model shortlists, parameter sizes, GGUF RAM requirements, and licenses in `docs/decision-log.md`. |
 | 2026-10-10 | T0.6: Verified free HF Space specs, Colab/Kaggle GPU quotas, and VPS memory budget in `docs/architecture.md`. |
 | 2026-10-10 | T0.7: Curated 21 verified regulations across 5 themes (added Bursa Efek Indonesia / Pasar Modal) in `data/corpus_manifest.csv`. |
+| 2026-10-13 | T3.3: Implemented LLM-judged metrics (faithfulness, correctness), Colab/Kaggle 4-bit GPU runner, and 35-item calibration export (commit `31a1c30`). |
+| 2026-10-13 | T3.4: Completed human judge calibration on 35 items, agreement analysis (97.1% agreement, 0.9429 PABAK, 0.0149 MAE), and documented methodology in Section 11 (commit `3dea475`). |
