@@ -21,9 +21,11 @@ class DummyEmbeddingBackend(EmbeddingBackend):
     def __init__(self, dimension: int = 4) -> None:
         self._dim = dimension
 
-    def embed_documents(self, texts: list[str], batch_size: int = 64) -> list[list[float]]:
+    def embed_documents(
+        self, texts: list[str], batch_size: int = 64, show_progress: bool = True
+    ) -> list[list[float]]:
         # Map words to simple deterministic vector components
-        _ = batch_size
+        _ = (batch_size, show_progress)
         return [self.embed_query(t) for t in texts]
 
     def embed_query(self, query: str) -> list[float]:
@@ -322,6 +324,43 @@ def test_retriever_from_paths_not_found(tmp_path: Path) -> None:
 
     with pytest.raises(FileNotFoundError, match="Qdrant directory does not exist"):
         HybridRetriever.from_paths(index_dir=empty_dir)
+
+
+def test_retriever_collection_name_resolution(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """Test collection name resolution in HybridRetriever.from_paths."""
+    q_dir = tmp_path / "qdrant"
+    q_dir.mkdir()
+    b_dir = tmp_path / "bm25"
+    b_dir.mkdir()
+
+    monkeypatch.setattr(QdrantVectorStore, "__init__", lambda _self, **_kwargs: None)
+    monkeypatch.setattr(BM25Index, "load", lambda **_kwargs: None)
+    monkeypatch.setattr(
+        "easypasal.retrieval.retriever.get_embedding_backend",
+        lambda **_kwargs: DummyEmbeddingBackend(),
+    )
+
+    # Default model
+    r1 = HybridRetriever.from_paths(index_dir=tmp_path, strategy="structure_aware")
+    assert r1.collection_name == "easypasal_structure_aware"
+
+    # Non-default model
+    r2 = HybridRetriever.from_paths(
+        index_dir=tmp_path,
+        strategy="structure_aware",
+        model_name="sentence-transformers/paraphrase-multilingual-mpnet-base-v2",
+    )
+    assert r2.collection_name == "easypasal_structure_aware_paraphrase_multilingual_mpnet_base_v2"
+
+    # Explicit override
+    r3 = HybridRetriever.from_paths(
+        index_dir=tmp_path,
+        strategy="structure_aware",
+        collection_name="custom_collection",
+    )
+    assert r3.collection_name == "custom_collection"
 
 
 def test_real_index_retrieval_if_available() -> None:

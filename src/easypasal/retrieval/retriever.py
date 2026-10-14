@@ -12,6 +12,7 @@ from easypasal.index.embeddings import (
     DEFAULT_EMBEDDING_MODEL,
     EmbeddingBackend,
     get_embedding_backend,
+    get_model_slug,
 )
 from easypasal.index.vector_store import QdrantVectorStore, VectorSearchResult
 from easypasal.retrieval.fusion import DEFAULT_K_RRF, reciprocal_rank_fusion
@@ -52,6 +53,7 @@ class HybridRetriever:
         index_dir: Path | str = "data/index",
         strategy: str = "structure_aware",
         model_name: str = DEFAULT_EMBEDDING_MODEL,
+        collection_name: str | None = None,
         k_rrf: int = DEFAULT_K_RRF,
         dense_weight: float = 1.0,
         bm25_weight: float = 1.0,
@@ -75,12 +77,20 @@ class HybridRetriever:
         logger.info("Initializing embedding backend %r...", model_name)
         embedding_backend = get_embedding_backend(model_name=model_name)
 
-        collection_name = f"easypasal_{strategy}"
+        if collection_name is None:
+            if model_name == DEFAULT_EMBEDDING_MODEL:
+                target_collection = f"easypasal_{strategy}"
+            else:
+                slug = get_model_slug(model_name)
+                target_collection = f"easypasal_{strategy}_{slug}"
+        else:
+            target_collection = collection_name
+
         return cls(
             qdrant_store=qdrant_store,
             bm25_index=bm25_index,
             embedding_backend=embedding_backend,
-            collection_name=collection_name,
+            collection_name=target_collection,
             k_rrf=k_rrf,
             dense_weight=dense_weight,
             bm25_weight=bm25_weight,

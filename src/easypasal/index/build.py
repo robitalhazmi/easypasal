@@ -20,6 +20,7 @@ from easypasal.index.embeddings import (
     DEFAULT_EMBEDDING_MODEL,
     EmbeddingBackend,
     get_embedding_backend,
+    get_model_slug,
 )
 from easypasal.index.vector_store import QdrantVectorStore
 
@@ -43,6 +44,7 @@ class IndexStats:
     chunks_per_second: float
     qdrant_size_mb: float
     bm25_size_mb: float
+    collection_name: str = ""
 
     def to_dict(self) -> dict[str, Any]:
         return asdict(self)
@@ -74,9 +76,11 @@ def build_indices(
     index_dir: Path | str = "data/index",
     strategy: str = "structure_aware",
     model_name: str = DEFAULT_EMBEDDING_MODEL,
+    collection_name: str | None = None,
     batch_size: int = 64,
     recreate: bool = True,
     embedding_backend: EmbeddingBackend | None = None,
+    show_progress: bool = True,
 ) -> IndexStats:
     """Build and persist both Qdrant vector store and BM25 index from a chunks JSONL file."""
     chunks_path = Path(chunks_file)
@@ -105,24 +109,33 @@ def build_indices(
     )
 
     texts = [c.get("text", "") for c in chunks]
-    vectors = backend.embed_documents(texts, batch_size=batch_size)
+    vectors = backend.embed_documents(texts, batch_size=batch_size, show_progress=show_progress)
 
     # 2. Build Qdrant Vector Store
     qdrant_dir = index_path / "qdrant"
-    collection_name = f"easypasal_{strategy}"
+    if collection_name is None:
+        if model_name == DEFAULT_EMBEDDING_MODEL:
+            target_collection = f"easypasal_{strategy}"
+        else:
+            slug = get_model_slug(model_name)
+            target_collection = f"easypasal_{strategy}_{slug}"
+    else:
+        target_collection = collection_name
+
     logger.info(
         "Upserting vectors into embedded Qdrant (path=%s, collection=%r)...",
         qdrant_dir,
-        collection_name,
+        target_collection,
     )
 
     store = QdrantVectorStore(path=qdrant_dir)
-    store.init_collection(collection_name=collection_name, dimension=dimension, recreate=recreate)
+    store.init_collection(collection_name=target_collection, dimension=dimension, recreate=recreate)
     store.upsert_chunks(
-        collection_name=collection_name,
+        collection_name=target_collection,
         chunks=chunks,
         vectors=vectors,
         batch_size=batch_size,
+        show_progress=show_progress,
     )
 
     # 3. Build & Serialize BM25 Sparse Index
@@ -147,15 +160,17 @@ def build_indices(
         chunks_per_second=round(chunks_per_sec, 1),
         qdrant_size_mb=round(qdrant_mb, 2),
         bm25_size_mb=round(bm25_mb, 2),
+        collection_name=target_collection,
     )
 
     logger.info(
-        "Index build complete: %d chunks indexed in %.2fs (%.1f chunks/s) | Qdrant: %.2f MB | BM25: %.2f MB",
+        "Index build complete: %d chunks indexed in %.2fs (%.1f chunks/s) | Qdrant: %.2f MB | BM25: %.2f MB | Collection: %s",
         stats.num_chunks,
         stats.elapsed_seconds,
         stats.chunks_per_second,
         stats.qdrant_size_mb,
         stats.bm25_size_mb,
+        stats.collection_name,
     )
 
     # 4. Probe Verification Query
@@ -164,7 +179,7 @@ def build_indices(
 
     # Dense Probe
     query_vec = backend.embed_query(probe_query)
-    dense_hits = store.search(collection_name, query_vec, top_k=3)
+    dense_hits = store.search(target_collection, query_vec, top_k=3)
     logger.info(
         "Top Dense Hit: %s (score=%.4f)",
         dense_hits[0].citation_label if dense_hits else "None",
@@ -213,6 +228,12 @@ def main() -> None:
         help="Directory to save index data (default: data/index)",
     )
     parser.add_argument(
+        "--collection-name",
+        type=str,
+        default=None,
+        help="Optional explicit Qdrant collection name override",
+    )
+    parser.add_argument(
         "--batch-size",
         type=int,
         default=64,
@@ -234,6 +255,7 @@ def main() -> None:
             index_dir=args.output_dir,
             strategy=strat,
             model_name=args.model_name,
+            collection_name=args.collection_name,
             batch_size=args.batch_size,
         )
 

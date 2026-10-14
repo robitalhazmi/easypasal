@@ -15,6 +15,8 @@ from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any
 
+from tqdm import tqdm
+
 from eval.labeling_helper import GoldItem
 from eval.metrics.retrieval import RetrievalMetrics, compute_retrieval_metrics
 from eval.split_eval import load_gold_items
@@ -176,6 +178,7 @@ def evaluate_retrieval(
     dataset_path: str = "data/gold/dev.jsonl",
     strategy: str = "structure_aware",
     chunk_mapper: Any | None = None,
+    show_progress: bool = True,
 ) -> EvalReport:
     """Run retrieval evaluation over gold items and compute aggregate metrics.
 
@@ -188,6 +191,7 @@ def evaluate_retrieval(
         dataset_path: Identifier path for the dataset being evaluated.
         strategy: Chunking strategy being evaluated.
         chunk_mapper: Optional ChunkSpanMapper to normalize non-canonical chunk IDs.
+        show_progress: Whether to show a tqdm progress bar during evaluation.
 
     Returns:
         Populated EvalReport dataclass.
@@ -198,7 +202,12 @@ def evaluate_retrieval(
 
     cat_items: dict[str, list[ItemEvalResult]] = defaultdict(list)
 
-    for item in items:
+    iterable = (
+        tqdm(items, desc=f"Evaluating ({mode} | {strategy})", unit="query")
+        if show_progress
+        else items
+    )
+    for item in iterable:
         start_t = time.perf_counter()
         retrieval_res = retriever.retrieve(query=item.question, top_k=top_k, mode=mode)
         latency_ms = (time.perf_counter() - start_t) * 1000.0
@@ -537,6 +546,12 @@ def main() -> None:
         help="Custom MLflow run name",
     )
     parser.add_argument(
+        "--model-name",
+        type=str,
+        default="sentence-transformers/paraphrase-multilingual-MiniLM-L12-v2",
+        help="Embedding model name (default: sentence-transformers/paraphrase-multilingual-MiniLM-L12-v2)",
+    )
+    parser.add_argument(
         "--output-json",
         type=str,
         default=None,
@@ -546,6 +561,11 @@ def main() -> None:
         "--no-mlflow",
         action="store_true",
         help="Disable MLflow run tracking",
+    )
+    parser.add_argument(
+        "--no-progress",
+        action="store_true",
+        help="Disable tqdm progress bar during evaluation",
     )
 
     args = parser.parse_args()
@@ -565,6 +585,7 @@ def main() -> None:
     retriever = HybridRetriever.from_paths(
         index_dir=args.index_dir,
         strategy=args.strategy,
+        model_name=args.model_name,
     )
 
     # 4. Optional chunk mapper for non-canonical chunking (e.g. fixed_size)
@@ -584,6 +605,7 @@ def main() -> None:
         dataset_path=str(dataset_path),
         strategy=args.strategy,
         chunk_mapper=mapper,
+        show_progress=not args.no_progress,
     )
 
     # 5. Print terminal report
@@ -604,6 +626,7 @@ def main() -> None:
                 "strategy": args.strategy,
                 "mode": args.mode,
                 "top_k": args.top_k,
+                "model_name": args.model_name,
             },
         )
         if run_id:

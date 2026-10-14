@@ -15,6 +15,7 @@ from typing import Any
 
 from qdrant_client import QdrantClient
 from qdrant_client.http import models
+from tqdm import tqdm
 
 logging.basicConfig(
     level=logging.INFO,
@@ -104,6 +105,7 @@ class QdrantVectorStore:
         chunks: list[dict[str, Any]],
         vectors: list[list[float]],
         batch_size: int = 100,
+        show_progress: bool = True,
     ) -> int:
         """Batch upsert chunks and their dense embeddings into Qdrant."""
         if len(chunks) != len(vectors):
@@ -119,27 +121,34 @@ class QdrantVectorStore:
             batch_size,
         )
 
-        for i in range(0, total, batch_size):
-            batch_chunks = chunks[i : i + batch_size]
-            batch_vectors = vectors[i : i + batch_size]
+        with tqdm(
+            total=total,
+            desc=f"Upserting Qdrant ({collection_name})",
+            unit="chunks",
+            disable=not show_progress,
+        ) as pbar:
+            for i in range(0, total, batch_size):
+                batch_chunks = chunks[i : i + batch_size]
+                batch_vectors = vectors[i : i + batch_size]
 
-            points: list[models.PointStruct] = []
-            for chunk, vec in zip(batch_chunks, batch_vectors, strict=True):
-                cid = chunk["chunk_id"]
-                p_uuid = chunk_id_to_uuid(cid)
-                points.append(
-                    models.PointStruct(
-                        id=p_uuid,
-                        vector=vec,
-                        payload=chunk,
+                points: list[models.PointStruct] = []
+                for chunk, vec in zip(batch_chunks, batch_vectors, strict=True):
+                    cid = chunk["chunk_id"]
+                    p_uuid = chunk_id_to_uuid(cid)
+                    points.append(
+                        models.PointStruct(
+                            id=p_uuid,
+                            vector=vec,
+                            payload=chunk,
+                        )
                     )
-                )
 
-            self.client.upsert(
-                collection_name=collection_name,
-                points=points,
-                wait=True,
-            )
+                self.client.upsert(
+                    collection_name=collection_name,
+                    points=points,
+                    wait=True,
+                )
+                pbar.update(len(batch_chunks))
 
         logger.info("Successfully upserted %d points into %r.", total, collection_name)
         return total

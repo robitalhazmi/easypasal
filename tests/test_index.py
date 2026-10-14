@@ -33,8 +33,10 @@ class MockEmbeddingBackend:
     def dimension(self) -> int:
         return self._dim
 
-    def embed_documents(self, texts: list[str], batch_size: int = 64) -> list[list[float]]:
-        _ = batch_size
+    def embed_documents(
+        self, texts: list[str], batch_size: int = 64, show_progress: bool = True
+    ) -> list[list[float]]:
+        _ = (batch_size, show_progress)
         # Generate simple deterministic pseudo-embeddings based on text length
         vectors: list[list[float]] = []
         for t in texts:
@@ -274,3 +276,71 @@ def test_build_indices_end_to_end(tmp_path: Path) -> None:
     # Verify BM25 disk directory
     assert (index_dir / "bm25" / "structure_aware_model.pkl").exists()
     assert (index_dir / "bm25" / "structure_aware_meta.json").exists()
+
+
+def test_get_model_slug() -> None:
+    """Test model slug extraction from model identifiers."""
+    from easypasal.index.embeddings import get_model_slug
+
+    assert (
+        get_model_slug("sentence-transformers/paraphrase-multilingual-MiniLM-L12-v2")
+        == "paraphrase_multilingual_minilm_l12_v2"
+    )
+    assert (
+        get_model_slug("sentence-transformers/paraphrase-multilingual-mpnet-base-v2")
+        == "paraphrase_multilingual_mpnet_base_v2"
+    )
+    assert get_model_slug("intfloat/multilingual-e5-large") == "multilingual_e5_large"
+
+
+def test_fastembed_e5_prefix_detection_and_formatting() -> None:
+    """Test that FastEmbedBackend detects E5 models and applies task prefixes."""
+    backend_e5 = FastEmbedBackend(model_name="intfloat/multilingual-e5-large")
+    assert backend_e5.is_e5_model is True
+
+    backend_standard = FastEmbedBackend(
+        model_name="sentence-transformers/paraphrase-multilingual-MiniLM-L12-v2"
+    )
+    assert backend_standard.is_e5_model is False
+
+
+def test_build_indices_custom_collection_name(tmp_path: Path) -> None:
+    """Test build_indices with custom collection name and non-default model slug."""
+    mock_chunks = [
+        {
+            "chunk_id": "c1",
+            "text": "sample text",
+            "citation_label": "Law 1",
+            "doc_id": "L1",
+            "doc_number": "Law 1",
+            "status": "berlaku",
+        }
+    ]
+    chunks_file = tmp_path / "chunks.jsonl"
+    chunks_file.write_text(json.dumps(mock_chunks[0]) + "\n")
+    index_dir = tmp_path / "idx"
+
+    # Explicit collection name
+    stats = build_indices(
+        chunks_file=chunks_file,
+        index_dir=index_dir,
+        strategy="structure_aware",
+        collection_name="custom_col_test",
+        recreate=True,
+        embedding_backend=MockEmbeddingBackend(dimension=4, model_name="custom-model"),
+    )
+    assert stats.collection_name == "custom_col_test"
+
+    # Auto-derived slug collection name
+    stats2 = build_indices(
+        chunks_file=chunks_file,
+        index_dir=index_dir,
+        strategy="structure_aware",
+        model_name="intfloat/multilingual-e5-large",
+        collection_name=None,
+        recreate=True,
+        embedding_backend=MockEmbeddingBackend(
+            dimension=4, model_name="intfloat/multilingual-e5-large"
+        ),
+    )
+    assert stats2.collection_name == "easypasal_structure_aware_multilingual_e5_large"

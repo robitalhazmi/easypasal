@@ -14,6 +14,7 @@ if TYPE_CHECKING:
         EmbeddingBackend,
         FastEmbedBackend,
         get_embedding_backend,
+        get_model_slug,
     )
     from easypasal.index.vector_store import (
         QdrantVectorStore,
@@ -33,6 +34,7 @@ __all__ = [
     "build_indices",
     "chunk_id_to_uuid",
     "get_embedding_backend",
+    "get_model_slug",
     "tokenize_indonesian_legal",
 ]
 
@@ -47,6 +49,7 @@ _EMBEDDING_SYMBOLS = {
     "EmbeddingBackend",
     "FastEmbedBackend",
     "get_embedding_backend",
+    "get_model_slug",
 }
 
 _VECTOR_SYMBOLS = {

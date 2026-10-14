@@ -8,7 +8,7 @@ This document records the hypotheses, experimental setups, quantitative evaluati
 |---|---|---|---|---|
 | **E0** | Project Scaffolding & Naming | 2026-10-10 | Approved | `EasyPasal` name verified available across PyPI/GitHub; scaffolded with uv |
 | **E1** | Chunking Strategy | 2026-10-14 | Structure-Aware + Breadcrumbs (Variant C) | +433% Recall@5 on dev ($p=0.0168$), +123% on test ($p=0.0210$); eliminates clause chopping and guarantees statutory citation anchors |
-| **E2** | Embedding Models | *TBD* | *TBD* | *TBD* |
+| **E2** | Embedding Models | 2026-10-15 | Multilingual-E5-Large (1024-d) | +216% Recall@5 on dev ($p=0.0364$), +117% on test ($p=0.0064$); asymmetric task prefixing unlocks precise statutory semantic search |
 | **E3** | Retrieval Pipeline | *TBD* | *TBD* | *TBD* |
 | **E4** | Generator Model (CPU) | *TBD* | *TBD* | *TBD* |
 | **E5** | Prompt Optimization (GEPA) | *TBD* | *TBD* | *TBD* |
@@ -128,3 +128,59 @@ All local generators run quantized via 4-bit GGUF (`Q4_K_M`) using `llama.cpp` o
 - **Adopt Variant C (`structure_aware` with hierarchical breadcrumbs)** as the standard, production chunking strategy across EasyPasal.
 - Maintain `data/chunks/structure_aware.jsonl` as the default source for embedding and indexing in subsequent experiments (E2 Embedding Models and E3 Hybrid Retrieval).
 - Keep the multi-strategy CLI flags (`--strategy {structure_aware,structure_aware_no_header,fixed_size}`) and runner (`make exp-e1`) in the codebase for experiment reproducibility and continuous benchmarking.
+
+---
+
+### Decision: Multilingual Embedding Models (Experiment E2 / T4.2)
+- **Date:** 2026-10-15
+- **Status:** Approved (Adopt `intfloat/multilingual-e5-large`)
+
+#### 1. Experimental Setup
+- **Evaluation Splits:**
+  - `dev.jsonl`: $N = 40$ questions (32 answerable, 8 unanswerable/out-of-scope).
+  - Held-out `test.jsonl`: $N = 66$ questions (54 answerable, 12 unanswerable/out-of-scope).
+- **Corpus & Chunks:**
+  - Canonical `structure_aware` chunks (9,215 chunks in `data/chunks/structure_aware.jsonl`).
+- **Retrieval Mode:**
+  - Pure dense vector search (`mode="dense"`, cosine similarity, top-$k = 10$). Evaluates purely the semantic representation quality of embeddings without BM25 masking.
+- **Evaluated Candidates:**
+  1. **Variant 1 (`minilm_384`)**: `sentence-transformers/paraphrase-multilingual-MiniLM-L12-v2` (384-dim, ~118M params, lightweight baseline, INT8 quantized ONNX).
+  2. **Variant 2 (`mpnet_768`)**: `sentence-transformers/paraphrase-multilingual-mpnet-base-v2` (768-dim, ~278M params, medium capacity multilingual transformer).
+  3. **Variant 3 (`e5_large_1024`)**: `intfloat/multilingual-e5-large` (1024-dim, ~560M params, asymmetric instruction prefixing with `passage: ` and `query: `).
+- **Statistical Significance Testing:**
+  - 95% bootstrap confidence intervals (2,000 resamples).
+  - Paired Monte Carlo permutation tests (5,000 resamples).
+  - Paired comparison against MiniLM reference baseline.
+
+#### 2. Quantitative Results
+
+##### Development Set (`dev.jsonl`, $N = 40$, 32 answerable)
+| Model Variant | Dim | Params | Recall@5 | 95% CI | MRR@5 | nDCG@5 | p95 Latency | Disk Size | Sig vs MiniLM ($p$) |
+|---|---|---|---|---|---|---|---|---|---|
+| **MiniLM-L12-v2** | 384 | ~118M | 0.0938 | [0.0000, 0.1875] | 0.0703 | 0.0760 | **193.0 ms** | **47.5 MB** | Reference |
+| **MPNet-Base-v2** | 768 | ~278M | 0.1406 | [0.0312, 0.2656] | 0.1406 | 0.1326 | 331.9 ms | 81.1 MB | $p = 0.6253$ |
+| **Multilingual-E5-Large** | 1024 | ~560M | **0.2969** | [0.1406, 0.4531] | **0.2135** | **0.2350** | 742.8 ms | 107.1 MB | **$p = 0.0364$** ✅ |
+
+##### Held-Out Test Set (`test.jsonl`, $N = 66$, 54 answerable)
+| Model Variant | Dim | Params | Recall@5 | 95% CI | MRR@5 | nDCG@5 | p95 Latency | Disk Size | Sig vs MiniLM ($p$) |
+|---|---|---|---|---|---|---|---|---|---|
+| **MiniLM-L12-v2** | 384 | ~118M | 0.1698 | [0.0755, 0.2830] | 0.1368 | 0.1451 | **199.9 ms** | **47.5 MB** | Reference |
+| **MPNet-Base-v2** | 768 | ~278M | 0.2264 | [0.1226, 0.3396] | 0.1673 | 0.1728 | 362.9 ms | 81.1 MB | $p = 0.3415$ |
+| **Multilingual-E5-Large** | 1024 | ~560M | **0.3679** | [0.2453, 0.5000] | **0.2396** | **0.2680** | 861.0 ms | 107.1 MB | **$p = 0.0064$** ✅ |
+
+#### 3. Plain Language Trade-off Analysis & Rationale
+1. **Decisive Semantic Superiority of Multilingual-E5-Large:**
+   Multilingual-E5-Large demonstrated substantial and statistically significant retrieval improvements over the MiniLM baseline across both development (+216% relative Recall@5, $p=0.0364$) and held-out test (+117% relative Recall@5, $p=0.0064$). MRR jumped from 0.0703 to 0.2135 on dev (a 3x improvement), showing that the top-ranked dense results are much more accurate.
+2. **The Impact of Asymmetric Task Prefixes (`query: ` vs `passage: `):**
+   Statutory texts contain dense, formal Indonesian legal drafting that differs sharply in linguistic style from natural language search queries. E5's dual prefix mechanism allows the embedding space to bridge the query-to-statute linguistic mismatch, whereas symmetric models like MiniLM and MPNet struggle to align short questions with long legal clauses.
+3. **MPNet Fails Significance Thresholds:**
+   While MPNet-Base-v2 improves Recall@5 from 0.0938 to 0.1406 on dev and 0.1698 to 0.2264 on test, the paired permutation test shows that these gains are not statistically significant ($p = 0.6253$ dev, $p = 0.3415$ test). Given that MPNet requires 2.5 hours to index without INT8 quantization and doubles query latency, it does not justify the added overhead over MiniLM.
+4. **Latency and Storage Budget:**
+   - Qdrant disk storage for E5-Large is 107.1 MB (vs 47.5 MB for MiniLM), which comfortably fits well within the < 500 MB budget for free tier hosting and local laptops.
+   - p95 query latency on CPU is 742-861 ms. While higher than MiniLM (~195 ms), this remains well under the 1.5-second retrieval latency budget for interactive compliance search, and can be further accelerated via hybrid fusion (E3) or embedding caching.
+
+#### 4. Final Decision
+- **Adopt `intfloat/multilingual-e5-large` (1024-d)** as the primary embedding model for EasyPasal across production retrieval and subsequent experiments (E3 Hybrid Retrieval Pipeline).
+- Maintain automated asymmetric prefixing (`passage: ` for indexing, `query: ` for querying) in `src/easypasal/index/embeddings.py`.
+- Preserve MiniLM (`sentence-transformers/paraphrase-multilingual-MiniLM-L12-v2`) in the codebase as a lightweight, low-resource fallback option.
+- Retain the automated E2 experiment runner (`make exp-e2` / `experiments/e2_embeddings/run_experiment.py`) for reproducibility.

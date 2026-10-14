@@ -89,6 +89,9 @@ smoke-eval:
 exp-e1:
 	uv run python -m experiments.e1_chunking.run_experiment --split both
 
+exp-e2:
+	uv run python -m experiments.e2_embeddings.run_experiment --split both --mode dense
+
 bench:
 	@echo "Benchmark runner not yet implemented (scheduled for Phase 5 / T5.2)."
 	@exit 1
