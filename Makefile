@@ -77,8 +77,11 @@ eval-judged:
 calibrate:
 	uv run python -m eval.compute_judge_calibration
 
+BASELINE ?= data/eval_outputs/eval_baseline.json
+CANDIDATE ?= data/eval_outputs/e1_variant_c_structure_enriched_dev.json
+
 compare:
-	uv run python -m eval.compare_variants --baseline data/eval_outputs/eval_baseline.json --candidate data/eval_outputs/eval_candidate.json
+	uv run python -m eval.compare_variants --baseline $(BASELINE) --candidate $(CANDIDATE)
 
 smoke-eval:
 	uv run python -m eval.smoke_eval
