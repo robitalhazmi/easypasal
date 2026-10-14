@@ -7,7 +7,7 @@ This document records the hypotheses, experimental setups, quantitative evaluati
 | Experiment ID | Focus Area | Date | Decision | Key Rationale / Trade-off |
 |---|---|---|---|---|
 | **E0** | Project Scaffolding & Naming | 2026-10-10 | Approved | `EasyPasal` name verified available across PyPI/GitHub; scaffolded with uv |
-| **E1** | Chunking Strategy | 2026-10-14 | Structure-Aware + Breadcrumbs (Variant C) | +433% Recall@5 on dev ($p=0.0168$), +123% on test ($p=0.0242$); eliminates clause chopping and guarantees statutory citation anchors |
+| **E1** | Chunking Strategy | 2026-10-14 | Structure-Aware + Breadcrumbs (Variant C) | +433% Recall@5 on dev ($p=0.0168$), +123% on test ($p=0.0210$); eliminates clause chopping and guarantees statutory citation anchors |
 | **E2** | Embedding Models | *TBD* | *TBD* | *TBD* |
 | **E3** | Retrieval Pipeline | *TBD* | *TBD* | *TBD* |
 | **E4** | Generator Model (CPU) | *TBD* | *TBD* | *TBD* |

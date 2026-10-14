@@ -79,7 +79,7 @@
 
 ## Phase 4 — Core experiments E1–E4 (P0)
 
-- [x] **T4.1** 🤝 E1 chunking strategy → decision logged
+- [x] **T4.1** 🤝 E1 chunking strategy → decision logged (commit `d868f66`)
   - AC: results on `dev`, final check on `test`, trade-off notes in plain language
 - [ ] **T4.2** 🤝 E2 embedding models → decision logged
 - [ ] **T4.3** 🤝 E3 retrieval pipeline (dense / BM25 / hybrid / +rerank) → decision logged
