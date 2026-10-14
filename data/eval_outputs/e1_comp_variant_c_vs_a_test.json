@@ -1,0 +1,607 @@
+{
+  "timestamp": "2026-10-14T03:01:45.207723+00:00",
+  "report_type": "retrieval",
+  "baseline_path": "variant_a_fixed_size",
+  "candidate_path": "variant_c_structure_enriched",
+  "paired_items_count": 66,
+  "answerable_items_count": 53,
+  "summary": {
+    "significant_gains": 4,
+    "regressions": 0,
+    "neutral": 7
+  },
+  "metrics": {
+    "Recall@1": {
+      "metric": "Recall@1",
+      "baseline_mean": 0.0189,
+      "baseline_ci": {
+        "point_estimate": 0.0189,
+        "lower_bound": 0.0,
+        "upper_bound": 0.0566,
+        "confidence_level": 0.95,
+        "formatted": "0.0189 [0.0000, 0.0566]"
+      },
+      "candidate_mean": 0.0472,
+      "candidate_ci": {
+        "point_estimate": 0.0472,
+        "lower_bound": 0.0,
+        "upper_bound": 0.1132,
+        "confidence_level": 0.95,
+        "formatted": "0.0472 [0.0000, 0.1132]"
+      },
+      "delta_mean": 0.0283,
+      "delta_ci": {
+        "point_estimate": 0.0283,
+        "lower_bound": -0.0377,
+        "upper_bound": 0.0943,
+        "confidence_level": 0.95,
+        "formatted": "0.0283 [-0.0377, 0.0943]"
+      },
+      "p_value": 0.62787,
+      "cohens_d": 0.114,
+      "is_significant": false,
+      "status": "NEUTRAL",
+      "status_badge": "\u2139\ufe0f NEUTRAL"
+    },
+    "Recall@3": {
+      "metric": "Recall@3",
+      "baseline_mean": 0.1038,
+      "baseline_ci": {
+        "point_estimate": 0.1038,
+        "lower_bound": 0.0283,
+        "upper_bound": 0.1887,
+        "confidence_level": 0.95,
+        "formatted": "0.1038 [0.0283, 0.1887]"
+      },
+      "candidate_mean": 0.1509,
+      "candidate_ci": {
+        "point_estimate": 0.1509,
+        "lower_bound": 0.0566,
+        "upper_bound": 0.2642,
+        "confidence_level": 0.95,
+        "formatted": "0.1509 [0.0566, 0.2642]"
+      },
+      "delta_mean": 0.0472,
+      "delta_ci": {
+        "point_estimate": 0.0472,
+        "lower_bound": -0.0472,
+        "upper_bound": 0.1415,
+        "confidence_level": 0.95,
+        "formatted": "0.0472 [-0.0472, 0.1415]"
+      },
+      "p_value": 0.45631,
+      "cohens_d": 0.1374,
+      "is_significant": false,
+      "status": "NEUTRAL",
+      "status_badge": "\u2139\ufe0f NEUTRAL"
+    },
+    "Recall@5": {
+      "metric": "Recall@5",
+      "baseline_mean": 0.1226,
+      "baseline_ci": {
+        "point_estimate": 0.1226,
+        "lower_bound": 0.0472,
+        "upper_bound": 0.2075,
+        "confidence_level": 0.95,
+        "formatted": "0.1226 [0.0472, 0.2075]"
+      },
+      "candidate_mean": 0.2736,
+      "candidate_ci": {
+        "point_estimate": 0.2736,
+        "lower_bound": 0.1604,
+        "upper_bound": 0.4057,
+        "confidence_level": 0.95,
+        "formatted": "0.2736 [0.1604, 0.4057]"
+      },
+      "delta_mean": 0.1509,
+      "delta_ci": {
+        "point_estimate": 0.1509,
+        "lower_bound": 0.0377,
+        "upper_bound": 0.2642,
+        "confidence_level": 0.95,
+        "formatted": "0.1509 [0.0377, 0.2642]"
+      },
+      "p_value": 0.021,
+      "cohens_d": 0.3671,
+      "is_significant": true,
+      "status": "SIG_GAIN",
+      "status_badge": "\u2705 SIG GAIN"
+    },
+    "Recall@10": {
+      "metric": "Recall@10",
+      "baseline_mean": 0.2453,
+      "baseline_ci": {
+        "point_estimate": 0.2453,
+        "lower_bound": 0.1415,
+        "upper_bound": 0.3585,
+        "confidence_level": 0.95,
+        "formatted": "0.2453 [0.1415, 0.3585]"
+      },
+      "candidate_mean": 0.3774,
+      "candidate_ci": {
+        "point_estimate": 0.3774,
+        "lower_bound": 0.2453,
+        "upper_bound": 0.5094,
+        "confidence_level": 0.95,
+        "formatted": "0.3774 [0.2453, 0.5094]"
+      },
+      "delta_mean": 0.1321,
+      "delta_ci": {
+        "point_estimate": 0.1321,
+        "lower_bound": 0.0189,
+        "upper_bound": 0.2547,
+        "confidence_level": 0.95,
+        "formatted": "0.1321 [0.0189, 0.2547]"
+      },
+      "p_value": 0.05179,
+      "cohens_d": 0.2929,
+      "is_significant": false,
+      "status": "NEUTRAL",
+      "status_badge": "\u2139\ufe0f NEUTRAL"
+    },
+    "MRR@5": {
+      "metric": "MRR@5",
+      "baseline_mean": 0.0613,
+      "baseline_ci": {
+        "point_estimate": 0.0613,
+        "lower_bound": 0.0189,
+        "upper_bound": 0.1164,
+        "confidence_level": 0.95,
+        "formatted": "0.0613 [0.0189, 0.1164]"
+      },
+      "candidate_mean": 0.1258,
+      "candidate_ci": {
+        "point_estimate": 0.1258,
+        "lower_bound": 0.0626,
+        "upper_bound": 0.1981,
+        "confidence_level": 0.95,
+        "formatted": "0.1258 [0.0626, 0.1981]"
+      },
+      "delta_mean": 0.0645,
+      "delta_ci": {
+        "point_estimate": 0.0645,
+        "lower_bound": 0.005,
+        "upper_bound": 0.1346,
+        "confidence_level": 0.95,
+        "formatted": "0.0645 [0.0050, 0.1346]"
+      },
+      "p_value": 0.05499,
+      "cohens_d": 0.2676,
+      "is_significant": false,
+      "status": "NEUTRAL",
+      "status_badge": "\u2139\ufe0f NEUTRAL"
+    },
+    "MRR@10": {
+      "metric": "MRR@10",
+      "baseline_mean": 0.0772,
+      "baseline_ci": {
+        "point_estimate": 0.0772,
+        "lower_bound": 0.0362,
+        "upper_bound": 0.132,
+        "confidence_level": 0.95,
+        "formatted": "0.0772 [0.0362, 0.1320]"
+      },
+      "candidate_mean": 0.1364,
+      "candidate_ci": {
+        "point_estimate": 0.1364,
+        "lower_bound": 0.0739,
+        "upper_bound": 0.2114,
+        "confidence_level": 0.95,
+        "formatted": "0.1364 [0.0739, 0.2114]"
+      },
+      "delta_mean": 0.0593,
+      "delta_ci": {
+        "point_estimate": 0.0593,
+        "lower_bound": 0.003,
+        "upper_bound": 0.1231,
+        "confidence_level": 0.95,
+        "formatted": "0.0593 [0.0030, 0.1231]"
+      },
+      "p_value": 0.06539,
+      "cohens_d": 0.2576,
+      "is_significant": false,
+      "status": "NEUTRAL",
+      "status_badge": "\u2139\ufe0f NEUTRAL"
+    },
+    "nDCG@5": {
+      "metric": "nDCG@5",
+      "baseline_mean": 0.0763,
+      "baseline_ci": {
+        "point_estimate": 0.0763,
+        "lower_bound": 0.0267,
+        "upper_bound": 0.1345,
+        "confidence_level": 0.95,
+        "formatted": "0.0763 [0.0267, 0.1345]"
+      },
+      "candidate_mean": 0.1611,
+      "candidate_ci": {
+        "point_estimate": 0.1611,
+        "lower_bound": 0.0876,
+        "upper_bound": 0.2403,
+        "confidence_level": 0.95,
+        "formatted": "0.1611 [0.0876, 0.2403]"
+      },
+      "delta_mean": 0.0848,
+      "delta_ci": {
+        "point_estimate": 0.0848,
+        "lower_bound": 0.0181,
+        "upper_bound": 0.1593,
+        "confidence_level": 0.95,
+        "formatted": "0.0848 [0.0181, 0.1593]"
+      },
+      "p_value": 0.0182,
+      "cohens_d": 0.3218,
+      "is_significant": true,
+      "status": "SIG_GAIN",
+      "status_badge": "\u2705 SIG GAIN"
+    },
+    "nDCG@10": {
+      "metric": "nDCG@10",
+      "baseline_mean": 0.1152,
+      "baseline_ci": {
+        "point_estimate": 0.1152,
+        "lower_bound": 0.0604,
+        "upper_bound": 0.182,
+        "confidence_level": 0.95,
+        "formatted": "0.1152 [0.0604, 0.1820]"
+      },
+      "candidate_mean": 0.1933,
+      "candidate_ci": {
+        "point_estimate": 0.1933,
+        "lower_bound": 0.1216,
+        "upper_bound": 0.2678,
+        "confidence_level": 0.95,
+        "formatted": "0.1933 [0.1216, 0.2678]"
+      },
+      "delta_mean": 0.0781,
+      "delta_ci": {
+        "point_estimate": 0.0781,
+        "lower_bound": 0.0163,
+        "upper_bound": 0.1451,
+        "confidence_level": 0.95,
+        "formatted": "0.0781 [0.0163, 0.1451]"
+      },
+      "p_value": 0.0232,
+      "cohens_d": 0.3159,
+      "is_significant": true,
+      "status": "SIG_GAIN",
+      "status_badge": "\u2705 SIG GAIN"
+    },
+    "Hit@1": {
+      "metric": "Hit@1",
+      "baseline_mean": 0.0189,
+      "baseline_ci": {
+        "point_estimate": 0.0189,
+        "lower_bound": 0.0,
+        "upper_bound": 0.0566,
+        "confidence_level": 0.95,
+        "formatted": "0.0189 [0.0000, 0.0566]"
+      },
+      "candidate_mean": 0.0566,
+      "candidate_ci": {
+        "point_estimate": 0.0566,
+        "lower_bound": 0.0,
+        "upper_bound": 0.1321,
+        "confidence_level": 0.95,
+        "formatted": "0.0566 [0.0000, 0.1321]"
+      },
+      "delta_mean": 0.0377,
+      "delta_ci": {
+        "point_estimate": 0.0377,
+        "lower_bound": -0.0193,
+        "upper_bound": 0.1132,
+        "confidence_level": 0.95,
+        "formatted": "0.0377 [-0.0193, 0.1132]"
+      },
+      "p_value": 0.62867,
+      "cohens_d": 0.1374,
+      "is_significant": false,
+      "status": "NEUTRAL",
+      "status_badge": "\u2139\ufe0f NEUTRAL"
+    },
+    "Hit@5": {
+      "metric": "Hit@5",
+      "baseline_mean": 0.1321,
+      "baseline_ci": {
+        "point_estimate": 0.1321,
+        "lower_bound": 0.0566,
+        "upper_bound": 0.2264,
+        "confidence_level": 0.95,
+        "formatted": "0.1321 [0.0566, 0.2264]"
+      },
+      "candidate_mean": 0.283,
+      "candidate_ci": {
+        "point_estimate": 0.283,
+        "lower_bound": 0.1698,
+        "upper_bound": 0.4151,
+        "confidence_level": 0.95,
+        "formatted": "0.2830 [0.1698, 0.4151]"
+      },
+      "delta_mean": 0.1509,
+      "delta_ci": {
+        "point_estimate": 0.1509,
+        "lower_bound": 0.0377,
+        "upper_bound": 0.2642,
+        "confidence_level": 0.95,
+        "formatted": "0.1509 [0.0377, 0.2642]"
+      },
+      "p_value": 0.0192,
+      "cohens_d": 0.3671,
+      "is_significant": true,
+      "status": "SIG_GAIN",
+      "status_badge": "\u2705 SIG GAIN"
+    },
+    "Latency (mean ms)": {
+      "metric": "Latency (mean ms)",
+      "baseline_mean": 202.4183,
+      "baseline_ci": {
+        "point_estimate": 202.4183,
+        "lower_bound": 176.7386,
+        "upper_bound": 245.5097,
+        "confidence_level": 0.95,
+        "formatted": "202.4183 [176.7386, 245.5097]"
+      },
+      "candidate_mean": 210.7202,
+      "candidate_ci": {
+        "point_estimate": 210.7202,
+        "lower_bound": 184.7664,
+        "upper_bound": 254.2948,
+        "confidence_level": 0.95,
+        "formatted": "210.7202 [184.7664, 254.2948]"
+      },
+      "delta_mean": 8.3018,
+      "delta_ci": {
+        "point_estimate": 8.3018,
+        "lower_bound": -0.2635,
+        "upper_bound": 16.9578,
+        "confidence_level": 0.95,
+        "formatted": "8.3018 [-0.2635, 16.9578]"
+      },
+      "p_value": 0.06179,
+      "cohens_d": 0.2347,
+      "is_significant": false,
+      "status": "NEUTRAL",
+      "status_badge": "\u2139\ufe0f NEUTRAL"
+    }
+  },
+  "category_metrics": {
+    "factual_direct": {
+      "Recall@5": {
+        "metric": "factual_direct Recall@5",
+        "baseline_mean": 0.1,
+        "baseline_ci": {
+          "point_estimate": 0.1,
+          "lower_bound": 0.0,
+          "upper_bound": 0.3,
+          "confidence_level": 0.95,
+          "formatted": "0.1000 [0.0000, 0.3000]"
+        },
+        "candidate_mean": 0.2,
+        "candidate_ci": {
+          "point_estimate": 0.2,
+          "lower_bound": 0.0,
+          "upper_bound": 0.5,
+          "confidence_level": 0.95,
+          "formatted": "0.2000 [0.0000, 0.5000]"
+        },
+        "delta_mean": 0.1,
+        "delta_ci": {
+          "point_estimate": 0.1,
+          "lower_bound": -0.2,
+          "upper_bound": 0.4,
+          "confidence_level": 0.95,
+          "formatted": "0.1000 [-0.2000, 0.4000]"
+        },
+        "p_value": 1.0,
+        "cohens_d": 0.1762,
+        "is_significant": false,
+        "status": "NEUTRAL",
+        "status_badge": "\u2139\ufe0f NEUTRAL"
+      }
+    },
+    "cross_article_synthesis": {
+      "Recall@5": {
+        "metric": "cross_article_synthesis Recall@5",
+        "baseline_mean": 0.15,
+        "baseline_ci": {
+          "point_estimate": 0.15,
+          "lower_bound": 0.0,
+          "upper_bound": 0.35,
+          "confidence_level": 0.95,
+          "formatted": "0.1500 [0.0000, 0.3500]"
+        },
+        "candidate_mean": 0.15,
+        "candidate_ci": {
+          "point_estimate": 0.15,
+          "lower_bound": 0.0,
+          "upper_bound": 0.4,
+          "confidence_level": 0.95,
+          "formatted": "0.1500 [0.0000, 0.4000]"
+        },
+        "delta_mean": 0.0,
+        "delta_ci": {
+          "point_estimate": 0.0,
+          "lower_bound": 0.0,
+          "upper_bound": 0.0,
+          "confidence_level": 0.95,
+          "formatted": "0.0000 [0.0000, 0.0000]"
+        },
+        "p_value": 1.0,
+        "cohens_d": 0.0,
+        "is_significant": false,
+        "status": "NEUTRAL",
+        "status_badge": "\u2139\ufe0f NEUTRAL"
+      }
+    },
+    "definitional": {
+      "Recall@5": {
+        "metric": "definitional Recall@5",
+        "baseline_mean": 0.1429,
+        "baseline_ci": {
+          "point_estimate": 0.1429,
+          "lower_bound": 0.0,
+          "upper_bound": 0.4286,
+          "confidence_level": 0.95,
+          "formatted": "0.1429 [0.0000, 0.4286]"
+        },
+        "candidate_mean": 0.2857,
+        "candidate_ci": {
+          "point_estimate": 0.2857,
+          "lower_bound": 0.0,
+          "upper_bound": 0.5714,
+          "confidence_level": 0.95,
+          "formatted": "0.2857 [0.0000, 0.5714]"
+        },
+        "delta_mean": 0.1429,
+        "delta_ci": {
+          "point_estimate": 0.1429,
+          "lower_bound": 0.0,
+          "upper_bound": 0.4286,
+          "confidence_level": 0.95,
+          "formatted": "0.1429 [0.0000, 0.4286]"
+        },
+        "p_value": 1.0,
+        "cohens_d": 0.378,
+        "is_significant": false,
+        "status": "NEUTRAL",
+        "status_badge": "\u2139\ufe0f NEUTRAL"
+      }
+    },
+    "obligation_and_prohibition": {
+      "Recall@5": {
+        "metric": "obligation_and_prohibition Recall@5",
+        "baseline_mean": 0.2857,
+        "baseline_ci": {
+          "point_estimate": 0.2857,
+          "lower_bound": 0.0,
+          "upper_bound": 0.5714,
+          "confidence_level": 0.95,
+          "formatted": "0.2857 [0.0000, 0.5714]"
+        },
+        "candidate_mean": 0.4286,
+        "candidate_ci": {
+          "point_estimate": 0.4286,
+          "lower_bound": 0.1429,
+          "upper_bound": 0.7143,
+          "confidence_level": 0.95,
+          "formatted": "0.4286 [0.1429, 0.7143]"
+        },
+        "delta_mean": 0.1429,
+        "delta_ci": {
+          "point_estimate": 0.1429,
+          "lower_bound": 0.0,
+          "upper_bound": 0.4286,
+          "confidence_level": 0.95,
+          "formatted": "0.1429 [0.0000, 0.4286]"
+        },
+        "p_value": 1.0,
+        "cohens_d": 0.378,
+        "is_significant": false,
+        "status": "NEUTRAL",
+        "status_badge": "\u2139\ufe0f NEUTRAL"
+      }
+    },
+    "sanctions_and_enforcement": {
+      "Recall@5": {
+        "metric": "sanctions_and_enforcement Recall@5",
+        "baseline_mean": 0.1429,
+        "baseline_ci": {
+          "point_estimate": 0.1429,
+          "lower_bound": 0.0,
+          "upper_bound": 0.4286,
+          "confidence_level": 0.95,
+          "formatted": "0.1429 [0.0000, 0.4286]"
+        },
+        "candidate_mean": 0.5714,
+        "candidate_ci": {
+          "point_estimate": 0.5714,
+          "lower_bound": 0.1429,
+          "upper_bound": 0.8571,
+          "confidence_level": 0.95,
+          "formatted": "0.5714 [0.1429, 0.8571]"
+        },
+        "delta_mean": 0.4286,
+        "delta_ci": {
+          "point_estimate": 0.4286,
+          "lower_bound": 0.1429,
+          "upper_bound": 0.8571,
+          "confidence_level": 0.95,
+          "formatted": "0.4286 [0.1429, 0.8571]"
+        },
+        "p_value": 0.24395,
+        "cohens_d": 0.8018,
+        "is_significant": false,
+        "status": "NEUTRAL",
+        "status_badge": "\u2139\ufe0f NEUTRAL"
+      }
+    },
+    "superseded_trap": {
+      "Recall@5": {
+        "metric": "superseded_trap Recall@5",
+        "baseline_mean": 0.0,
+        "baseline_ci": {
+          "point_estimate": 0.0,
+          "lower_bound": 0.0,
+          "upper_bound": 0.0,
+          "confidence_level": 0.95,
+          "formatted": "0.0000 [0.0000, 0.0000]"
+        },
+        "candidate_mean": 0.1667,
+        "candidate_ci": {
+          "point_estimate": 0.1667,
+          "lower_bound": 0.0,
+          "upper_bound": 0.5,
+          "confidence_level": 0.95,
+          "formatted": "0.1667 [0.0000, 0.5000]"
+        },
+        "delta_mean": 0.1667,
+        "delta_ci": {
+          "point_estimate": 0.1667,
+          "lower_bound": 0.0,
+          "upper_bound": 0.5,
+          "confidence_level": 0.95,
+          "formatted": "0.1667 [0.0000, 0.5000]"
+        },
+        "p_value": 1.0,
+        "cohens_d": 0.4082,
+        "is_significant": false,
+        "status": "NEUTRAL",
+        "status_badge": "\u2139\ufe0f NEUTRAL"
+      }
+    },
+    "english_slice": {
+      "Recall@5": {
+        "metric": "english_slice Recall@5",
+        "baseline_mean": 0.0,
+        "baseline_ci": {
+          "point_estimate": 0.0,
+          "lower_bound": 0.0,
+          "upper_bound": 0.0,
+          "confidence_level": 0.95,
+          "formatted": "0.0000 [0.0000, 0.0000]"
+        },
+        "candidate_mean": 0.1667,
+        "candidate_ci": {
+          "point_estimate": 0.1667,
+          "lower_bound": 0.0,
+          "upper_bound": 0.5,
+          "confidence_level": 0.95,
+          "formatted": "0.1667 [0.0000, 0.5000]"
+        },
+        "delta_mean": 0.1667,
+        "delta_ci": {
+          "point_estimate": 0.1667,
+          "lower_bound": 0.0,
+          "upper_bound": 0.5,
+          "confidence_level": 0.95,
+          "formatted": "0.1667 [0.0000, 0.5000]"
+        },
+        "p_value": 1.0,
+        "cohens_d": 0.4082,
+        "is_significant": false,
+        "status": "NEUTRAL",
+        "status_badge": "\u2139\ufe0f NEUTRAL"
+      }
+    }
+  }
+}

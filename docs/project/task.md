@@ -79,7 +79,7 @@
 
 ## Phase 4 — Core experiments E1–E4 (P0)
 
-- [ ] **T4.1** 🤝 E1 chunking strategy → decision logged
+- [x] **T4.1** 🤝 E1 chunking strategy → decision logged
   - AC: results on `dev`, final check on `test`, trade-off notes in plain language
 - [ ] **T4.2** 🤝 E2 embedding models → decision logged
 - [ ] **T4.3** 🤝 E3 retrieval pipeline (dense / BM25 / hybrid / +rerank) → decision logged
@@ -165,3 +165,4 @@ If time runs short, descope in this order and record it as future work: **E7 QLo
 | 2026-10-10 | T0.7: Curated 21 verified regulations across 5 themes (added Bursa Efek Indonesia / Pasar Modal) in `data/corpus_manifest.csv`. |
 | 2026-10-13 | T3.3: Implemented LLM-judged metrics (faithfulness, correctness), Colab/Kaggle 4-bit GPU runner, and 35-item calibration export (commit `31a1c30`). |
 | 2026-10-13 | T3.4: Completed human judge calibration on 35 items, agreement analysis (97.1% agreement, 0.9429 PABAK, 0.0149 MAE), and documented methodology in Section 11 (commit `3dea475`). |
+| 2026-10-14 | T4.1: Evaluated chunking strategies (fixed-size vs structure without header vs structure with breadcrumbs) on `dev` and `test` splits; logged decision for Variant C in `docs/decision-log.md`. |

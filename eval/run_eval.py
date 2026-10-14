@@ -174,6 +174,8 @@ def evaluate_retrieval(
     k_values: Sequence[int] = (1, 3, 5, 10),
     mode: str = "hybrid",
     dataset_path: str = "data/gold/dev.jsonl",
+    strategy: str = "structure_aware",
+    chunk_mapper: Any | None = None,
 ) -> EvalReport:
     """Run retrieval evaluation over gold items and compute aggregate metrics.
 
@@ -184,6 +186,8 @@ def evaluate_retrieval(
         k_values: Depths to compute metrics for.
         mode: Retrieval mode ('hybrid', 'dense', or 'bm25').
         dataset_path: Identifier path for the dataset being evaluated.
+        strategy: Chunking strategy being evaluated.
+        chunk_mapper: Optional ChunkSpanMapper to normalize non-canonical chunk IDs.
 
     Returns:
         Populated EvalReport dataclass.
@@ -203,8 +207,16 @@ def evaluate_retrieval(
         retrieved_ids = [c.chunk_id for c in retrieval_res.chunks]
         gold_chunks = item.relevant_chunk_ids
 
+        # If a chunk mapper is provided (e.g. for fixed-size evaluation), map IDs to canonical targets
+        if chunk_mapper is not None:
+            eval_retrieved_ids = chunk_mapper.map_retrieved_chunk_ids(
+                retrieved_ids, strategy=strategy
+            )
+        else:
+            eval_retrieved_ids = retrieved_ids
+
         metrics = compute_retrieval_metrics(
-            retrieved=retrieved_ids,
+            retrieved=eval_retrieved_ids,
             relevant=gold_chunks,
             k_values=sorted_k,
         )
@@ -490,7 +502,7 @@ def main() -> None:
         "--strategy",
         type=str,
         default="structure_aware",
-        choices=["structure_aware", "fixed_size"],
+        choices=["structure_aware", "structure_aware_no_header", "fixed_size"],
         help="Chunking strategy to evaluate (default: structure_aware)",
     )
     parser.add_argument(
@@ -555,7 +567,14 @@ def main() -> None:
         strategy=args.strategy,
     )
 
-    # 4. Run evaluation
+    # 4. Optional chunk mapper for non-canonical chunking (e.g. fixed_size)
+    mapper = None
+    if args.strategy == "fixed_size":
+        from eval.chunk_mapper import ChunkSpanMapper
+
+        mapper = ChunkSpanMapper.load_or_build()
+
+    # 5. Run evaluation
     report = evaluate_retrieval(
         retriever=retriever,
         items=items,
@@ -563,6 +582,8 @@ def main() -> None:
         k_values=k_vals,
         mode=args.mode,
         dataset_path=str(dataset_path),
+        strategy=args.strategy,
+        chunk_mapper=mapper,
     )
 
     # 5. Print terminal report

@@ -190,7 +190,7 @@ def main() -> None:
     )
     parser.add_argument(
         "--strategy",
-        choices=["structure_aware", "fixed_size", "all"],
+        choices=["structure_aware", "structure_aware_no_header", "fixed_size", "all"],
         default="structure_aware",
         help="Chunking strategy to index (default: structure_aware)",
     )
@@ -221,7 +221,11 @@ def main() -> None:
 
     args = parser.parse_args()
 
-    strategies = ["structure_aware", "fixed_size"] if args.strategy == "all" else [args.strategy]
+    strategies = (
+        ["structure_aware", "structure_aware_no_header", "fixed_size"]
+        if args.strategy == "all"
+        else [args.strategy]
+    )
 
     for strat in strategies:
         chunks_file = args.input_dir / f"{strat}.jsonl"

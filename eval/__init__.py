@@ -3,6 +3,7 @@
 from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
+    from eval.chunk_mapper import ChunkSpanMapper
     from eval.compute_judge_calibration import (
         CalibratedItem,
         CalibrationDiscrepancy,
@@ -92,6 +93,7 @@ __all__ = [
     "CalibrationDiscrepancy",
     "CategoryCalibrationSummary",
     "CategoryEvalSummary",
+    "ChunkSpanMapper",
     "CitationMetrics",
     "CorrectnessResult",
     "EvalReport",
@@ -234,6 +236,10 @@ _SMOKE_SYMBOLS = {
     "load_smoke_baseline",
 }
 
+_MAPPER_SYMBOLS = {
+    "ChunkSpanMapper",
+}
+
 
 def __getattr__(name: str) -> object:
     if name in _HELPER_SYMBOLS:
@@ -268,4 +274,8 @@ def __getattr__(name: str) -> object:
         import eval.smoke_eval as _smoke
 
         return getattr(_smoke, name)
+    if name in _MAPPER_SYMBOLS:
+        import eval.chunk_mapper as _mapper
+
+        return getattr(_mapper, name)
     raise AttributeError(f"module {__name__!r} has no attribute {name!r}")

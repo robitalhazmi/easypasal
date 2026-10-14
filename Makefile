@@ -1,4 +1,4 @@
-.PHONY: help setup lint format test check clean ingest index serve eval compare smoke-eval bench
+.PHONY: help setup lint format test check clean ingest index serve eval compare smoke-eval exp-e1 bench
 
 help:
 	@echo "EasyPasal Development Commands:"
@@ -13,6 +13,7 @@ help:
 	@echo "  make eval       - Run the evaluation harness on the gold evaluation set (Phase 3)"
 	@echo "  make compare    - Compare baseline and candidate runs with bootstrap CIs (Phase 3)"
 	@echo "  make smoke-eval - Run fast CI smoke evaluation gate against stored baseline (Phase 3)"
+	@echo "  make exp-e1     - Run Experiment E1: Chunking Strategy comparison on dev & test (Phase 4)"
 	@echo "  make bench      - Run CPU inference latency benchmark (Phase 5)"
 	@echo "  make clean      - Remove cache directories and temporary build artifacts"
 
@@ -81,6 +82,9 @@ compare:
 
 smoke-eval:
 	uv run python -m eval.smoke_eval
+
+exp-e1:
+	uv run python -m experiments.e1_chunking.run_experiment --split both
 
 bench:
 	@echo "Benchmark runner not yet implemented (scheduled for Phase 5 / T5.2)."
