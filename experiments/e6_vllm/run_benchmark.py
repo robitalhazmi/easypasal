@@ -16,6 +16,7 @@ from pathlib import Path
 from typing import Any
 
 from eval.split_eval import load_gold_items
+from tqdm.auto import tqdm
 
 from experiments.e6_vllm.client import AsyncVLLMBenchmarkClient
 from experiments.e6_vllm.models import (
@@ -90,6 +91,7 @@ async def run_concurrency_sweep(
     num_requests: int,
     prompts: list[str],
     max_tokens: int = 160,
+    show_progress: bool = True,
 ) -> ConcurrencyBenchmarkSummary:
     """Execute a single concurrency tier sweep using semaphore throttling."""
     logger.info(
@@ -100,19 +102,36 @@ async def run_concurrency_sweep(
     )
     semaphore = asyncio.Semaphore(concurrency)
 
+    pbar = tqdm(
+        total=num_requests,
+        desc=f"Concurrency c={concurrency:<2}",
+        unit="req",
+        dynamic_ncols=True,
+        disable=not show_progress,
+    )
+
     async def _worker(idx: int, prompt: str) -> BenchmarkRequestResult:
         req_id = f"req_c{concurrency}_{idx:03d}"
         async with semaphore:
-            return await client.generate_stream(
+            res = await client.generate_stream(
                 request_id=req_id,
                 prompt=prompt,
                 max_tokens=max_tokens,
                 concurrency_context=concurrency,
             )
+            pbar.update(1)
+            pbar.set_postfix(
+                {
+                    "tok/s": f"{res.tokens_per_second:.1f}",
+                    "lat": f"{res.total_latency_ms / 1000.0:.2f}s",
+                }
+            )
+            return res
 
     start_wall = time.perf_counter()
     tasks = [_worker(i, prompts[i % len(prompts)]) for i in range(num_requests)]
     results = await asyncio.gather(*tasks)
+    pbar.close()
     total_wall_time = time.perf_counter() - start_wall
     if client.mock:
         # Calibrate wall time to reflect realistic continuous batching throughput on NVIDIA T4 16GB
@@ -171,8 +190,20 @@ async def run_e6_benchmark(
         notes="Benchmarked with continuous batching and dynamic KV-cache management",
     )
 
+    logger.info(
+        "Starting E6 vLLM serving benchmark for '%s' across concurrencies: %s",
+        model_name,
+        concurrency_list,
+    )
     summaries: dict[int, ConcurrencyBenchmarkSummary] = {}
-    for c in concurrency_list:
+    for idx, c in enumerate(concurrency_list, 1):
+        logger.info(
+            "[%d/%d] Starting benchmark sweep for concurrency c=%d (%d requests)...",
+            idx,
+            len(concurrency_list),
+            c,
+            num_requests_per_level,
+        )
         summary = await run_concurrency_sweep(
             client=client,
             concurrency=c,
