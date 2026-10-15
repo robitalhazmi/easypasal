@@ -82,7 +82,7 @@
 - [x] **T4.1** 🤝 E1 chunking strategy → decision logged (commit `d868f66`)
   - AC: results on `dev`, final check on `test`, trade-off notes in plain language
 - [x] **T4.2** 🤝 E2 embedding models → decision logged (commit `a213910`)
-- [x] **T4.3** 🤝 E3 retrieval pipeline (dense / BM25 / hybrid / +rerank) → decision logged (commit `eaadd20`)
+- [x] **T4.3** 🤝 E3 retrieval pipeline (dense / BM25 / hybrid / +rerank) → decision logged (commit `2265eb8`)
 - [ ] **T4.4** 🤝 E4 generator model comparison (quality vs latency/memory on CPU) → decision logged
 - [ ] **T4.5** 🤖 Freeze the **baseline variant** in `configs/` and tag the release `v0.1`
   - AC: tag exists; CI baseline updated
@@ -169,4 +169,4 @@ If time runs short, descope in this order and record it as future work: **E7 QLo
 | 2026-10-13 | T3.6: Implemented CI smoke evaluation harness, regression prevention gates, and automated test suite (commit `490d7db`). |
 | 2026-10-14 | T4.1: Evaluated chunking strategies (fixed-size vs structure without header vs structure with breadcrumbs) on `dev` and `test` splits; logged decision for Variant C in `docs/decision-log.md` (commit `d868f66`). |
 | 2026-10-15 | T4.2: Evaluated multilingual embedding models (MiniLM vs MPNet vs Multilingual-E5-Large) on `dev` and `test` splits; logged decision for Multilingual-E5-Large in `docs/decision-log.md` (commit `a213910`). |
-| 2026-10-15 | T4.3: Evaluated retrieval pipeline architectures (pure dense vs pure BM25 vs hybrid RRF vs hybrid+reranker) on `dev` and `test` splits; logged decision for Pure Dense in `docs/decision-log.md` (commit `eaadd20`). |
+| 2026-10-15 | T4.3: Evaluated retrieval pipeline architectures (pure dense vs pure BM25 vs hybrid RRF vs hybrid+reranker) on `dev` and `test` splits; logged decision for Pure Dense in `docs/decision-log.md` (commit `2265eb8`). |
