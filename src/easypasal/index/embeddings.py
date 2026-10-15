@@ -34,7 +34,12 @@ class EmbeddingBackend(Protocol):
         """Embedding vector dimension."""
         ...
 
-    def embed_documents(self, texts: list[str], batch_size: int = 64) -> list[list[float]]:
+    def embed_documents(
+        self,
+        texts: list[str],
+        batch_size: int = 64,
+        show_progress: bool = True,
+    ) -> list[list[float]]:
         """Embed a list of document chunk texts into float vectors."""
         ...
 
@@ -93,6 +98,11 @@ class FastEmbedBackend:
         )
 
     @property
+    def is_e5_model(self) -> bool:
+        """Check if model belongs to the e5 family requiring task prefixes."""
+        return "e5" in self._model_name.lower()
+
+    @property
     def model_name(self) -> str:
         return self._model_name
 
@@ -103,7 +113,12 @@ class FastEmbedBackend:
         assert self._dimension is not None
         return self._dimension
 
-    def embed_documents(self, texts: list[str], batch_size: int = 64) -> list[list[float]]:
+    def embed_documents(
+        self,
+        texts: list[str],
+        batch_size: int = 64,
+        show_progress: bool = True,
+    ) -> list[list[float]]:
         """Generate normalized embedding vectors for document chunks."""
         self._init_model()
         assert self._model is not None
@@ -111,7 +126,25 @@ class FastEmbedBackend:
         if not texts:
             return []
 
-        embeddings_gen = self._model.embed(texts, batch_size=batch_size)
+        if self.is_e5_model:
+            formatted_texts = [
+                f"passage: {t}" if not t.startswith("passage: ") else t for t in texts
+            ]
+        else:
+            formatted_texts = texts
+
+        embeddings_gen = self._model.embed(formatted_texts, batch_size=batch_size)
+        if show_progress:
+            from tqdm import tqdm
+
+            embeddings_gen = tqdm(
+                embeddings_gen,
+                total=len(formatted_texts),
+                desc=f"Embedding ({self.model_name.split('/')[-1]})",
+                unit="chunk",
+                leave=True,
+            )
+
         return [[float(x) for x in vec] for vec in embeddings_gen]
 
     def embed_query(self, query: str) -> list[float]:
@@ -119,8 +152,16 @@ class FastEmbedBackend:
         self._init_model()
         assert self._model is not None
 
-        gen = self._model.embed([query])
+        formatted_query = (
+            f"query: {query}" if self.is_e5_model and not query.startswith("query: ") else query
+        )
+        gen = self._model.embed([formatted_query])
         return [float(x) for x in next(gen)]
+
+
+def get_model_slug(model_name: str) -> str:
+    """Derive a safe collection identifier slug from an embedding model identifier."""
+    return model_name.split("/")[-1].replace("-", "_").replace(".", "_").lower()
 
 
 def get_embedding_backend(

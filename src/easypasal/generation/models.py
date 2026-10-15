@@ -34,5 +34,6 @@ class GenerationOutput:
     prompt_tokens: int = 0
     completion_tokens: int = 0
     latency_ms: float = 0.0
+    tokens_per_second: float = 0.0
     model_name: str = ""
     metadata: dict[str, Any] = field(default_factory=dict)

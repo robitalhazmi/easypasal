@@ -1,0 +1,199 @@
+{
+  "baseline_id": "qwen_2_5_1_5b",
+  "candidate_id": "qwen_2_5_3b",
+  "common_items": 40,
+  "metrics": {
+    "Citation F1 (Article)": {
+      "metric": "Citation F1 (Article)",
+      "baseline_mean": 0.225,
+      "baseline_ci": {
+        "point_estimate": 0.225,
+        "lower_bound": 0.1,
+        "upper_bound": 0.35,
+        "confidence_level": 0.95,
+        "formatted": "0.2250 [0.1000, 0.3500]"
+      },
+      "candidate_mean": 0.3167,
+      "candidate_ci": {
+        "point_estimate": 0.3167,
+        "lower_bound": 0.1831,
+        "upper_bound": 0.4583,
+        "confidence_level": 0.95,
+        "formatted": "0.3167 [0.1831, 0.4583]"
+      },
+      "delta_mean": 0.0917,
+      "delta_ci": {
+        "point_estimate": 0.0917,
+        "lower_bound": -0.0167,
+        "upper_bound": 0.1917,
+        "confidence_level": 0.95,
+        "formatted": "0.0917 [-0.0167, 0.1917]"
+      },
+      "p_value": 0.12418,
+      "cohens_d": 0.2716,
+      "is_significant": false,
+      "status": "NEUTRAL",
+      "status_badge": "\u2139\ufe0f NEUTRAL"
+    },
+    "Citation F1 (Exact)": {
+      "metric": "Citation F1 (Exact)",
+      "baseline_mean": 0.225,
+      "baseline_ci": {
+        "point_estimate": 0.225,
+        "lower_bound": 0.1,
+        "upper_bound": 0.35,
+        "confidence_level": 0.95,
+        "formatted": "0.2250 [0.1000, 0.3500]"
+      },
+      "candidate_mean": 0.2583,
+      "candidate_ci": {
+        "point_estimate": 0.2583,
+        "lower_bound": 0.125,
+        "upper_bound": 0.4,
+        "confidence_level": 0.95,
+        "formatted": "0.2583 [0.1250, 0.4000]"
+      },
+      "delta_mean": 0.0333,
+      "delta_ci": {
+        "point_estimate": 0.0333,
+        "lower_bound": -0.05,
+        "upper_bound": 0.1167,
+        "confidence_level": 0.95,
+        "formatted": "0.0333 [-0.0500, 0.1167]"
+      },
+      "p_value": 0.63127,
+      "cohens_d": 0.1234,
+      "is_significant": false,
+      "status": "NEUTRAL",
+      "status_badge": "\u2139\ufe0f NEUTRAL"
+    },
+    "Abstention Acc": {
+      "metric": "Abstention Acc",
+      "baseline_mean": 0.525,
+      "baseline_ci": {
+        "point_estimate": 0.525,
+        "lower_bound": 0.375,
+        "upper_bound": 0.675,
+        "confidence_level": 0.95,
+        "formatted": "0.5250 [0.3750, 0.6750]"
+      },
+      "candidate_mean": 0.525,
+      "candidate_ci": {
+        "point_estimate": 0.525,
+        "lower_bound": 0.375,
+        "upper_bound": 0.675,
+        "confidence_level": 0.95,
+        "formatted": "0.5250 [0.3750, 0.6750]"
+      },
+      "delta_mean": 0.0,
+      "delta_ci": {
+        "point_estimate": 0.0,
+        "lower_bound": -0.175,
+        "upper_bound": 0.175,
+        "confidence_level": 0.95,
+        "formatted": "0.0000 [-0.1750, 0.1750]"
+      },
+      "p_value": 1.0,
+      "cohens_d": 0.0,
+      "is_significant": false,
+      "status": "NEUTRAL",
+      "status_badge": "\u2139\ufe0f NEUTRAL"
+    },
+    "Lexical F1": {
+      "metric": "Lexical F1",
+      "baseline_mean": 0.4082,
+      "baseline_ci": {
+        "point_estimate": 0.4082,
+        "lower_bound": 0.3116,
+        "upper_bound": 0.5098,
+        "confidence_level": 0.95,
+        "formatted": "0.4082 [0.3116, 0.5098]"
+      },
+      "candidate_mean": 0.5697,
+      "candidate_ci": {
+        "point_estimate": 0.5697,
+        "lower_bound": 0.4915,
+        "upper_bound": 0.6451,
+        "confidence_level": 0.95,
+        "formatted": "0.5697 [0.4915, 0.6451]"
+      },
+      "delta_mean": 0.1615,
+      "delta_ci": {
+        "point_estimate": 0.1615,
+        "lower_bound": 0.0837,
+        "upper_bound": 0.2433,
+        "confidence_level": 0.95,
+        "formatted": "0.1615 [0.0837, 0.2433]"
+      },
+      "p_value": 0.0004,
+      "cohens_d": 0.5884,
+      "is_significant": true,
+      "status": "SIG_GAIN",
+      "status_badge": "\u2705 SIG GAIN"
+    },
+    "Tokens/s": {
+      "metric": "Tokens/s",
+      "baseline_mean": 0.8625,
+      "baseline_ci": {
+        "point_estimate": 0.8625,
+        "lower_bound": 0.6857,
+        "upper_bound": 1.0558,
+        "confidence_level": 0.95,
+        "formatted": "0.8625 [0.6857, 1.0558]"
+      },
+      "candidate_mean": 0.603,
+      "candidate_ci": {
+        "point_estimate": 0.603,
+        "lower_bound": 0.5015,
+        "upper_bound": 0.7085,
+        "confidence_level": 0.95,
+        "formatted": "0.6030 [0.5015, 0.7085]"
+      },
+      "delta_mean": -0.2595,
+      "delta_ci": {
+        "point_estimate": -0.2595,
+        "lower_bound": -0.458,
+        "upper_bound": -0.0719,
+        "confidence_level": 0.95,
+        "formatted": "-0.2595 [-0.4580, -0.0719]"
+      },
+      "p_value": 0.0122,
+      "cohens_d": -0.4062,
+      "is_significant": true,
+      "status": "REGRESSION",
+      "status_badge": "\u274c REGRESSION"
+    },
+    "Latency (ms)": {
+      "metric": "Latency (ms)",
+      "baseline_mean": 70946.831,
+      "baseline_ci": {
+        "point_estimate": 70946.831,
+        "lower_bound": 62967.3918,
+        "upper_bound": 79571.5245,
+        "confidence_level": 0.95,
+        "formatted": "70946.8310 [62967.3918, 79571.5245]"
+      },
+      "candidate_mean": 172773.2442,
+      "candidate_ci": {
+        "point_estimate": 172773.2442,
+        "lower_bound": 153435.9705,
+        "upper_bound": 195044.8273,
+        "confidence_level": 0.95,
+        "formatted": "172773.2442 [153435.9705, 195044.8273]"
+      },
+      "delta_mean": 101826.4133,
+      "delta_ci": {
+        "point_estimate": 101826.4133,
+        "lower_bound": 88567.3676,
+        "upper_bound": 114502.7657,
+        "confidence_level": 0.95,
+        "formatted": "101826.4133 [88567.3676, 114502.7657]"
+      },
+      "p_value": 0.0002,
+      "cohens_d": 2.3539,
+      "is_significant": true,
+      "status": "REGRESSION",
+      "status_badge": "\u274c REGRESSION"
+    }
+  }
+}

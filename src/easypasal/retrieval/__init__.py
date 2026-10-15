@@ -11,10 +11,18 @@ if TYPE_CHECKING:
         RetrievalResult,
         RetrievedChunk,
     )
+    from easypasal.retrieval.reranker import (
+        DEFAULT_RERANKER_MODEL,
+        BaseReranker,
+        FlashRankReranker,
+    )
     from easypasal.retrieval.retriever import HybridRetriever
 
 __all__ = [
     "DEFAULT_K_RRF",
+    "DEFAULT_RERANKER_MODEL",
+    "BaseReranker",
+    "FlashRankReranker",
     "HybridRetriever",
     "RetrievalResult",
     "RetrievedChunk",
@@ -31,6 +39,12 @@ _MODEL_SYMBOLS = {
     "RetrievedChunk",
 }
 
+_RERANKER_SYMBOLS = {
+    "BaseReranker",
+    "DEFAULT_RERANKER_MODEL",
+    "FlashRankReranker",
+}
+
 _RETRIEVER_SYMBOLS = {
     "HybridRetriever",
 }
@@ -45,6 +59,10 @@ def __getattr__(name: str) -> object:
         import easypasal.retrieval.models as _models
 
         return getattr(_models, name)
+    if name in _RERANKER_SYMBOLS:
+        import easypasal.retrieval.reranker as _reranker
+
+        return getattr(_reranker, name)
     if name in _RETRIEVER_SYMBOLS:
         import easypasal.retrieval.retriever as _retriever
 

@@ -509,7 +509,16 @@ def format_comparison_table(report: VariantComparisonReport) -> str:
 def main() -> None:
     """CLI entrypoint for compare_variants."""
     parser = argparse.ArgumentParser(
-        description="EasyPasal Variant Comparison & Statistical Significance Utility (T3.5)"
+        description="EasyPasal Variant Comparison & Statistical Significance Utility (T3.5)",
+        epilog=(
+            "Example:\n"
+            "  uv run python -m eval.compare_variants \\\n"
+            "    --baseline data/eval_outputs/eval_baseline.json \\\n"
+            "    --candidate data/eval_outputs/e1_variant_c_structure_enriched_dev.json\n\n"
+            "Makefile shortcut:\n"
+            "  make compare BASELINE=<path> CANDIDATE=<path>"
+        ),
+        formatter_class=argparse.RawDescriptionHelpFormatter,
     )
     parser.add_argument(
         "--baseline",
@@ -553,6 +562,11 @@ def main() -> None:
         type=int,
         help="Random seed for reproducibility (default: 42).",
     )
+
+    if len(sys.argv) == 1:
+        parser.print_help(sys.stderr)
+        sys.exit(0)
+
     args = parser.parse_args()
 
     logging.basicConfig(level=logging.INFO, format="%(levelname)s: %(message)s")

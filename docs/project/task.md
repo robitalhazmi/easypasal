@@ -72,19 +72,19 @@
   - AC: judged eval runs on Colab/Kaggle; outputs saved
 - [x] **T3.4** 👤 Judge calibration: hand-label 30–40 outputs, compare with judge, report agreement (commit `3dea475`)
   - AC: calibration section in `docs/eval-methodology.md`
-- [x] **T3.5** 🤖 Bootstrap confidence intervals + paired comparison utility
+- [x] **T3.5** 🤖 Bootstrap confidence intervals + paired comparison utility (commit `41c954d`)
   - AC: variant comparison output includes CIs
-- [x] **T3.6** 🤖 CI smoke eval (≈30 fixed items, retrieval + deterministic metrics, no GPU) with stored baseline and thresholds
+- [x] **T3.6** 🤖 CI smoke eval (≈30 fixed items, retrieval + deterministic metrics, no GPU) with stored baseline and thresholds (commit `490d7db`)
   - AC: a deliberately broken retrieval change makes CI fail (demonstrate and keep as a test)
 
 ## Phase 4 — Core experiments E1–E4 (P0)
 
-- [ ] **T4.1** 🤝 E1 chunking strategy → decision logged
+- [x] **T4.1** 🤝 E1 chunking strategy → decision logged (commit `d868f66`)
   - AC: results on `dev`, final check on `test`, trade-off notes in plain language
-- [ ] **T4.2** 🤝 E2 embedding models → decision logged
-- [ ] **T4.3** 🤝 E3 retrieval pipeline (dense / BM25 / hybrid / +rerank) → decision logged
-- [ ] **T4.4** 🤝 E4 generator model comparison (quality vs latency/memory on CPU) → decision logged
-- [ ] **T4.5** 🤖 Freeze the **baseline variant** in `configs/` and tag the release `v0.1`
+- [x] **T4.2** 🤝 E2 embedding models → decision logged (commit `a213910`)
+- [x] **T4.3** 🤝 E3 retrieval pipeline (dense / BM25 / hybrid / +rerank) → decision logged (commit `2265eb8`)
+- [x] **T4.4** 🤝 E4 generator model comparison (quality vs latency/memory on CPU) → decision logged (commit `2b0de98`)
+- [x] **T4.5** 🤖 Freeze the **baseline variant** in `configs/` and tag the release `v0.1` (commit `9aa71a0`, tag `v0.1`)
   - AC: tag exists; CI baseline updated
 
 ## Phase 5 — Prompt optimization and inference (P1)
@@ -165,3 +165,10 @@ If time runs short, descope in this order and record it as future work: **E7 QLo
 | 2026-10-10 | T0.7: Curated 21 verified regulations across 5 themes (added Bursa Efek Indonesia / Pasar Modal) in `data/corpus_manifest.csv`. |
 | 2026-10-13 | T3.3: Implemented LLM-judged metrics (faithfulness, correctness), Colab/Kaggle 4-bit GPU runner, and 35-item calibration export (commit `31a1c30`). |
 | 2026-10-13 | T3.4: Completed human judge calibration on 35 items, agreement analysis (97.1% agreement, 0.9429 PABAK, 0.0149 MAE), and documented methodology in Section 11 (commit `3dea475`). |
+| 2026-10-13 | T3.5: Implemented bootstrap confidence intervals, paired permutation significance testing, and variant comparison utility (commit `41c954d`). |
+| 2026-10-13 | T3.6: Implemented CI smoke evaluation harness, regression prevention gates, and automated test suite (commit `490d7db`). |
+| 2026-10-14 | T4.1: Evaluated chunking strategies (fixed-size vs structure without header vs structure with breadcrumbs) on `dev` and `test` splits; logged decision for Variant C in `docs/decision-log.md` (commit `d868f66`). |
+| 2026-10-15 | T4.2: Evaluated multilingual embedding models (MiniLM vs MPNet vs Multilingual-E5-Large) on `dev` and `test` splits; logged decision for Multilingual-E5-Large in `docs/decision-log.md` (commit `a213910`). |
+| 2026-10-15 | T4.3: Evaluated retrieval pipeline architectures (pure dense vs pure BM25 vs hybrid RRF vs hybrid+reranker) on `dev` and `test` splits; logged decision for Pure Dense in `docs/decision-log.md` (commit `2265eb8`). |
+| 2026-10-15 | T4.4: Evaluated generator models on CPU (Llama-3.2-1B vs Qwen2.5-1.5B vs Qwen2.5-3B) across `dev` and `test` splits; logged decision for Llama-3.2-1B (CPU default) and Qwen2.5-3B (GPU target) in `docs/decision-log.md` (commit `2b0de98`). |
+| 2026-10-15 | T4.5: Frozen production baseline in `configs/baseline_v0.1.yaml` (Structure-Aware + Multilingual-E5-Large + Dense + Llama-3.2-1B CPU / Qwen2.5-3B GPU), implemented `EasyPasalConfig`, updated CI smoke and dev evaluation baselines, and tagged release `v0.1`. |

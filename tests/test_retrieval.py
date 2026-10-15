@@ -4,6 +4,7 @@ from __future__ import annotations
 
 from pathlib import Path
 from typing import Any
+from unittest.mock import MagicMock
 
 import pytest
 
@@ -11,7 +12,7 @@ from easypasal.index.bm25 import BM25Index, BM25SearchResult
 from easypasal.index.embeddings import EmbeddingBackend
 from easypasal.index.vector_store import QdrantVectorStore, VectorSearchResult
 from easypasal.retrieval.fusion import reciprocal_rank_fusion
-from easypasal.retrieval.models import RetrievalResult
+from easypasal.retrieval.models import RetrievalResult, RetrievedChunk
 from easypasal.retrieval.retriever import HybridRetriever
 
 
@@ -21,9 +22,11 @@ class DummyEmbeddingBackend(EmbeddingBackend):
     def __init__(self, dimension: int = 4) -> None:
         self._dim = dimension
 
-    def embed_documents(self, texts: list[str], batch_size: int = 64) -> list[list[float]]:
+    def embed_documents(
+        self, texts: list[str], batch_size: int = 64, show_progress: bool = True
+    ) -> list[list[float]]:
         # Map words to simple deterministic vector components
-        _ = batch_size
+        _ = (batch_size, show_progress)
         return [self.embed_query(t) for t in texts]
 
     def embed_query(self, query: str) -> list[float]:
@@ -324,6 +327,43 @@ def test_retriever_from_paths_not_found(tmp_path: Path) -> None:
         HybridRetriever.from_paths(index_dir=empty_dir)
 
 
+def test_retriever_collection_name_resolution(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """Test collection name resolution in HybridRetriever.from_paths."""
+    q_dir = tmp_path / "qdrant"
+    q_dir.mkdir()
+    b_dir = tmp_path / "bm25"
+    b_dir.mkdir()
+
+    monkeypatch.setattr(QdrantVectorStore, "__init__", lambda _self, **_kwargs: None)
+    monkeypatch.setattr(BM25Index, "load", lambda **_kwargs: None)
+    monkeypatch.setattr(
+        "easypasal.retrieval.retriever.get_embedding_backend",
+        lambda **_kwargs: DummyEmbeddingBackend(),
+    )
+
+    # Default model
+    r1 = HybridRetriever.from_paths(index_dir=tmp_path, strategy="structure_aware")
+    assert r1.collection_name == "easypasal_structure_aware"
+
+    # Non-default model
+    r2 = HybridRetriever.from_paths(
+        index_dir=tmp_path,
+        strategy="structure_aware",
+        model_name="sentence-transformers/paraphrase-multilingual-mpnet-base-v2",
+    )
+    assert r2.collection_name == "easypasal_structure_aware_paraphrase_multilingual_mpnet_base_v2"
+
+    # Explicit override
+    r3 = HybridRetriever.from_paths(
+        index_dir=tmp_path,
+        strategy="structure_aware",
+        collection_name="custom_collection",
+    )
+    assert r3.collection_name == "custom_collection"
+
+
 def test_real_index_retrieval_if_available() -> None:
     """Integration test against actual on-disk index if already built."""
     qdrant_dir = Path("data/index/qdrant")
@@ -398,3 +438,89 @@ def test_retriever_cli(monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFi
     assert "POJK 1 Tahun 2024, Pasal 1" in captured.out
     assert "Dense #1" in captured.out
     assert "BM25 #1" in captured.out
+
+
+def test_hybrid_retriever_hybrid_rerank_mode() -> None:
+    """Verify that mode='hybrid+rerank' invokes the configured reranker."""
+    qdrant = QdrantVectorStore(path=":memory:")
+    backend = DummyEmbeddingBackend(dimension=4)
+    chunks = [
+        {
+            "chunk_id": "c1",
+            "text": "Perlindungan konsumen perbankan",
+            "citation_label": "POJK 1, Pasal 1",
+            "doc_id": "d1",
+            "doc_number": "POJK 1",
+            "status": "berlaku",
+        },
+        {
+            "chunk_id": "c2",
+            "text": "Modal minimum bank umum",
+            "citation_label": "POJK 2, Pasal 1",
+            "doc_id": "d2",
+            "doc_number": "POJK 2",
+            "status": "berlaku",
+        },
+    ]
+    qdrant.init_collection(collection_name="test_col", dimension=4)
+    vectors = backend.embed_documents([c["text"] for c in chunks])
+    qdrant.upsert_chunks(collection_name="test_col", chunks=chunks, vectors=vectors)
+    bm25 = BM25Index.build_from_chunks(chunks)
+
+    mock_reranker = MagicMock()
+
+    def mock_rerank(query: str, chunks: list[RetrievedChunk], top_k: int) -> list[RetrievedChunk]:
+        _ = query
+        for rank, c in enumerate(reversed(chunks[:top_k]), start=1):
+            c.rerank_score = 0.99 / rank
+            c.rerank_rank = rank
+            c.score = 0.99 / rank
+        return list(reversed(chunks[:top_k]))
+
+    mock_reranker.rerank.side_effect = mock_rerank
+
+    retriever = HybridRetriever(
+        qdrant_store=qdrant,
+        bm25_index=bm25,
+        embedding_backend=backend,
+        collection_name="test_col",
+        reranker=mock_reranker,
+    )
+
+    res = retriever.retrieve(query="perlindungan konsumen", top_k=2, mode="hybrid+rerank")
+    assert len(res.chunks) == 2
+    assert mock_reranker.rerank.called
+    assert res.chunks[0].rerank_score is not None
+    assert res.chunks[0].rerank_rank == 1
+
+
+def test_hybrid_retriever_hybrid_rerank_fallback_when_none() -> None:
+    """Verify fallback to Hybrid RRF when mode='hybrid+rerank' but reranker is None."""
+    qdrant = QdrantVectorStore(path=":memory:")
+    backend = DummyEmbeddingBackend(dimension=4)
+    chunks = [
+        {
+            "chunk_id": "c1",
+            "text": "Perlindungan konsumen perbankan",
+            "citation_label": "POJK 1, Pasal 1",
+            "doc_id": "d1",
+            "doc_number": "POJK 1",
+            "status": "berlaku",
+        },
+    ]
+    qdrant.init_collection(collection_name="test_col", dimension=4)
+    vectors = backend.embed_documents([c["text"] for c in chunks])
+    qdrant.upsert_chunks(collection_name="test_col", chunks=chunks, vectors=vectors)
+    bm25 = BM25Index.build_from_chunks(chunks)
+
+    retriever = HybridRetriever(
+        qdrant_store=qdrant,
+        bm25_index=bm25,
+        embedding_backend=backend,
+        collection_name="test_col",
+        reranker=None,
+    )
+
+    res = retriever.retrieve(query="perlindungan konsumen", top_k=1, mode="hybrid+rerank")
+    assert len(res.chunks) == 1
+    assert res.chunks[0].score > 0.0

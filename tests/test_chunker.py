@@ -368,3 +368,36 @@ def test_chunk_corpus_jsonl(tmp_path: Path, sample_statute_doc: ParsedDocument) 
     assert len(chunks_f) > 0
     f_file = chunks_dir / "fixed_size.jsonl"
     assert f_file.exists()
+
+    # Run structure_aware_no_header
+    chunks_nh = chunk_corpus(parsed_dir, chunks_dir, strategy="structure_aware_no_header")
+    assert len(chunks_nh) == len(chunks_s)
+    nh_file = chunks_dir / "structure_aware_no_header.jsonl"
+    assert nh_file.exists()
+
+
+def test_structure_aware_chunker_no_breadcrumbs(sample_statute_doc: ParsedDocument) -> None:
+    """Test that include_breadcrumbs=False strips breadcrumb prefixes from text."""
+    chunker_with = StructureAwareChunker(include_breadcrumbs=True)
+    chunks_with = chunker_with.chunk(sample_statute_doc)
+
+    chunker_no = StructureAwareChunker(include_breadcrumbs=False)
+    chunks_no = chunker_no.chunk(sample_statute_doc)
+
+    assert len(chunks_with) == len(chunks_no)
+
+    for c_with, c_no in zip(chunks_with, chunks_no, strict=True):
+        assert c_with.chunk_id == c_no.chunk_id
+        assert c_with.raw_content == c_no.raw_content
+        # Breadcrumbs format: "[...]\n"
+        assert c_with.text.startswith("[")
+        assert not c_no.text.startswith("[")
+        assert c_no.text == c_no.raw_content
+
+
+def test_chunk_document_structure_aware_no_header(sample_statute_doc: ParsedDocument) -> None:
+    """Test chunk_document dispatch with structure_aware_no_header."""
+    chunks = chunk_document(sample_statute_doc, strategy="structure_aware_no_header")
+    assert len(chunks) > 0
+    assert all(c.chunk_type == "structure_aware" for c in chunks)
+    assert not chunks[0].text.startswith("[")

@@ -157,9 +157,15 @@ def is_catchword(text: str) -> bool:
 class StructureAwareChunker:
     """Decomposes Indonesian regulations into hierarchy-aware, context-enriched chunks."""
 
-    def __init__(self, max_chunk_size: int = 2000, overlap: int = 200) -> None:
+    def __init__(
+        self,
+        max_chunk_size: int = 2000,
+        overlap: int = 200,
+        include_breadcrumbs: bool = True,
+    ) -> None:
         self.max_chunk_size = max_chunk_size
         self.overlap = overlap
+        self.include_breadcrumbs = include_breadcrumbs
         self.penjelasan_re = re.compile(
             r"\n(?=PENJELASAN\s+(?:ATAS|UNDANG-UNDANG|PERATURAN)\b|\n\s*PENJELASAN\s*\n)",
             re.IGNORECASE,
@@ -172,6 +178,12 @@ class StructureAwareChunker:
             r"\n(?=(?:[IVXLCDM]+\.\s+[A-Z\s]+|Pasal\s+(?:[0-9]+[A-Za-z]*|[IVXLCDM]+))\s*:?$)",
             re.MULTILINE,
         )
+
+    def _format_chunk_text(self, breadcrumb: str, body: str) -> str:
+        """Format chunk text with or without statutory breadcrumbs."""
+        if not self.include_breadcrumbs or not breadcrumb:
+            return body if body else breadcrumb
+        return f"[{breadcrumb}]\n{body}" if body else f"[{breadcrumb}]"
 
     def chunk(self, doc: ParsedDocument | dict[str, Any]) -> list[Chunk]:
         """Process a parsed document into structure-aware chunks."""
@@ -290,8 +302,8 @@ class StructureAwareChunker:
                         cit_suffix = f" (bagian {idx + 1})" if idx > 0 else ""
                         cit = f"{doc_number}, Romawi {roman} angka {num_str}{cit_suffix}"
                         cid = f"{doc_id}_romawi_{roman}_angka_{num_str}{suffix}"
-                        c_hdr = f"[{doc_number} | Romawi {roman} {roman_title} | Angka {num_str}]"
-                        c_text = f"{c_hdr}\n{part_text}"
+                        c_hdr = f"{doc_number} | Romawi {roman} {roman_title} | Angka {num_str}"
+                        c_text = self._format_chunk_text(c_hdr, part_text)
                         chunks.append(
                             Chunk(
                                 chunk_id=cid,
@@ -320,8 +332,8 @@ class StructureAwareChunker:
                     cit_suffix = f" (bagian {idx + 1})" if idx > 0 else ""
                     cit = f"{doc_number}, Romawi {roman}{cit_suffix}"
                     cid = f"{doc_id}_romawi_{roman}{suffix}"
-                    c_hdr = f"[{doc_number} | Romawi {roman} {roman_title}]"
-                    c_text = f"{c_hdr}\n{part_text}" if part_text else c_hdr
+                    c_hdr = f"{doc_number} | Romawi {roman} {roman_title}"
+                    c_text = self._format_chunk_text(c_hdr, part_text)
                     chunks.append(
                         Chunk(
                             chunk_id=cid,
@@ -376,7 +388,7 @@ class StructureAwareChunker:
             ):
                 suffix = f"_part_{idx + 1}" if idx > 0 else ""
                 cit_suffix = f" (bagian {idx + 1})" if idx > 0 else ""
-                c_text = f"[{doc_number} | Pembukaan]\n{p_part}"
+                c_text = self._format_chunk_text(f"{doc_number} | Pembukaan", p_part)
                 chunks.append(
                     Chunk(
                         chunk_id=f"{doc_id}_pembukaan{suffix}",
@@ -517,7 +529,7 @@ class StructureAwareChunker:
                         cit_suffix = f" (bagian {idx + 1})" if idx > 0 else ""
                         cid = f"{doc_id}_{prefix}pasal_{pasal_num}_ayat_{ayat_num}{suffix}"
                         cit = f"{cit_prefix}, Pasal {pasal_num} ayat ({ayat_num}){cit_suffix}"
-                        c_text = f"[{bc}]\n{c_split}"
+                        c_text = self._format_chunk_text(bc, c_split)
                         chunks.append(
                             Chunk(
                                 chunk_id=cid,
@@ -574,7 +586,7 @@ class StructureAwareChunker:
                         cit_suffix = f" (bagian {idx + 1})" if idx > 0 else ""
                         cid = f"{doc_id}_{prefix}pasal_{pasal_num}_angka_{angka_num}{suffix}"
                         cit = f"{cit_prefix}, Pasal {pasal_num} angka {angka_num}{cit_suffix}"
-                        c_text = f"[{bc}]\n{d_split}"
+                        c_text = self._format_chunk_text(bc, d_split)
                         chunks.append(
                             Chunk(
                                 chunk_id=cid,
@@ -621,7 +633,7 @@ class StructureAwareChunker:
             cit_suffix = f" (bagian {idx + 1})" if idx > 0 else ""
             cid = f"{doc_id}_{prefix}pasal_{pasal_num}{suffix}"
             cit = f"{cit_prefix}, Pasal {pasal_num}{cit_suffix}"
-            c_text = f"[{bc}]\n{u_split}" if u_split else f"[{bc}]"
+            c_text = self._format_chunk_text(bc, u_split)
             chunks.append(
                 Chunk(
                     chunk_id=cid,
@@ -676,7 +688,7 @@ class StructureAwareChunker:
                 ):
                     suffix = f"_part_{idx + 1}" if idx > 0 else ""
                     cit_suffix = f" (bagian {idx + 1})" if idx > 0 else ""
-                    c_text = f"[Penjelasan {doc_number} | I. Umum]\n{u_split}"
+                    c_text = self._format_chunk_text(f"Penjelasan {doc_number} | I. Umum", u_split)
                     chunks.append(
                         Chunk(
                             chunk_id=f"{doc_id}_penjelasan_umum{suffix}",
@@ -729,7 +741,7 @@ class StructureAwareChunker:
                                 bc = (
                                     f"Penjelasan {doc_number} | Pasal {pasal_num} ayat ({ayat_num})"
                                 )
-                                c_text = f"[{bc}]\n{a_split}"
+                                c_text = self._format_chunk_text(bc, a_split)
                                 chunks.append(
                                     Chunk(
                                         chunk_id=cid,
@@ -760,7 +772,7 @@ class StructureAwareChunker:
                         cid = f"{doc_id}_penjelasan_pasal_{pasal_num}{suffix}"
                         cit = f"Penjelasan {doc_number}, Pasal {pasal_num}{cit_suffix}"
                         bc = f"Penjelasan {doc_number} | Pasal {pasal_num}"
-                        c_text = f"[{bc}]\n{b_split}" if b_split else f"[{bc}]"
+                        c_text = self._format_chunk_text(bc, b_split)
                         chunks.append(
                             Chunk(
                                 chunk_id=cid,
@@ -859,17 +871,29 @@ def chunk_document(
     chunk_size: int = 500,
     chunk_overlap: int = 100,
     max_chunk_size: int = 2000,
+    include_breadcrumbs: bool = True,
 ) -> list[Chunk]:
     """Chunk a single parsed document using the specified strategy."""
-    if strategy == "structure_aware":
-        chunker = StructureAwareChunker(max_chunk_size=max_chunk_size, overlap=chunk_overlap)
+    if strategy in ("structure_aware", "structure_aware_enriched"):
+        chunker = StructureAwareChunker(
+            max_chunk_size=max_chunk_size,
+            overlap=chunk_overlap,
+            include_breadcrumbs=include_breadcrumbs,
+        )
+        return chunker.chunk(doc)
+    elif strategy == "structure_aware_no_header":
+        chunker = StructureAwareChunker(
+            max_chunk_size=max_chunk_size,
+            overlap=chunk_overlap,
+            include_breadcrumbs=False,
+        )
         return chunker.chunk(doc)
     elif strategy == "fixed_size":
         baseline_chunker = FixedSizeChunker(chunk_size=chunk_size, chunk_overlap=chunk_overlap)
         return baseline_chunker.chunk(doc)
     else:
         raise ValueError(
-            f"Unsupported chunking strategy: {strategy!r}. Must be 'structure_aware' or 'fixed_size'."
+            f"Unsupported chunking strategy: {strategy!r}. Must be 'structure_aware', 'structure_aware_no_header', or 'fixed_size'."
         )
 
 
@@ -936,7 +960,7 @@ def main() -> None:
     )
     parser.add_argument(
         "--strategy",
-        choices=["structure_aware", "fixed_size", "all"],
+        choices=["structure_aware", "structure_aware_no_header", "fixed_size", "all"],
         default="structure_aware",
         help="Chunking strategy to execute (default: structure_aware)",
     )
@@ -978,6 +1002,14 @@ def main() -> None:
             input_dir=args.input_dir,
             output_dir=args.output_dir,
             strategy="structure_aware",
+            max_chunk_size=args.max_chunk_size,
+        )
+
+    if args.strategy in ("structure_aware_no_header", "all"):
+        chunk_corpus(
+            input_dir=args.input_dir,
+            output_dir=args.output_dir,
+            strategy="structure_aware_no_header",
             max_chunk_size=args.max_chunk_size,
         )
 

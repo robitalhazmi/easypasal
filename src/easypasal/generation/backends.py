@@ -2,12 +2,13 @@
 
 from __future__ import annotations
 
+import contextlib
 import logging
 import re
 import time
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Protocol
+from typing import Any, Protocol
 
 import httpx
 
@@ -19,9 +20,9 @@ from easypasal.generation.prompts import (
 
 logger = logging.getLogger("easypasal.generation.backends")
 
-DEFAULT_GGUF_REPO: str = "Qwen/Qwen2.5-1.5B-Instruct-GGUF"
-DEFAULT_GGUF_FILE: str = "qwen2.5-1.5b-instruct-q4_k_m.gguf"
-DEFAULT_OLLAMA_MODEL: str = "qwen2.5:1.5b"
+DEFAULT_GGUF_REPO: str = "bartowski/Llama-3.2-1B-Instruct-GGUF"
+DEFAULT_GGUF_FILE: str = "Llama-3.2-1B-Instruct-Q4_K_M.gguf"
+DEFAULT_OLLAMA_MODEL: str = "llama3.2:1b"
 
 
 @dataclass
@@ -33,6 +34,18 @@ class LLMGenerationResult:
     completion_tokens: int = 0
     latency_ms: float = 0.0
     model_name: str = ""
+    tokens_per_second: float = 0.0
+
+
+def get_process_peak_memory_mb() -> float:
+    """Return peak resident set size (RSS) of current process in megabytes."""
+    import platform
+    import resource
+
+    rusage = resource.getrusage(resource.RUSAGE_SELF).ru_maxrss
+    if platform.system() == "Darwin":
+        return round(rusage / (1024 * 1024), 2)
+    return round(rusage / 1024, 2)
 
 
 class GeneratorBackend(Protocol):
@@ -99,13 +112,17 @@ class MockGeneratorBackend:
 
         if is_ooc or has_no_docs:
             answer = STANDARD_ABSTAIN_EN if lang == "en" else STANDARD_ABSTAIN_ID
-            latency_ms = round((time.perf_counter() - start_time) * 1000, 2)
+            elapsed = time.perf_counter() - start_time
+            latency_ms = round(elapsed * 1000, 2)
+            completion_tokens = len(answer.split())
+            tokens_per_second = round(completion_tokens / elapsed, 2) if elapsed > 0 else 50.0
             return LLMGenerationResult(
                 text=answer,
                 prompt_tokens=len(prompt.split()),
-                completion_tokens=len(answer.split()),
+                completion_tokens=completion_tokens,
                 latency_ms=latency_ms,
                 model_name=self._model_name,
+                tokens_per_second=tokens_per_second,
             )
 
         # 2. In-Corpus Question: Synthesize answer with top passage citation
@@ -138,13 +155,17 @@ class MockGeneratorBackend:
                 f"Dasar hukum ketentuan ini tercantum dalam [{citation_label}]."
             )
 
-        latency_ms = round((time.perf_counter() - start_time) * 1000, 2)
+        elapsed = time.perf_counter() - start_time
+        latency_ms = round(elapsed * 1000, 2)
+        completion_tokens = len(answer.split())
+        tokens_per_second = round(completion_tokens / elapsed, 2) if elapsed > 0 else 50.0
         return LLMGenerationResult(
             text=answer,
             prompt_tokens=len(prompt.split()),
-            completion_tokens=len(answer.split()),
+            completion_tokens=completion_tokens,
             latency_ms=latency_ms,
             model_name=self._model_name,
+            tokens_per_second=tokens_per_second,
         )
 
 
@@ -195,13 +216,18 @@ class OllamaBackend:
             logger.error("Ollama generation failed: %s", e)
             raise
 
-        latency_ms = round((time.perf_counter() - start_time) * 1000, 2)
+        elapsed = time.perf_counter() - start_time
+        latency_ms = round(elapsed * 1000, 2)
+        tokens_per_second = (
+            round(completion_tokens / elapsed, 2) if elapsed > 0 and completion_tokens > 0 else 0.0
+        )
         return LLMGenerationResult(
             text=text,
             prompt_tokens=prompt_tokens,
             completion_tokens=completion_tokens,
             latency_ms=latency_ms,
             model_name=self._model_name,
+            tokens_per_second=tokens_per_second,
         )
 
 
@@ -248,13 +274,19 @@ class OpenAICompatibleBackend:
         text = choices[0]["message"]["content"].strip() if choices else ""
         usage = data.get("usage", {})
 
-        latency_ms = round((time.perf_counter() - start_time) * 1000, 2)
+        elapsed = time.perf_counter() - start_time
+        latency_ms = round(elapsed * 1000, 2)
+        completion_tokens = int(usage.get("completion_tokens", 0)) if isinstance(usage, dict) else 0
+        tokens_per_second = (
+            round(completion_tokens / elapsed, 2) if elapsed > 0 and completion_tokens > 0 else 0.0
+        )
         return LLMGenerationResult(
             text=text,
-            prompt_tokens=usage.get("prompt_tokens", 0),
-            completion_tokens=usage.get("completion_tokens", 0),
+            prompt_tokens=int(usage.get("prompt_tokens", 0)) if isinstance(usage, dict) else 0,
+            completion_tokens=completion_tokens,
             latency_ms=latency_ms,
             model_name=self._model_name,
+            tokens_per_second=tokens_per_second,
         )
 
 
@@ -266,7 +298,7 @@ class LlamaCppBackend:
         model_path: Path | str | None = None,
         repo_id: str = DEFAULT_GGUF_REPO,
         filename: str = DEFAULT_GGUF_FILE,
-        n_ctx: int = 2048,
+        n_ctx: int = 8192,
         n_threads: int | None = None,
     ) -> None:
         from llama_cpp import Llama
@@ -289,7 +321,17 @@ class LlamaCppBackend:
         if not self.model_path.exists():
             raise FileNotFoundError(f"GGUF model not found at {self.model_path}")
 
-        logger.info("Initializing Llama model from %s (n_ctx=%d)...", self.model_path, n_ctx)
+        if n_threads is None:
+            import os
+
+            n_threads = max(1, (os.cpu_count() or 4) // 2)
+
+        logger.info(
+            "Initializing Llama model from %s (n_ctx=%d, n_threads=%d)...",
+            self.model_path,
+            n_ctx,
+            n_threads,
+        )
         self._llm = Llama(
             model_path=str(self.model_path),
             n_ctx=n_ctx,
@@ -309,42 +351,102 @@ class LlamaCppBackend:
         max_tokens: int = 512,
         stop: list[str] | None = None,
     ) -> LLMGenerationResult:
-        start_time = time.perf_counter()
-        res = self._llm.create_completion(
-            prompt=prompt,
-            temperature=temperature,
-            max_tokens=max_tokens,
-            stop=stop or ["</answer>", "User:", "\n\nUser:"],
-            stream=False,
-        )
+        default_stops = [
+            "<|eot_id|>",
+            "<|im_end|>",
+            "<|end_of_text|>",
+            "<|endoftext|>",
+            "</answer>",
+            "\n\n\n",
+        ]
+        effective_stop = list(stop) if stop else []
+        for s in default_stops:
+            if s not in effective_stop:
+                effective_stop.append(s)
 
+        # Check if prompt contains system tags for chat formatting
+        sys_match = re.search(r"<system>\s*(.*?)\s*</system>", prompt, re.DOTALL)
+        user_body = re.sub(r"<system>\s*.*?\s*</system>", "", prompt, flags=re.DOTALL).strip()
+
+        start_time = time.perf_counter()
         prompt_tokens = 0
         completion_tokens = 0
-        if isinstance(res, dict):
-            choice = res["choices"][0]
-            text = str(choice.get("text", "")).strip()
-            usage = res.get("usage")
-            if isinstance(usage, dict):
-                prompt_tokens = int(usage.get("prompt_tokens", 0))
-                completion_tokens = int(usage.get("completion_tokens", 0))
-        else:
-            text = ""
 
-        latency_ms = round((time.perf_counter() - start_time) * 1000, 2)
+        if sys_match:
+            sys_text = sys_match.group(1).strip()
+            messages: list[Any] = [
+                {"role": "system", "content": sys_text},
+                {"role": "user", "content": user_body},
+            ]
+            chat_res: Any = self._llm.create_chat_completion(
+                messages=messages,
+                temperature=temperature,
+                max_tokens=max_tokens,
+                stop=effective_stop,
+            )
+            if isinstance(chat_res, dict):
+                choice = chat_res["choices"][0]
+                text = str(choice.get("message", {}).get("content", "")).strip()
+                usage = chat_res.get("usage")
+                if isinstance(usage, dict):
+                    prompt_tokens = int(usage.get("prompt_tokens", 0))
+                    completion_tokens = int(usage.get("completion_tokens", 0))
+            else:
+                text = ""
+        else:
+            comp_res: Any = self._llm.create_completion(
+                prompt=prompt,
+                temperature=temperature,
+                max_tokens=max_tokens,
+                stop=effective_stop,
+                stream=False,
+            )
+            if isinstance(comp_res, dict):
+                choice = comp_res["choices"][0]
+                text = str(choice.get("text", "")).strip()
+                usage = comp_res.get("usage")
+                if isinstance(usage, dict):
+                    prompt_tokens = int(usage.get("prompt_tokens", 0))
+                    completion_tokens = int(usage.get("completion_tokens", 0))
+            else:
+                text = ""
+
+        elapsed = time.perf_counter() - start_time
+        latency_ms = round(elapsed * 1000, 2)
+        tokens_per_second = (
+            round(completion_tokens / elapsed, 2) if elapsed > 0 and completion_tokens > 0 else 0.0
+        )
+
         return LLMGenerationResult(
             text=text,
             prompt_tokens=prompt_tokens,
             completion_tokens=completion_tokens,
             latency_ms=latency_ms,
             model_name=self._model_name,
+            tokens_per_second=tokens_per_second,
         )
+
+    def close(self) -> None:
+        """Close the underlying Llama model and release resources."""
+        llm = getattr(self, "_llm", None)
+        if llm is not None:
+            with contextlib.suppress(Exception):
+                llm.close()
+            del self._llm
+        import gc
+
+        gc.collect()
 
 
 def get_generator_backend(
     provider: str = "auto",
     model_name: str | None = None,
     model_path: Path | str | None = None,
+    repo_id: str | None = None,
+    filename: str | None = None,
     base_url: str | None = None,
+    n_ctx: int = 8192,
+    n_threads: int | None = None,
 ) -> GeneratorBackend:
     """Factory creating a generator backend based on available infrastructure.
 
@@ -373,7 +475,10 @@ def get_generator_backend(
     if provider == "llamacpp":
         return LlamaCppBackend(
             model_path=model_path,
-            filename=model_name or DEFAULT_GGUF_FILE,
+            repo_id=repo_id or DEFAULT_GGUF_REPO,
+            filename=filename or model_name or DEFAULT_GGUF_FILE,
+            n_ctx=n_ctx,
+            n_threads=n_threads,
         )
 
     # Provider == 'auto': Check local Ollama server first

@@ -1,6 +1,6 @@
 [project]
 name = "easypasal"
-version = "0.1.0.dev0"
+version = "0.1.0"
 description = "Evaluated, cited answers on Indonesian financial regulation."
 readme = "README.md"
 requires-python = ">=3.11"
@@ -20,6 +20,8 @@ dependencies = [
     "huggingface-hub>=0.20.0",
     "fastapi>=0.115.0",
     "uvicorn>=0.32.0",
+    "tqdm>=4.66.0",
+    "flashrank>=0.2.10",
 ]
 
 [dependency-groups]
@@ -30,6 +32,7 @@ dev = [
     "mypy>=1.13.0",
     "pre-commit>=4.0.0",
     "mlflow>=3.17.0",
+    "types-tqdm>=4.66.0",
 ]
 
 [build-system]
@@ -83,7 +86,7 @@ module = "tests.*"
 disallow_untyped_defs = false
 
 [[tool.mypy.overrides]]
-module = ["torch", "transformers"]
+module = ["torch", "transformers", "yaml"]
 ignore_missing_imports = true
 
 [tool.pytest.ini_options]

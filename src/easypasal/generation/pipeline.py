@@ -7,6 +7,7 @@ import logging
 import time
 from pathlib import Path
 
+from easypasal.config import EasyPasalConfig
 from easypasal.generation.backends import GeneratorBackend, get_generator_backend
 from easypasal.generation.citations import check_abstention, extract_citations
 from easypasal.generation.models import GenerationOutput
@@ -28,9 +29,55 @@ class RAGPipeline:
         self,
         retriever: HybridRetriever,
         generator: GeneratorBackend,
+        config: EasyPasalConfig | None = None,
     ) -> None:
         self.retriever = retriever
         self.generator = generator
+        self.config = config
+
+    @classmethod
+    def from_config(
+        cls,
+        config: EasyPasalConfig | None = None,
+        config_path: Path | str | None = None,
+        override_provider: str | None = None,
+    ) -> RAGPipeline:
+        """Initialize RAG pipeline from a validated EasyPasalConfig instance or YAML file.
+
+        Args:
+            config: Optional pre-loaded EasyPasalConfig instance.
+            config_path: Optional path to a YAML configuration file.
+            override_provider: Optional provider override ('auto', 'mock', 'llamacpp', etc.).
+
+        Returns:
+            Initialized RAGPipeline aligned with the specified configuration.
+        """
+        if config is None:
+            config = EasyPasalConfig.load_default(config_path)
+
+        logger.info(
+            "Initializing RAGPipeline from config variant %r (version=%s)...",
+            config.variant_id,
+            config.version,
+        )
+
+        retriever = HybridRetriever.from_paths(
+            index_dir=config.retrieval.index_dir,
+            strategy=config.chunking.strategy,
+            model_name=config.embeddings.model_name,
+            collection_name=config.retrieval.collection_name,
+        )
+
+        provider = override_provider or config.generator.cpu_default.provider
+        generator = get_generator_backend(
+            provider=provider,
+            repo_id=config.generator.cpu_default.repo_id,
+            filename=config.generator.cpu_default.filename,
+            n_ctx=config.generator.cpu_default.n_ctx,
+            n_threads=config.generator.cpu_default.n_threads,
+        )
+
+        return cls(retriever=retriever, generator=generator, config=config)
 
     @classmethod
     def from_defaults(
@@ -41,47 +88,74 @@ class RAGPipeline:
         model_name: str | None = None,
         model_path: Path | str | None = None,
         base_url: str | None = None,
+        config_path: Path | str | None = None,
     ) -> RAGPipeline:
-        """Initialize RAG pipeline using default index paths and specified generator backend."""
-        logger.info("Initializing HybridRetriever from %s...", index_dir)
-        retriever = HybridRetriever.from_paths(index_dir=index_dir, strategy=strategy)
+        """Initialize RAG pipeline using default configuration and optional parameter overrides."""
+        try:
+            config = EasyPasalConfig.load_default(config_path)
+            effective_strategy = strategy or config.chunking.strategy
+            effective_model = model_name or config.embeddings.model_name
+            effective_provider = (
+                provider if provider != "auto" else config.generator.cpu_default.provider
+            )
 
-        logger.info("Initializing GeneratorBackend (provider=%r)...", provider)
-        generator = get_generator_backend(
-            provider=provider,
-            model_name=model_name,
-            model_path=model_path,
-            base_url=base_url,
-        )
+            logger.info("Initializing HybridRetriever from %s...", index_dir)
+            retriever = HybridRetriever.from_paths(
+                index_dir=index_dir,
+                strategy=effective_strategy,
+                model_name=effective_model,
+                collection_name=config.retrieval.collection_name,
+            )
 
-        return cls(retriever=retriever, generator=generator)
+            logger.info("Initializing GeneratorBackend (provider=%r)...", effective_provider)
+            generator = get_generator_backend(
+                provider=effective_provider,
+                model_name=model_name,
+                model_path=model_path,
+                base_url=base_url,
+                repo_id=config.generator.cpu_default.repo_id,
+                filename=config.generator.cpu_default.filename,
+                n_ctx=config.generator.cpu_default.n_ctx,
+                n_threads=config.generator.cpu_default.n_threads,
+            )
+            return cls(retriever=retriever, generator=generator, config=config)
+        except Exception as exc:
+            logger.warning("Initializing pipeline with standard defaults without config: %s", exc)
+            retriever = HybridRetriever.from_paths(index_dir=index_dir, strategy=strategy)
+            generator = get_generator_backend(
+                provider=provider,
+                model_name=model_name,
+                model_path=model_path,
+                base_url=base_url,
+            )
+            return cls(retriever=retriever, generator=generator)
 
     def ask(
         self,
         question: str,
         language: str | None = None,
-        top_k: int = 5,
-        mode: str = "hybrid",
-        status_filter: str | None = "berlaku",
-        temperature: float = 0.1,
-        max_tokens: int = 512,
+        top_k: int | None = None,
+        mode: str | None = None,
+        status_filter: str | None = None,
+        temperature: float | None = None,
+        max_tokens: int | None = None,
         system_prompt_override: str | None = None,
-        verify_citations: bool = True,
-        strict_grounding: bool = False,
+        verify_citations: bool | None = None,
+        strict_grounding: bool | None = None,
     ) -> GenerationOutput:
         """Answer a regulatory question with citations and cite-or-abstain behavior.
 
         Args:
             question: User query in Indonesian or English.
             language: Optional language code ('id' or 'en'). Detected automatically if omitted.
-            top_k: Number of relevant regulatory passages to retrieve.
-            mode: Retrieval strategy ('hybrid', 'dense', or 'bm25').
-            status_filter: Regulation status constraint (default: 'berlaku').
-            temperature: LLM sampling temperature.
-            max_tokens: Maximum tokens in generated completion.
+            top_k: Number of relevant regulatory passages to retrieve (default: from config or 5).
+            mode: Retrieval strategy ('dense', 'hybrid', or 'bm25') (default: from config or 'dense').
+            status_filter: Regulation status constraint (default: from config or 'berlaku').
+            temperature: LLM sampling temperature (default: from config or 0.1).
+            max_tokens: Maximum tokens in generated completion (default: from config or 160).
             system_prompt_override: Custom system instructions if desired.
-            verify_citations: Validate that cited pasal/ayat exist in retrieved passages.
-            strict_grounding: Fall back to abstention if ungrounded citations are detected.
+            verify_citations: Validate that cited pasal/ayat exist in retrieved passages (default: True).
+            strict_grounding: Fall back to abstention if ungrounded citations are detected (default: False).
 
         Returns:
             GenerationOutput with answer text, extracted citations, and abstention status.
@@ -89,15 +163,48 @@ class RAGPipeline:
         start_time = time.perf_counter()
         clean_question = question.strip()
 
+        # Resolve effective parameters from attached config or baseline defaults
+        eff_top_k = (
+            top_k if top_k is not None else (self.config.retrieval.top_k if self.config else 5)
+        )
+        eff_mode = (
+            mode if mode is not None else (self.config.retrieval.mode if self.config else "dense")
+        )
+        eff_status = (
+            status_filter
+            if status_filter is not None
+            else (self.config.guardrails.status_filter if self.config else "berlaku")
+        )
+        eff_temp = (
+            temperature
+            if temperature is not None
+            else (self.config.generator.cpu_default.temperature if self.config else 0.1)
+        )
+        eff_max_tokens = (
+            max_tokens
+            if max_tokens is not None
+            else (self.config.generator.cpu_default.max_tokens if self.config else 160)
+        )
+        eff_verify = (
+            verify_citations
+            if verify_citations is not None
+            else (self.config.guardrails.verify_citations if self.config else True)
+        )
+        eff_strict = (
+            strict_grounding
+            if strict_grounding is not None
+            else (self.config.guardrails.strict_grounding if self.config else False)
+        )
+
         # 1. Detect Question Language
         lang = language if language is not None else detect_language(clean_question)
 
         # 2. Retrieve Candidate Passages
         retrieval_res = self.retriever.retrieve(
             query=clean_question,
-            top_k=top_k,
-            mode=mode,
-            status_filter=status_filter,
+            top_k=eff_top_k,
+            mode=eff_mode,
+            status_filter=eff_status,
         )
 
         # 3. Assemble Grounded Prompt
@@ -111,8 +218,8 @@ class RAGPipeline:
         # 4. Generate Completion via Backend
         gen_res = self.generator.generate(
             prompt=prompt,
-            temperature=temperature,
-            max_tokens=max_tokens,
+            temperature=eff_temp,
+            max_tokens=eff_max_tokens,
         )
 
         # 5. Extract Citations and Check Abstention
@@ -122,7 +229,7 @@ class RAGPipeline:
 
         # 6. Post-Hoc Citation Verification (T1.7)
         verification_dict = None
-        if verify_citations:
+        if eff_verify:
             from easypasal.guardrails.citation_verifier import verify_citations as verify_fn
 
             v_res = verify_fn(
@@ -139,7 +246,7 @@ class RAGPipeline:
                 "hallucinated_pasal": v_res.hallucinated_pasal,
             }
 
-            if not v_res.is_valid and strict_grounding and not abstained:
+            if not v_res.is_valid and eff_strict and not abstained:
                 logger.warning(
                     "Strict grounding triggered: ungrounded citations detected %s. Reverting to abstention.",
                     v_res.ungrounded_citations,
@@ -165,10 +272,12 @@ class RAGPipeline:
             prompt_tokens=gen_res.prompt_tokens,
             completion_tokens=gen_res.completion_tokens,
             latency_ms=total_latency_ms,
+            tokens_per_second=gen_res.tokens_per_second,
             model_name=self.generator.model_name,
             metadata={
                 "retrieval_ms": retrieval_res.duration_ms,
                 "generation_ms": gen_res.latency_ms,
+                "tokens_per_second": gen_res.tokens_per_second,
                 "retrieval_mode": mode,
                 "total_candidates": retrieval_res.total_candidates,
                 "citation_verification": verification_dict,

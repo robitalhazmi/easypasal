@@ -3,6 +3,16 @@
 from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
+    from eval.chunk_mapper import ChunkSpanMapper
+    from eval.compare_variants import (
+        VariantComparisonReport,
+        compare_judged_runs,
+        compare_retrieval_runs,
+        compare_variants,
+        detect_report_type,
+        format_comparison_table,
+        load_report_json,
+    )
     from eval.compute_judge_calibration import (
         CalibratedItem,
         CalibrationDiscrepancy,
@@ -92,6 +102,7 @@ __all__ = [
     "CalibrationDiscrepancy",
     "CategoryCalibrationSummary",
     "CategoryEvalSummary",
+    "ChunkSpanMapper",
     "CitationMetrics",
     "CorrectnessResult",
     "EvalReport",
@@ -109,6 +120,7 @@ __all__ = [
     "SmokeGateResult",
     "TransformersJudgeBackend",
     "ValidationReport",
+    "VariantComparisonReport",
     "abstention_accuracy",
     "abstention_f1",
     "abstention_precision",
@@ -117,9 +129,13 @@ __all__ = [
     "citation_f1",
     "citation_precision",
     "citation_recall",
+    "compare_judged_runs",
+    "compare_retrieval_runs",
+    "compare_variants",
     "compute_abstention_metrics",
     "compute_citation_metrics",
     "compute_retrieval_metrics",
+    "detect_report_type",
     "draft_candidate_questions",
     "evaluate_agreement",
     "evaluate_calibration",
@@ -129,11 +145,13 @@ __all__ = [
     "evaluate_retrieval",
     "evaluate_smoke_gate",
     "filter_passages",
+    "format_comparison_table",
     "generate_blank_template",
     "generate_draft_items_batch",
     "hit_at_k",
     "load_calibrated_items",
     "load_passages",
+    "load_report_json",
     "load_smoke_baseline",
     "log_to_mlflow",
     "ndcg_at_k",
@@ -234,6 +252,20 @@ _SMOKE_SYMBOLS = {
     "load_smoke_baseline",
 }
 
+_MAPPER_SYMBOLS = {
+    "ChunkSpanMapper",
+}
+
+_COMPARISON_SYMBOLS = {
+    "VariantComparisonReport",
+    "compare_judged_runs",
+    "compare_retrieval_runs",
+    "compare_variants",
+    "detect_report_type",
+    "format_comparison_table",
+    "load_report_json",
+}
+
 
 def __getattr__(name: str) -> object:
     if name in _HELPER_SYMBOLS:
@@ -268,4 +300,12 @@ def __getattr__(name: str) -> object:
         import eval.smoke_eval as _smoke
 
         return getattr(_smoke, name)
+    if name in _MAPPER_SYMBOLS:
+        import eval.chunk_mapper as _mapper
+
+        return getattr(_mapper, name)
+    if name in _COMPARISON_SYMBOLS:
+        import eval.compare_variants as _compare
+
+        return getattr(_compare, name)
     raise AttributeError(f"module {__name__!r} has no attribute {name!r}")
