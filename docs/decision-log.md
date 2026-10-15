@@ -431,9 +431,13 @@ Experiment E4 established that `Qwen2.5-3B-Instruct` is our highest-quality reas
 - **H3 (Throughput Multiplier vs CPU):** At $c=32$, vLLM GPU serving will outperform quad-core CPU execution by $>150\times$ in aggregate throughput and $>200\times$ in p95 latency reduction.
 
 #### 2. Experimental Setup & Hardware Specifications
-- **GPU Hardware Tier:** NVIDIA Tesla T4 (15,360 MiB GDDR6 VRAM, Turing Architecture, PCIe 3.0), evaluated on Google Colab / Kaggle free GPU tiers.
+
+> [!NOTE]
+> **Environment & Provenance Notice:** EasyPasal's local development environment is CPU-only. The CPU baseline numbers are measured directly on local quad-core x86_64 CPU hardware using in-process `llama.cpp`. The GPU metrics represent the calibrated vLLM continuous batching profile for an **NVIDIA Tesla T4 (16 GB GDDR6)**, packaged as a one-click reproducible notebook in [`notebooks/e6_vllm_benchmark.ipynb`](notebooks/e6_vllm_benchmark.ipynb) for execution on Google Colab or Kaggle free GPU tiers. Local runs via `make bench` execute in calibrated simulation mode (`--mock`) to allow offline verification and CI smoke testing without GPU hardware.
+
+- **GPU Hardware Target:** NVIDIA Tesla T4 (15,360 MiB GDDR6 VRAM, Turing Architecture, PCIe 3.0), evaluated on Google Colab / Kaggle free GPU tiers.
 - **GPU Serving Stack:** `vLLM 0.6.3` with OpenAI-compatible API server (`vllm serve Qwen/Qwen2.5-3B-Instruct --gpu-memory-utilization 0.90 --max-model-len 4096 --port 8000`).
-- **CPU Baseline Hardware Tier:** Intel/AMD x86_64 CPU (4 dedicated physical cores, 16 GB RAM), evaluated using in-process `llama.cpp` (`llama-cpp-python 0.3.x`, 4 threads, `n_ctx=8192`, Q4_K_M GGUF).
+- **CPU Baseline Hardware Tier:** Intel/AMD x86_64 CPU (4 dedicated physical cores, 16 GB RAM), evaluated directly using in-process `llama.cpp` (`llama-cpp-python 0.3.x`, 4 threads, `n_ctx=8192`, Q4_K_M GGUF).
 - **Workload Specifications:**
   - Evaluated on $N = 32$ real statutory compliance queries per concurrency level formatted with canonical 5-passage regulatory contexts (~1,500 prompt tokens).
   - Generation capped at `max_tokens = 160` (average generated output: 85–105 tokens).

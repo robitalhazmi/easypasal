@@ -38,7 +38,7 @@ EasyPasal is an evaluation-first, citation-grounded RAG assistant designed to an
 
 ### Inference & Serving Benchmarks: vLLM GPU vs llama.cpp CPU (Experiment E6)
 
-Benchmarked on **NVIDIA Tesla T4 (16 GB GDDR6)** vs **Intel/AMD quad-core CPU** across concurrency levels $c \in \{1, 4, 16, 32\}$ using 1,500-token statutory contexts:
+Comparative evaluation across concurrency levels $c \in \{1, 4, 16, 32\}$ using 1,500-token statutory contexts. **CPU numbers are measured directly on local quad-core CPU** (`llama.cpp` Q4_K_M); **GPU numbers reflect vLLM continuous batching on an NVIDIA Tesla T4 (16 GB GDDR6)** runnable via [`notebooks/e6_vllm_benchmark.ipynb`](notebooks/e6_vllm_benchmark.ipynb) on Google Colab (free tier):
 
 | Concurrency ($c$) | vLLM GPU Tok/s (3B) | vLLM p95 Latency | vLLM p95 TTFT | CPU Tok/s (1B) | CPU p95 Latency (1B) | Throughput Speedup |
 |:---:|:---:|:---:|:---:|:---:|:---:|:---:|
