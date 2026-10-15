@@ -140,6 +140,7 @@ class RAGPipeline:
         temperature: float | None = None,
         max_tokens: int | None = None,
         system_prompt_override: str | None = None,
+        prompt_variant: str = "gepa",
         verify_citations: bool | None = None,
         strict_grounding: bool | None = None,
     ) -> GenerationOutput:
@@ -213,6 +214,7 @@ class RAGPipeline:
             chunks=retrieval_res.chunks,
             language=lang,
             system_prompt_override=system_prompt_override,
+            prompt_variant=prompt_variant,
         )
 
         # 4. Generate Completion via Backend

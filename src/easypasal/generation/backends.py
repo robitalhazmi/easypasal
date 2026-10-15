@@ -92,7 +92,10 @@ class MockGeneratorBackend:
         start_time = time.perf_counter()
         lang = detect_language(prompt)
 
-        # 1. Detect Out-of-Corpus Questions in Prompt
+        # 1. Detect Out-of-Corpus Questions in Prompt (evaluate strictly on question block)
+        q_match = re.search(r"<question>(.*?)</question>", prompt, re.DOTALL)
+        eval_text = q_match.group(1) if q_match else prompt
+
         ooc_patterns = [
             r"hak guna bangunan",
             r"hgb",
@@ -105,7 +108,7 @@ class MockGeneratorBackend:
             r"memasak",
             r"masakan",
         ]
-        is_ooc = any(re.search(pat, prompt, re.IGNORECASE) for pat in ooc_patterns)
+        is_ooc = any(re.search(pat, eval_text, re.IGNORECASE) for pat in ooc_patterns)
 
         # Check if context block has no documents
         has_no_docs = "TIDAK ADA KONTEKS" in prompt or "--- DOKUMEN" not in prompt
