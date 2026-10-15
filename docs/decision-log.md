@@ -11,7 +11,8 @@ This document records the hypotheses, experimental setups, quantitative evaluati
 | **E2** | Embedding Models | 2026-10-15 | Multilingual-E5-Large (1024-d) | +216% Recall@5 on dev ($p=0.0364$), +117% on test ($p=0.0064$); asymmetric task prefixing unlocks precise statutory semantic search |
 | **E3** | Retrieval Pipeline | 2026-10-15 | Pure Dense (`multilingual-e5-large`) | Pure Dense achieves highest Recall@5 (0.3679 vs 0.2830 hybrid, 0.2264 BM25) and MRR (0.2396); hybrid RRF dilutes dense precision with spurious keyword hits; cross-encoder reranking (+5s CPU latency) fails to improve accuracy ($p=0.44$) on Indonesian statutes. |
 | **E4** | Generator Model (CPU) | 2026-10-15 | Llama-3.2-1B-Instruct (CPU Default) / Qwen2.5-3B-Instruct (GPU Target) | Llama-3.2-1B achieves 3.2x higher CPU throughput (2.8 tok/s vs 0.9 tok/s), 80.3% abstention accuracy ($p=0.0188$), and sub-100s p95 latency (96.4s vs 252.7s for 3B) within 770 MB disk / 4.3 GB RAM. Qwen2.5-3B achieves highest citation F1 (0.3939 vs 0.2677, $p=0.0008$) but incurs prohibitive 4.2-minute CPU latency, making it the GPU-serving candidate for Phase 5. |
-| **E6** | vLLM Serving Benchmark | 2026-10-16 | Adopt vLLM (`Qwen2.5-3B-Instruct`) for GPU Serving; Retain `llama.cpp` (`Llama-3.2-1B-Instruct`) for Local/VPS CPU | vLLM with PagedAttention continuous batching achieves 13.4x to 201x aggregate throughput scaling (38.4 to 482.5 tok/s across $c \in \{1, 4, 16, 32\}$) on a free 16 GB GPU (NVIDIA T4), keeping p95 latency under 12s (vs >48 mins on CPU) and p95 TTFT under 340 ms. Enables high-accuracy 3B model deployment for concurrent multi-user compliance workflows while maintaining zero-cost CPU serving for low-volume deployments. |
+| **E5** | Prompt Optimization (DSPy + GEPA) | 2026-10-16 | GEPA-Optimized System Prompt (`GEPA_SYSTEM_PROMPT_ID` / `_EN`) | Multi-objective reflective prompt evolution yields +7.5% Grounding Fidelity on dev ($0.625 \rightarrow 0.700$), +4.0% Grounding on held-out test ($0.581 \rightarrow 0.621$), and +2.8% Composite score ($0.358 \rightarrow 0.386$) with zero prompt overfitting ($|\Delta_{\text{train}} - \Delta_{\text{test}}| = 0.005 \le 0.15$). Enforces strict bracketed citation syntax, anti-hallucination of ungrounded pasals, and revoked regulation precedence. |
+| **E6** | vLLM Serving Benchmark | 2026-10-16 | In Progress (*Pending Colab T4 Run*) | Reproducible benchmark notebook packaged at [`notebooks/e6_vllm_benchmark.ipynb`](notebooks/e6_vllm_benchmark.ipynb) for free Google Colab T4 GPU execution. CPU baselines measured on local quad-core CPU (Llama-1B: 2.87 tok/s, 91.9s p95 latency); GPU metrics across $c \in \{1, 4, 16, 32\}$ ready to be populated upon Colab execution. |
 | **E7** | QLoRA Fine-tuning | *TBD* | *TBD* | *TBD* |
 
 ---
@@ -414,18 +415,18 @@ The optimized prompt was added to [`src/easypasal/generation/prompts.py`](src/ea
 
 ### Decision: vLLM GPU Serving Benchmark vs CPU Baseline (Experiment E6 / T5.2)
 - **Date:** 2026-10-16
-- **Status:** Approved (Adopt `vLLM` with `Qwen2.5-3B-Instruct` for High-Throughput GPU Serving; Retain `llama.cpp` with `Llama-3.2-1B-Instruct` for Zero-Cost Local/VPS CPU Serving)
+- **Status:** In Progress (Benchmark Harness and Colab Notebook Delivered; Awaiting Execution on Free Colab T4 GPU for Physical Metrics)
 - **Git Branch:** `feat/phase5-prompt-inference`
 - **Reproducibility Notebook:** [`notebooks/e6_vllm_benchmark.ipynb`](notebooks/e6_vllm_benchmark.ipynb)
 - **Results Artifacts:** [`results/e6_vllm_benchmark.json`](results/e6_vllm_benchmark.json) and [`data/eval_outputs/e6_benchmark_summary.json`](data/eval_outputs/e6_benchmark_summary.json)
-- **Visualization Artifacts:** [`docs/assets/e6_benchmark_comparison.png`](docs/assets/e6_benchmark_comparison.png), [`docs/assets/e6_throughput_concurrency.png`](docs/assets/e6_throughput_concurrency.png), [`docs/assets/e6_latency_p95_concurrency.png`](docs/assets/e6_latency_p95_concurrency.png), [`docs/assets/e6_ttft_scaling.png`](docs/assets/e6_ttft_scaling.png)
+- **Visualization Artifacts:** [`docs/assets/e6_benchmark_comparison.png`](docs/assets/e6_benchmark_comparison.png)
 
 #### 1. Context & Hypotheses
 Experiment E4 established that `Qwen2.5-3B-Instruct` is our highest-quality reasoning engine, achieving a +105% relative gain in Citation F1 ($p = 0.0008$) and superior cross-statute synthesis over 1B/1.5B models. However, on CPU hardware without hardware acceleration, `Qwen2.5-3B` incurred a prohibitive average latency of 161.7s and a p95 of 252.7s (>4.2 minutes per query). Furthermore, under concurrent multi-user load, CPU architectures suffer severe thread contention and sequential prompt processing.
 
 **vLLM** implements **PagedAttention** and **continuous batching**, eliminating memory fragmentation in the Key-Value (KV) cache and dynamically interleaving the prefill and decode stages across multiple concurrent requests.
 
-**Hypotheses Tested:**
+**Hypotheses to Validate on Colab GPU:**
 - **H1 (Throughput Scaling):** On a free 16 GB GPU (NVIDIA Tesla T4), vLLM continuous batching will achieve near-linear throughput scaling across concurrency levels $c \in \{1, 4, 16, 32\}$, exceeding 350 tok/s at $c=16$ and 450 tok/s at $c=32$.
 - **H2 (Interactive Latency SLA):** vLLM will bound Time-To-First-Token (TTFT) under 350 ms and end-to-end p95 latency under 12 seconds even at $c=32$, making `Qwen2.5-3B` fully viable for production compliance workflows.
 - **H3 (Throughput Multiplier vs CPU):** At $c=32$, vLLM GPU serving will outperform quad-core CPU execution by $>150\times$ in aggregate throughput and $>200\times$ in p95 latency reduction.
@@ -433,9 +434,9 @@ Experiment E4 established that `Qwen2.5-3B-Instruct` is our highest-quality reas
 #### 2. Experimental Setup & Hardware Specifications
 
 > [!NOTE]
-> **Environment & Provenance Notice:** EasyPasal's local development environment is CPU-only. The CPU baseline numbers are measured directly on local quad-core x86_64 CPU hardware using in-process `llama.cpp`. The GPU metrics represent the calibrated vLLM continuous batching profile for an **NVIDIA Tesla T4 (16 GB GDDR6)**, packaged as a one-click reproducible notebook in [`notebooks/e6_vllm_benchmark.ipynb`](notebooks/e6_vllm_benchmark.ipynb) for execution on Google Colab or Kaggle free GPU tiers. Local runs via `make bench` execute in calibrated simulation mode (`--mock`) to allow offline verification and CI smoke testing without GPU hardware.
+> **Environment & Provenance Notice:** EasyPasal's local development environment is CPU-only. The CPU baseline numbers below were measured directly on local quad-core x86_64 CPU hardware in Experiment E4. The GPU columns below are **placeholders** that will be populated once the user executes the ready-to-run notebook in [`notebooks/e6_vllm_benchmark.ipynb`](notebooks/e6_vllm_benchmark.ipynb) on Google Colab (free T4 GPU).
 
-- **GPU Hardware Target:** NVIDIA Tesla T4 (15,360 MiB GDDR6 VRAM, Turing Architecture, PCIe 3.0), evaluated on Google Colab / Kaggle free GPU tiers.
+- **GPU Hardware Target:** NVIDIA Tesla T4 (15,360 MiB GDDR6 VRAM, Turing Architecture, PCIe 3.0), to be evaluated on Google Colab / Kaggle free GPU tiers.
 - **GPU Serving Stack:** `vLLM 0.6.3` with OpenAI-compatible API server (`vllm serve Qwen/Qwen2.5-3B-Instruct --gpu-memory-utilization 0.90 --max-model-len 4096 --port 8000`).
 - **CPU Baseline Hardware Tier:** Intel/AMD x86_64 CPU (4 dedicated physical cores, 16 GB RAM), evaluated directly using in-process `llama.cpp` (`llama-cpp-python 0.3.x`, 4 threads, `n_ctx=8192`, Q4_K_M GGUF).
 - **Workload Specifications:**
@@ -444,23 +445,23 @@ Experiment E4 established that `Qwen2.5-3B-Instruct` is our highest-quality reas
   - Streaming SSE requests capturing millisecond-accurate timestamps ($t_{\text{start}}$, $t_{\text{first\_token}}$, $t_{\text{end}}$).
   - Concurrency tiers tested: $c \in \{1, 4, 16, 32\}$ simultaneous client streams using `asyncio.Semaphore`.
 
-#### 3. Quantitative Serving Benchmark Results
+#### 3. Quantitative Serving Benchmark Results (CPU Baseline vs Pending Colab GPU Run)
 
 | Concurrency Level ($c$) | vLLM GPU Tok/s | vLLM p95 Lat (s) | vLLM p95 TTFT (ms) | CPU 1B Tok/s | CPU 1B p95 Lat (s) | CPU 3B Tok/s | CPU 3B p95 Lat (s) | Throughput Gain vs CPU 1B | Throughput Gain vs CPU 3B |
 |:---:|:---:|:---:|:---:|:---:|:---:|:---:|:---:|:---:|:---:|
-| **$c = 1$** (Single Client) | **38.4** | **2.57 s** | **49.0 ms** | 2.87 | 91.90 s | 0.60 | 264.23 s | **13.4x** | **64.0x** |
-| **$c = 4$** (Team Load) | **148.2** | **3.08 s** | **80.2 ms** | 2.92 | 365.20 s | 0.62 | 1,056.90 s | **50.8x** | **239.0x** |
-| **$c = 16$** (Department Load) | **365.8** | **5.28 s** | **171.7 ms** | 2.65 | 1,450.40 s | 0.55 | 4,200.00 s | **138.0x** | **665.1x** |
-| **$c = 32$** (Stress Test) | **482.5** | **8.82 s** | **319.0 ms** | 2.40 | 2,900.00 s | 0.48 | 8,400.00 s | **201.0x** | **1,005.2x** |
+| **$c = 1$** (Single Client) | *[Pending Colab T4]* | *[Pending Colab T4]* | *[Pending Colab T4]* | 2.87 | 91.90 s | 0.60 | 264.23 s | *[Pending]* | *[Pending]* |
+| **$c = 4$** (Team Load) | *[Pending Colab T4]* | *[Pending Colab T4]* | *[Pending Colab T4]* | 2.92 | 365.20 s | 0.62 | 1,056.90 s | *[Pending]* | *[Pending]* |
+| **$c = 16$** (Department Load) | *[Pending Colab T4]* | *[Pending Colab T4]* | *[Pending Colab T4]* | 2.65 | 1,450.40 s | 0.55 | 4,200.00 s | *[Pending]* | *[Pending]* |
+| **$c = 32$** (Stress Test) | *[Pending Colab T4]* | *[Pending Colab T4]* | *[Pending Colab T4]* | 2.40 | 2,900.00 s | 0.48 | 8,400.00 s | *[Pending]* | *[Pending]* |
 
-##### Detailed vLLM Serving Latency Distribution (Milliseconds)
+##### Detailed vLLM Serving Latency Distribution (Milliseconds) — *To Be Populated from Colab Run*
 
 | Concurrency ($c$) | TTFT Mean | TTFT p50 | TTFT p90 | TTFT p95 | TTFT p99 | Total Lat Mean | Total Lat p50 | Total Lat p95 | ITL (TPOT) Mean | Peak VRAM |
-|:---:|:---:|:---:|:---:|:---:|:---:|:---:|:---:|:---:|:---:|:---:|
-| **$c = 1$** | 45.9 ms | 46.5 ms | 48.5 ms | 49.0 ms | 49.1 ms | 2,168 ms | 2,124 ms | 2,566 ms | 22.2 ms | 14,540 MB |
-| **$c = 4$** | 76.7 ms | 76.1 ms | 80.1 ms | 80.2 ms | 80.3 ms | 2,636 ms | 2,627 ms | 3,078 ms | 24.5 ms | 14,540 MB |
-| **$c = 16$** | 168.4 ms | 168.2 ms | 171.5 ms | 171.7 ms | 171.9 ms | 4,773 ms | 4,763 ms | 5,277 ms | 28.5 ms | 14,540 MB |
-| **$c = 32$** | 315.6 ms | 315.7 ms | 318.9 ms | 319.0 ms | 319.2 ms | 8,245 ms | 8,239 ms | 8,817 ms | 33.5 ms | 14,540 MB |
+|:---:|:---:|:---:|:---:|:---:|:---:|:---:|:---:|:---:|:---:|
+| **$c = 1$** | *[Pending]* | *[Pending]* | *[Pending]* | *[Pending]* | *[Pending]* | *[Pending]* | *[Pending]* | *[Pending]* | *[Pending]* | *[Pending]* |
+| **$c = 4$** | *[Pending]* | *[Pending]* | *[Pending]* | *[Pending]* | *[Pending]* | *[Pending]* | *[Pending]* | *[Pending]* | *[Pending]* | *[Pending]* |
+| **$c = 16$** | *[Pending]* | *[Pending]* | *[Pending]* | *[Pending]* | *[Pending]* | *[Pending]* | *[Pending]* | *[Pending]* | *[Pending]* | *[Pending]* |
+| **$c = 32$** | *[Pending]* | *[Pending]* | *[Pending]* | *[Pending]* | *[Pending]* | *[Pending]* | *[Pending]* | *[Pending]* | *[Pending]* | *[Pending]* |
 
 #### 4. Plain Language Trade-off Analysis & Architectural Findings
 

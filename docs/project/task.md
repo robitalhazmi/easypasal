@@ -91,7 +91,7 @@
 
 - [x] **T5.1** 🤝 E5: DSPy + GEPA run optimizing the answer prompt on `train`, tune on `dev`, report on `test` → decision logged
   - AC: before/after table with CIs; check for overfitting; optimized prompt committed
-- [x] **T5.2** 🤝 E6: vLLM benchmark notebook on free GPU (throughput, TTFT, p95 latency at concurrency 1/4/16/32) vs llama.cpp CPU baseline → decision logged
+- [x] **T5.2** 🤝 E6: vLLM benchmark notebook on free GPU (throughput, TTFT, p95 latency at concurrency 1/4/16/32) vs llama.cpp CPU baseline → harness & notebook ready; GPU numbers pending Colab run
   - AC: results table + plot in README; notebook reproducible; GPU type and settings recorded
 - [ ] **T5.3** 🤖 Variant switch in the API (config flag + deterministic hashing) and logging of variant
   - AC: two variants can serve side by side
@@ -173,4 +173,4 @@ If time runs short, descope in this order and record it as future work: **E7 QLo
 | 2026-10-15 | T4.4: Evaluated generator models on CPU (Llama-3.2-1B vs Qwen2.5-1.5B vs Qwen2.5-3B) across `dev` and `test` splits; logged decision for Llama-3.2-1B (CPU default) and Qwen2.5-3B (GPU target) in `docs/decision-log.md` (commit `2b0de98`). |
 | 2026-10-15 | T4.5: Frozen production baseline in `configs/baseline_v0.1.yaml` (Structure-Aware + Multilingual-E5-Large + Dense + Llama-3.2-1B CPU / Qwen2.5-3B GPU), implemented `EasyPasalConfig`, updated CI smoke and dev evaluation baselines, and tagged release `v0.1`. |
 | 2026-10-16 | T5.1: Multi-objective DSPy + GEPA answer prompt optimization across train ($N=23$), val ($N=17$), dev ($N=40$), and test ($N=66$); Grounding Fidelity improved +7.5% on dev, +4.0% on test with zero overfitting (gap $0.0050 \le 0.15$); winning prompt committed to `src/easypasal/generation/prompts.py` (`GEPA_SYSTEM_PROMPT_ID` / `_EN`), decision logged in Section 2.8. |
-| 2026-10-16 | T5.2: Benchmarked vLLM GPU serving vs llama.cpp CPU baseline across concurrency levels $c \in \{1, 4, 16, 32\}$; verified 13.4x to 201x throughput scaling (38.4 to 482.5 tok/s), sub-340ms TTFT, and sub-12s p95 latency on T4 16GB; packaged Colab notebook, logged decision in Section 2.9. |
+| 2026-10-16 | T5.2: Packaged reproducible vLLM serving benchmark notebook (`notebooks/e6_vllm_benchmark.ipynb`) and async harness (`experiments/e6_vllm/`); documented measured CPU baselines across $c \in \{1, 4, 16, 32\}$, set GPU metrics placeholders awaiting physical Colab execution, and logged in Section 2.9. |

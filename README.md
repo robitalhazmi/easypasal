@@ -31,25 +31,25 @@ EasyPasal is an evaluation-first, citation-grounded RAG assistant designed to an
 |---|---|---|---|---|---|---|
 | **Baseline (v0.1 / M1)** | 0.3679 | 0.2677 | 0.5808 | 0.8030 | 96.4 s | Frozen Baseline (`configs/baseline_v0.1.yaml`) |
 | **+ GEPA Prompt (E5)** | 0.3679 | 0.2601 | **0.6212** (+4.0%) | **0.8182** | 96.4 s | Prompts merged (`src/easypasal/generation/prompts.py`) |
-| **+ vLLM Serving (E6)** | 0.3679 | **0.3939** (+47.1%) | **0.6212** | **0.8182** | **8.82 s** ($c=32$) | Production GPU Serving Target (T4 16GB) |
+| **+ vLLM Serving (E6)** | 0.3679 | **0.3939** (+47.1%) | **0.6212** | **0.8182** | *TBD (Pending Colab)* | Production GPU Target ([Run Notebook](notebooks/e6_vllm_benchmark.ipynb)) |
 | **+ QLoRA (E7)** | *TBD* | *TBD* | *TBD* | *TBD* | *TBD* | Planned (Phase 6) |
 
 *Note: All results evaluated on author-labeled gold Indonesian regulatory datasets with 95% bootstrap confidence intervals and paired permutation tests. No metrics are fabricated.*
 
 ### Inference & Serving Benchmarks: vLLM GPU vs llama.cpp CPU (Experiment E6)
 
-Comparative evaluation across concurrency levels $c \in \{1, 4, 16, 32\}$ using 1,500-token statutory contexts. **CPU numbers are measured directly on local quad-core CPU** (`llama.cpp` Q4_K_M); **GPU numbers reflect vLLM continuous batching on an NVIDIA Tesla T4 (16 GB GDDR6)** runnable via [`notebooks/e6_vllm_benchmark.ipynb`](notebooks/e6_vllm_benchmark.ipynb) on Google Colab (free tier):
+[![Open In Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/github/robitalhazmi/easypasal/blob/feat/phase5-prompt-inference/notebooks/e6_vllm_benchmark.ipynb)
+
+Comparative evaluation across concurrency levels $c \in \{1, 4, 16, 32\}$ using 1,500-token statutory contexts. **CPU numbers are measured directly on local quad-core CPU** (`llama.cpp` Q4_K_M). **GPU numbers will be populated from execution on Google Colab free T4 GPU tier** using [`notebooks/e6_vllm_benchmark.ipynb`](notebooks/e6_vllm_benchmark.ipynb):
 
 | Concurrency ($c$) | vLLM GPU Tok/s (3B) | vLLM p95 Latency | vLLM p95 TTFT | CPU Tok/s (1B) | CPU p95 Latency (1B) | Throughput Speedup |
 |:---:|:---:|:---:|:---:|:---:|:---:|:---:|
-| **$c = 1$** (Single Client) | 38.40 tok/s | 2.57 s | 49.0 ms | 2.87 tok/s | 91.90 s | **13.4x** |
-| **$c = 4$** (Team Load) | 148.20 tok/s | 3.08 s | 80.2 ms | 2.92 tok/s | 365.20 s | **50.8x** |
-| **$c = 16$** (Department Load) | 365.80 tok/s | 5.28 s | 171.7 ms | 2.65 tok/s | 1,450.40 s (24 min) | **138.0x** |
-| **$c = 32$** (Stress Test) | **482.50 tok/s** | **8.82 s** | **319.0 ms** | 2.40 tok/s | 2,900.00 s (48 min) | **201.0x** |
+| **$c = 1$** (Single Client) | *[Pending Colab T4]* | *[Pending Colab T4]* | *[Pending Colab T4]* | 2.87 tok/s | 91.90 s | *[Pending]* |
+| **$c = 4$** (Team Load) | *[Pending Colab T4]* | *[Pending Colab T4]* | *[Pending Colab T4]* | 2.92 tok/s | 365.20 s | *[Pending]* |
+| **$c = 16$** (Department Load) | *[Pending Colab T4]* | *[Pending Colab T4]* | *[Pending Colab T4]* | 2.65 tok/s | 1,450.40 s (24 min) | *[Pending]* |
+| **$c = 32$** (Stress Test) | *[Pending Colab T4]* | *[Pending Colab T4]* | *[Pending Colab T4]* | 2.40 tok/s | 2,900.00 s (48 min) | *[Pending]* |
 
-![vLLM GPU vs llama.cpp CPU Serving Benchmark](docs/assets/e6_benchmark_comparison.png)
-
-- **Reproducibility Notebook:** [`notebooks/e6_vllm_benchmark.ipynb`](notebooks/e6_vllm_benchmark.ipynb)
+- **Reproducibility Notebook:** [`notebooks/e6_vllm_benchmark.ipynb`](notebooks/e6_vllm_benchmark.ipynb) — Run on Colab with T4 GPU to generate live physical hardware metrics and plots.
 - **Serving Benchmark Harness:** `make bench` / `make exp-e6` (`experiments/e6_vllm/run_benchmark.py`)
 
 ---
