@@ -11,6 +11,7 @@ if TYPE_CHECKING:
         OllamaBackend,
         OpenAICompatibleBackend,
         get_generator_backend,
+        get_process_peak_memory_mb,
     )
     from easypasal.generation.citations import (
         check_abstention,
@@ -48,6 +49,7 @@ __all__ = [
     "extract_citations",
     "format_passages",
     "get_generator_backend",
+    "get_process_peak_memory_mb",
     "verify_citation_coverage",
 ]
 
@@ -59,6 +61,7 @@ _BACKEND_SYMBOLS = {
     "OllamaBackend",
     "OpenAICompatibleBackend",
     "get_generator_backend",
+    "get_process_peak_memory_mb",
 }
 
 _CITATION_SYMBOLS = {

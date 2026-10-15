@@ -442,3 +442,59 @@ def test_pipeline_from_defaults_mock(monkeypatch: pytest.MonkeyPatch) -> None:
     pipe = RAGPipeline.from_defaults(provider="mock")
     assert isinstance(pipe.generator, MockGeneratorBackend)
     pipe.close()
+
+
+def test_get_process_peak_memory_mb() -> None:
+    """Verify peak resident memory reporting returns positive value."""
+    from easypasal.generation.backends import get_process_peak_memory_mb
+
+    mem = get_process_peak_memory_mb()
+    assert isinstance(mem, float)
+    assert mem > 0.0
+
+
+def test_mock_generator_throughput() -> None:
+    """Verify mock generator computes non-zero tokens_per_second."""
+    gen = MockGeneratorBackend()
+    res = gen.generate("Test prompt")
+    assert res.tokens_per_second > 0.0
+    assert res.completion_tokens > 0
+
+
+def test_llama_cpp_backend_chat_format_mock(monkeypatch: pytest.MonkeyPatch, tmp_path: Any) -> None:
+    """Verify LlamaCppBackend delegates to create_chat_completion when system prompt is present."""
+    from easypasal.generation.backends import LlamaCppBackend
+
+    fake_model = tmp_path / "fake_model.gguf"
+    fake_model.write_text("fake gguf content")
+
+    mock_llm_instance = MagicMock()
+    mock_llm_instance.create_chat_completion.return_value = {
+        "choices": [{"message": {"content": "Jawaban dari model instruct."}}],
+        "usage": {"prompt_tokens": 50, "completion_tokens": 15},
+    }
+    mock_llm_instance.create_completion.return_value = {
+        "choices": [{"text": "Jawaban dari raw completion."}],
+        "usage": {"prompt_tokens": 20, "completion_tokens": 10},
+    }
+
+    import llama_cpp
+
+    monkeypatch.setattr(llama_cpp, "Llama", lambda **_kwargs: mock_llm_instance)
+
+    backend = LlamaCppBackend(model_path=fake_model)
+    assert backend.model_name == "fake_model"
+
+    # 1. Prompt with <system> tag should invoke create_chat_completion
+    chat_prompt = "<system>Anda asisten hukum.</system>\n<question>Apa itu PUJK?</question>"
+    res_chat = backend.generate(chat_prompt)
+    assert res_chat.text == "Jawaban dari model instruct."
+    assert res_chat.tokens_per_second > 0.0
+    mock_llm_instance.create_chat_completion.assert_called_once()
+
+    # 2. Raw prompt without <system> tag should invoke create_completion
+    raw_prompt = "Lengkapi teks berikut: Pasal 1 adalah"
+    res_raw = backend.generate(raw_prompt)
+    assert res_raw.text == "Jawaban dari raw completion."
+    assert res_raw.tokens_per_second > 0.0
+    mock_llm_instance.create_completion.assert_called_once()

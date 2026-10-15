@@ -165,10 +165,12 @@ class RAGPipeline:
             prompt_tokens=gen_res.prompt_tokens,
             completion_tokens=gen_res.completion_tokens,
             latency_ms=total_latency_ms,
+            tokens_per_second=gen_res.tokens_per_second,
             model_name=self.generator.model_name,
             metadata={
                 "retrieval_ms": retrieval_res.duration_ms,
                 "generation_ms": gen_res.latency_ms,
+                "tokens_per_second": gen_res.tokens_per_second,
                 "retrieval_mode": mode,
                 "total_candidates": retrieval_res.total_candidates,
                 "citation_verification": verification_dict,

@@ -97,6 +97,9 @@ exp-e2:
 exp-e3:
 	uv run python -m experiments.e3_retrieval.run_experiment --split both
 
+exp-e4:
+	uv run python -m experiments.e4_generator.run_experiment --split both
+
 bench:
 	@echo "Benchmark runner not yet implemented (scheduled for Phase 5 / T5.2)."
 	@exit 1
