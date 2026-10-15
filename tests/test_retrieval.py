@@ -4,6 +4,7 @@ from __future__ import annotations
 
 from pathlib import Path
 from typing import Any
+from unittest.mock import MagicMock
 
 import pytest
 
@@ -11,7 +12,7 @@ from easypasal.index.bm25 import BM25Index, BM25SearchResult
 from easypasal.index.embeddings import EmbeddingBackend
 from easypasal.index.vector_store import QdrantVectorStore, VectorSearchResult
 from easypasal.retrieval.fusion import reciprocal_rank_fusion
-from easypasal.retrieval.models import RetrievalResult
+from easypasal.retrieval.models import RetrievalResult, RetrievedChunk
 from easypasal.retrieval.retriever import HybridRetriever
 
 
@@ -437,3 +438,89 @@ def test_retriever_cli(monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFi
     assert "POJK 1 Tahun 2024, Pasal 1" in captured.out
     assert "Dense #1" in captured.out
     assert "BM25 #1" in captured.out
+
+
+def test_hybrid_retriever_hybrid_rerank_mode() -> None:
+    """Verify that mode='hybrid+rerank' invokes the configured reranker."""
+    qdrant = QdrantVectorStore(path=":memory:")
+    backend = DummyEmbeddingBackend(dimension=4)
+    chunks = [
+        {
+            "chunk_id": "c1",
+            "text": "Perlindungan konsumen perbankan",
+            "citation_label": "POJK 1, Pasal 1",
+            "doc_id": "d1",
+            "doc_number": "POJK 1",
+            "status": "berlaku",
+        },
+        {
+            "chunk_id": "c2",
+            "text": "Modal minimum bank umum",
+            "citation_label": "POJK 2, Pasal 1",
+            "doc_id": "d2",
+            "doc_number": "POJK 2",
+            "status": "berlaku",
+        },
+    ]
+    qdrant.init_collection(collection_name="test_col", dimension=4)
+    vectors = backend.embed_documents([c["text"] for c in chunks])
+    qdrant.upsert_chunks(collection_name="test_col", chunks=chunks, vectors=vectors)
+    bm25 = BM25Index.build_from_chunks(chunks)
+
+    mock_reranker = MagicMock()
+
+    def mock_rerank(query: str, chunks: list[RetrievedChunk], top_k: int) -> list[RetrievedChunk]:
+        _ = query
+        for rank, c in enumerate(reversed(chunks[:top_k]), start=1):
+            c.rerank_score = 0.99 / rank
+            c.rerank_rank = rank
+            c.score = 0.99 / rank
+        return list(reversed(chunks[:top_k]))
+
+    mock_reranker.rerank.side_effect = mock_rerank
+
+    retriever = HybridRetriever(
+        qdrant_store=qdrant,
+        bm25_index=bm25,
+        embedding_backend=backend,
+        collection_name="test_col",
+        reranker=mock_reranker,
+    )
+
+    res = retriever.retrieve(query="perlindungan konsumen", top_k=2, mode="hybrid+rerank")
+    assert len(res.chunks) == 2
+    assert mock_reranker.rerank.called
+    assert res.chunks[0].rerank_score is not None
+    assert res.chunks[0].rerank_rank == 1
+
+
+def test_hybrid_retriever_hybrid_rerank_fallback_when_none() -> None:
+    """Verify fallback to Hybrid RRF when mode='hybrid+rerank' but reranker is None."""
+    qdrant = QdrantVectorStore(path=":memory:")
+    backend = DummyEmbeddingBackend(dimension=4)
+    chunks = [
+        {
+            "chunk_id": "c1",
+            "text": "Perlindungan konsumen perbankan",
+            "citation_label": "POJK 1, Pasal 1",
+            "doc_id": "d1",
+            "doc_number": "POJK 1",
+            "status": "berlaku",
+        },
+    ]
+    qdrant.init_collection(collection_name="test_col", dimension=4)
+    vectors = backend.embed_documents([c["text"] for c in chunks])
+    qdrant.upsert_chunks(collection_name="test_col", chunks=chunks, vectors=vectors)
+    bm25 = BM25Index.build_from_chunks(chunks)
+
+    retriever = HybridRetriever(
+        qdrant_store=qdrant,
+        bm25_index=bm25,
+        embedding_backend=backend,
+        collection_name="test_col",
+        reranker=None,
+    )
+
+    res = retriever.retrieve(query="perlindungan konsumen", top_k=1, mode="hybrid+rerank")
+    assert len(res.chunks) == 1
+    assert res.chunks[0].score > 0.0

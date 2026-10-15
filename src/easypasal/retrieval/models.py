@@ -32,6 +32,8 @@ class RetrievedChunk:
     dense_rank: int | None = None
     bm25_score: float | None = None
     bm25_rank: int | None = None
+    rerank_score: float | None = None
+    rerank_rank: int | None = None
     metadata: dict[str, Any] = field(default_factory=dict)
 
     @classmethod
@@ -44,6 +46,8 @@ class RetrievedChunk:
         dense_rank: int | None = None,
         bm25_score: float | None = None,
         bm25_rank: int | None = None,
+        rerank_score: float | None = None,
+        rerank_rank: int | None = None,
     ) -> RetrievedChunk:
         """Create a RetrievedChunk from a chunk dictionary or search result payload."""
         return cls(
@@ -69,6 +73,8 @@ class RetrievedChunk:
             dense_rank=dense_rank,
             bm25_score=bm25_score,
             bm25_rank=bm25_rank,
+            rerank_score=rerank_score,
+            rerank_rank=rerank_rank,
             metadata=payload,
         )
 

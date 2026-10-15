@@ -9,7 +9,7 @@ This document records the hypotheses, experimental setups, quantitative evaluati
 | **E0** | Project Scaffolding & Naming | 2026-10-10 | Approved | `EasyPasal` name verified available across PyPI/GitHub; scaffolded with uv |
 | **E1** | Chunking Strategy | 2026-10-14 | Structure-Aware + Breadcrumbs (Variant C) | +433% Recall@5 on dev ($p=0.0168$), +123% on test ($p=0.0210$); eliminates clause chopping and guarantees statutory citation anchors |
 | **E2** | Embedding Models | 2026-10-15 | Multilingual-E5-Large (1024-d) | +216% Recall@5 on dev ($p=0.0364$), +117% on test ($p=0.0064$); asymmetric task prefixing unlocks precise statutory semantic search |
-| **E3** | Retrieval Pipeline | *TBD* | *TBD* | *TBD* |
+| **E3** | Retrieval Pipeline | 2026-10-15 | Pure Dense (`multilingual-e5-large`) | Pure Dense achieves highest Recall@5 (0.3679 vs 0.2830 hybrid, 0.2264 BM25) and MRR (0.2396); hybrid RRF dilutes dense precision with spurious keyword hits; cross-encoder reranking (+5s CPU latency) fails to improve accuracy ($p=0.44$) on Indonesian statutes. |
 | **E4** | Generator Model (CPU) | *TBD* | *TBD* | *TBD* |
 | **E5** | Prompt Optimization (GEPA) | *TBD* | *TBD* | *TBD* |
 | **E6** | vLLM Serving Benchmark | *TBD* | *TBD* | *TBD* |
@@ -184,3 +184,78 @@ All local generators run quantized via 4-bit GGUF (`Q4_K_M`) using `llama.cpp` o
 - Maintain automated asymmetric prefixing (`passage: ` for indexing, `query: ` for querying) in `src/easypasal/index/embeddings.py`.
 - Preserve MiniLM (`sentence-transformers/paraphrase-multilingual-MiniLM-L12-v2`) in the codebase as a lightweight, low-resource fallback option.
 - Retain the automated E2 experiment runner (`make exp-e2` / `experiments/e2_embeddings/run_experiment.py`) for reproducibility.
+
+---
+
+### Decision: Retrieval Pipeline Architecture (Experiment E3 / T4.3)
+- **Date:** 2026-10-15
+- **Status:** Approved (Adopt Pure Dense Retrieval with `intfloat/multilingual-e5-large`)
+
+#### 1. Experimental Setup
+- **Evaluation Splits:**
+  - `dev.jsonl`: $N = 40$ questions (32 answerable, 8 unanswerable/out-of-scope).
+  - Held-out `test.jsonl`: $N = 66$ questions (54 answerable, 12 unanswerable/out-of-scope).
+- **Corpus & Chunks:**
+  - Canonical `structure_aware` chunks (9,215 chunks in `data/chunks/structure_aware.jsonl`).
+- **Embedding & Index Infrastructure:**
+  - Dense Retriever: `intfloat/multilingual-e5-large` (1024-dim, asymmetric `query: ` / `passage: ` prefixes, cosine similarity, Qdrant index at `data/index/qdrant/`).
+  - BM25 Retriever: BM25Okapi with Indonesian legal tokenization (`indonesian` regex word tokenizer, casefold, alphanumeric normalization, indexed at `data/index/bm25/`).
+- **Evaluated Pipeline Variants:**
+  1. **Variant 1 (`dense`)**: Pure semantic vector search via E5-Large.
+  2. **Variant 2 (`bm25`)**: Pure sparse BM25 keyword search.
+  3. **Variant 3 (`hybrid`)**: Reciprocal Rank Fusion (RRF, $k_{\text{rrf}} = 60$) combining top dense and BM25 candidate lists.
+  4. **Variant 4 (`hybrid_rerank`)**: Two-stage retrieval pipeline fusing dense and BM25 into an $N = 15$ candidate pool, followed by cross-encoder re-ranking using INT8 quantized `ms-marco-MiniLM-L-12-v2` via FlashRank.
+- **Statistical Significance Testing:**
+  - 95% bootstrap confidence intervals (2,000 resamples).
+  - Paired Monte Carlo permutation tests (5,000 resamples).
+  - Paired comparisons: BM25 vs Dense, Hybrid vs Dense, Hybrid+Rerank vs Dense, and Hybrid+Rerank vs Hybrid.
+
+#### 2. Quantitative Results
+
+##### Development Set (`dev.jsonl`, $N = 40$, 32 answerable)
+| Pipeline Variant | Recall@1 | Recall@3 | Recall@5 | 95% CI | MRR@5 | nDCG@5 | p95 Latency | Mean Latency | Sig vs Dense ($p$) |
+|---|---|---|---|---|---|---|---|---|---|
+| **Pure Dense (E5-Large)** | **0.1562** | **0.2500** | **0.2969** | [0.1559, 0.4688] | **0.2135** | **0.2350** | 1071.4 ms | 862.9 ms | Reference |
+| **Pure BM25 (Indonesian)** | 0.0781 | 0.1250 | 0.1562 | [0.0312, 0.2812] | 0.1156 | 0.1230 | **170.2 ms** | **131.1 ms** | $p = 0.1756$ |
+| **Hybrid RRF ($k=60$)** | 0.0938 | 0.2188 | 0.2656 | [0.1250, 0.4219] | 0.1651 | 0.1908 | 1328.9 ms | 927.6 ms | $p = 1.0000$ |
+| **Hybrid + Reranker (MiniLM)** | 0.0938 | 0.1406 | 0.2031 | [0.0781, 0.3594] | 0.1302 | 0.1459 | 7405.9 ms | 5900.3 ms | $p = 0.3419$ |
+
+##### Held-Out Test Set (`test.jsonl`, $N = 66$, 54 answerable)
+| Pipeline Variant | Recall@1 | Recall@3 | Recall@5 | 95% CI | MRR@5 | nDCG@5 | p95 Latency | Mean Latency | Sig vs Dense ($p$) |
+|---|---|---|---|---|---|---|---|---|---|
+| **Pure Dense (E5-Large)** | 0.1226 | **0.3302** | **0.3679** | [0.2453, 0.4906] | **0.2396** | **0.2680** | 972.8 ms | 787.2 ms | Reference |
+| **Pure BM25 (Indonesian)** | 0.0660 | 0.2075 | 0.2264 | [0.1132, 0.3396] | 0.1368 | 0.1595 | **188.9 ms** | **141.2 ms** | **$p = 0.0276$** ❌ |
+| **Hybrid RRF ($k=60$)** | 0.0849 | 0.2264 | 0.2830 | [0.1693, 0.4151] | 0.1619 | 0.1922 | 975.2 ms | 835.7 ms | $p = 0.2050$ |
+| **Hybrid + Reranker (MiniLM)** | **0.1415** | 0.2358 | 0.3113 | [0.1887, 0.4342] | 0.2160 | 0.2320 | 6489.2 ms | 4949.9 ms | $p = 0.4397$ |
+
+##### Paired Significance Testing Highlights (Test Set)
+- **BM25 vs Dense**: Statistically significant regression across all ranking metrics:
+  - $\Delta \text{Recall@5} = -0.1415$ [-0.2547, -0.0189], $p = 0.0276$ (REGRESSION)
+  - $\Delta \text{MRR@5} = -0.1028$ [-0.1846, -0.0258], $p = 0.0128$ (REGRESSION)
+  - $\Delta \text{nDCG@5} = -0.1085$ [-0.1940, -0.0269], $p = 0.0162$ (REGRESSION)
+- **Hybrid RRF vs Dense**: Statistically significant drop in reciprocal rank:
+  - $\Delta \text{MRR@5} = -0.0777$ [-0.1506, -0.0132], $p = 0.0294$ (REGRESSION)
+  - $\Delta \text{Recall@5} = -0.0849$ [-0.1981, +0.0283], $p = 0.2050$ (NEUTRAL)
+- **Hybrid + Reranker vs Hybrid**:
+  - $\Delta \text{Recall@5} = +0.0283$ [-0.1038, +0.1512], $p = 0.7687$ (NEUTRAL, not statistically significant)
+  - $\Delta \text{MRR@5} = +0.0541$ [-0.0371, +0.1422], $p = 0.2524$ (NEUTRAL)
+- **Hybrid + Reranker vs Dense**:
+  - $\Delta \text{Recall@5} = -0.0566$ [-0.1698, +0.0566], $p = 0.4397$ (NEUTRAL, remains inferior to Dense)
+
+#### 3. Plain Language Trade-off Analysis & Rationale
+1. **Why Pure Dense Dominates Sparse Retrieval on Indonesian Statutory Law:**
+   Legal questions asked by compliance practitioners rarely reuse verbatim statutory formulations. Practitioners ask about concepts like *"kewajiban melapor kebocoran data"* (obligation to report data breaches) or *"sanksi bagi fintech ilegal"* (sanctions for illegal fintech). Pure BM25 relies on exact lexeme matching and fails when statutory articles use formal administrative terminology (e.g. *"kegagalan pelindungan data pribadi"* or *"penyelenggara sistem elektronik"*). BM25 suffered a statistically significant 38% relative collapse in Recall@5 (0.2264 vs 0.3679, $p=0.0276$).
+2. **The Pitfall of Naive Reciprocal Rank Fusion (RRF):**
+   Standard IR doctrine suggests hybrid search is always superior to single-modality retrieval. However, in our domain, BM25 frequently retrieves noisy statutory clauses containing ubiquitously repeated statutory boilerplate (e.g. *"Menteri"*, *"Pidana"*, *"Denda"*, *"Ayat (1)"*). When RRF merges these lists, the noisy BM25 hits pollute the top-5 positions, pushing genuinely relevant dense semantic matches down. On the held-out test set, Hybrid RRF caused a statistically significant regression in MRR@5 from 0.2396 to 0.1619 ($p=0.0294$).
+3. **The Failure of Cross-Encoder Reranking to "Earn Its Latency":**
+   The two-stage reranker pipeline (`ms-marco-MiniLM-L-12-v2`) failed on both primary criteria:
+   - **Severe Latency SLA Breach:** On CPU, evaluating 15 candidates with cross-attention added 4.9 to 6.5 seconds per query, driving p95 latency to **6,489 ms** on test (and 7,405 ms on dev). This breaches the strict 1,500 ms SLA by 4.3x to 5x.
+   - **Zero Statistically Significant Gain:** The reranker only improved Recall@5 over Hybrid RRF by +0.0283 on test ($p = 0.7687$), while remaining lower than Pure Dense (0.3113 vs 0.3679, $p = 0.4397$). Because the cross-encoder was pretrained primarily on English MS MARCO, its cross-lingual ability to score nuanced Indonesian legal clauses is insufficient to justify its massive computational overhead.
+4. **Optimal Latency/Accuracy Envelope:**
+   Pure Dense retrieval delivers the highest retrieval accuracy (Recall@5 = 0.3679, MRR = 0.2396) while operating comfortably within the latency budget (mean latency: 787 ms, p95: 972 ms on CPU).
+
+#### 4. Final Decision
+- **Adopt Pure Dense Retrieval (`mode="dense"`, `intfloat/multilingual-e5-large`)** as the standard production retrieval pipeline for EasyPasal.
+- **Do not ship cross-encoder reranking** to the CPU demo or production deployment, eliminating >5 seconds of CPU latency overhead and an external runtime dependency.
+- **Retain Hybrid and BM25 retriever implementations** in `src/easypasal/retrieval/` as configurable modes (`mode="hybrid"`, `mode="bm25"`), allowing downstream specialized lookups (such as verbatim article number queries e.g. "Pasal 78 UU PDP") where exact keyword matching is beneficial.
+- **Maintain the automated E3 experiment benchmark** (`make exp-e3` / `experiments/e3_retrieval/run_experiment.py`) for regression testing and future evaluation of multilingual legal rerankers.

@@ -518,7 +518,7 @@ def main() -> None:
         "--mode",
         type=str,
         default="hybrid",
-        choices=["hybrid", "dense", "bm25"],
+        choices=["hybrid", "dense", "bm25", "hybrid+rerank", "hybrid_rerank"],
         help="Retrieval search mode (default: hybrid)",
     )
     parser.add_argument(
@@ -582,10 +582,12 @@ def main() -> None:
     # 3. Initialize retriever
     from easypasal.retrieval.retriever import HybridRetriever
 
+    should_rerank = args.mode in ("hybrid+rerank", "hybrid_rerank")
     retriever = HybridRetriever.from_paths(
         index_dir=args.index_dir,
         strategy=args.strategy,
         model_name=args.model_name,
+        rerank=should_rerank,
     )
 
     # 4. Optional chunk mapper for non-canonical chunking (e.g. fixed_size)

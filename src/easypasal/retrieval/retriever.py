@@ -17,6 +17,11 @@ from easypasal.index.embeddings import (
 from easypasal.index.vector_store import QdrantVectorStore, VectorSearchResult
 from easypasal.retrieval.fusion import DEFAULT_K_RRF, reciprocal_rank_fusion
 from easypasal.retrieval.models import RetrievalResult, RetrievedChunk
+from easypasal.retrieval.reranker import (
+    DEFAULT_RERANKER_MODEL,
+    BaseReranker,
+    FlashRankReranker,
+)
 
 logging.basicConfig(
     level=logging.INFO,
@@ -27,7 +32,7 @@ logger = logging.getLogger("easypasal.retrieval.retriever")
 
 
 class HybridRetriever:
-    """Hybrid retrieval engine with Reciprocal Rank Fusion (RRF)."""
+    """Hybrid retrieval engine with Reciprocal Rank Fusion (RRF) and optional cross-encoder reranking."""
 
     def __init__(
         self,
@@ -38,6 +43,7 @@ class HybridRetriever:
         k_rrf: int = DEFAULT_K_RRF,
         dense_weight: float = 1.0,
         bm25_weight: float = 1.0,
+        reranker: BaseReranker | None = None,
     ) -> None:
         self.qdrant_store = qdrant_store
         self.bm25_index = bm25_index
@@ -46,6 +52,7 @@ class HybridRetriever:
         self.k_rrf = k_rrf
         self.dense_weight = dense_weight
         self.bm25_weight = bm25_weight
+        self.reranker = reranker
 
     @classmethod
     def from_paths(
@@ -57,6 +64,9 @@ class HybridRetriever:
         k_rrf: int = DEFAULT_K_RRF,
         dense_weight: float = 1.0,
         bm25_weight: float = 1.0,
+        reranker: BaseReranker | None = None,
+        rerank: bool = False,
+        reranker_model: str = DEFAULT_RERANKER_MODEL,
     ) -> HybridRetriever:
         """Initialize HybridRetriever from serialized on-disk index directories."""
         index_path = Path(index_dir)
@@ -86,6 +96,11 @@ class HybridRetriever:
         else:
             target_collection = collection_name
 
+        target_reranker = reranker
+        if target_reranker is None and rerank:
+            logger.info("Initializing FlashRank reranker %r...", reranker_model)
+            target_reranker = FlashRankReranker(model_name=reranker_model)
+
         return cls(
             qdrant_store=qdrant_store,
             bm25_index=bm25_index,
@@ -94,6 +109,7 @@ class HybridRetriever:
             k_rrf=k_rrf,
             dense_weight=dense_weight,
             bm25_weight=bm25_weight,
+            reranker=target_reranker,
         )
 
     def retrieve(
@@ -135,7 +151,7 @@ class HybridRetriever:
         bm25_candidates: list[BM25SearchResult] = []
 
         # 1. Dense Vector Retrieval
-        if mode in ("hybrid", "dense"):
+        if mode in ("hybrid", "dense", "hybrid+rerank", "hybrid_rerank"):
             query_vec = self.embedding_backend.embed_query(query_clean)
             dense_candidates = self.qdrant_store.search(
                 collection_name=self.collection_name,
@@ -148,7 +164,7 @@ class HybridRetriever:
                 ]
 
         # 2. Sparse BM25 Retrieval
-        if mode in ("hybrid", "bm25"):
+        if mode in ("hybrid", "bm25", "hybrid+rerank", "hybrid_rerank"):
             bm25_candidates = self.bm25_index.search(
                 query=query_clean,
                 top_k=pool_size,
@@ -170,6 +186,27 @@ class HybridRetriever:
                 bm25_weight=self.bm25_weight,
                 top_k=top_k,
             )
+        elif mode in ("hybrid+rerank", "hybrid_rerank"):
+            rerank_pool_limit = max(top_k, 15)
+            fused_candidates = reciprocal_rank_fusion(
+                dense_results=dense_candidates,
+                bm25_results=bm25_candidates,
+                k_rrf=self.k_rrf,
+                dense_weight=self.dense_weight,
+                bm25_weight=self.bm25_weight,
+                top_k=rerank_pool_limit,
+            )
+            if self.reranker is not None:
+                final_chunks = self.reranker.rerank(
+                    query=query_clean,
+                    chunks=fused_candidates,
+                    top_k=top_k,
+                )
+            else:
+                logger.warning(
+                    "Hybrid+rerank requested but no reranker configured; falling back to Hybrid RRF."
+                )
+                final_chunks = fused_candidates[:top_k]
         elif mode == "dense":
             for rank, dense_item in enumerate(dense_candidates[:top_k], start=1):
                 final_chunks.append(
@@ -194,7 +231,7 @@ class HybridRetriever:
                 )
         else:
             raise ValueError(
-                f"Unsupported retrieval mode: {mode!r}. Must be 'hybrid', 'dense', or 'bm25'."
+                f"Unsupported retrieval mode: {mode!r}. Must be 'hybrid', 'dense', 'bm25', or 'hybrid+rerank'."
             )
 
         duration_ms = round((time.perf_counter() - start_time) * 1000, 2)
@@ -226,11 +263,21 @@ def main() -> None:
     parser.add_argument(
         "--mode",
         "-m",
-        choices=["hybrid", "dense", "bm25"],
+        choices=["hybrid", "dense", "bm25", "hybrid+rerank", "hybrid_rerank"],
         default="hybrid",
         help="Retrieval mode (default: hybrid)",
     )
     parser.add_argument("--top-k", "-k", type=int, default=5, help="Number of results (default: 5)")
+    parser.add_argument(
+        "--model-name",
+        default=DEFAULT_EMBEDDING_MODEL,
+        help="Embedding model name (default: MiniLM-L12-v2)",
+    )
+    parser.add_argument(
+        "--reranker-model",
+        default=DEFAULT_RERANKER_MODEL,
+        help=f"FlashRank reranker model name (default: {DEFAULT_RERANKER_MODEL})",
+    )
     parser.add_argument(
         "--index-dir",
         default="data/index",
@@ -249,9 +296,13 @@ def main() -> None:
 
     args = parser.parse_args()
 
+    should_rerank = args.mode in ("hybrid+rerank", "hybrid_rerank")
     retriever = HybridRetriever.from_paths(
         index_dir=args.index_dir,
         strategy=args.strategy,
+        model_name=args.model_name,
+        rerank=should_rerank,
+        reranker_model=args.reranker_model,
     )
 
     result = retriever.retrieve(
@@ -273,14 +324,22 @@ def main() -> None:
         return
 
     for idx, chunk in enumerate(result.chunks, start=1):
-        score_str = (
-            f"RRF: {chunk.score:.6f}" if result.mode == "hybrid" else f"Score: {chunk.score:.4f}"
-        )
+        if result.mode in ("hybrid+rerank", "hybrid_rerank"):
+            score_str = f"Rerank Score: {chunk.score:.4f}"
+        elif result.mode == "hybrid":
+            score_str = f"RRF: {chunk.score:.6f}"
+        else:
+            score_str = f"Score: {chunk.score:.4f}"
+
         provenance = []
+        if chunk.rerank_rank is not None:
+            provenance.append(f"Rerank #{chunk.rerank_rank} ({chunk.score:.4f})")
         if chunk.dense_rank is not None:
-            provenance.append(f"Dense #{chunk.dense_rank} ({chunk.dense_score:.4f})")
+            dense_sc = f"{chunk.dense_score:.4f}" if chunk.dense_score is not None else "N/A"
+            provenance.append(f"Dense #{chunk.dense_rank} ({dense_sc})")
         if chunk.bm25_rank is not None:
-            provenance.append(f"BM25 #{chunk.bm25_rank} ({chunk.bm25_score:.2f})")
+            bm25_sc = f"{chunk.bm25_score:.2f}" if chunk.bm25_score is not None else "N/A"
+            provenance.append(f"BM25 #{chunk.bm25_rank} ({bm25_sc})")
         prov_str = f" [{', '.join(provenance)}]" if provenance else ""
 
         print(f"\n[{idx}] {chunk.citation_label} ({score_str}){prov_str}")
