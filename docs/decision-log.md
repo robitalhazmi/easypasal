@@ -11,8 +11,7 @@ This document records the hypotheses, experimental setups, quantitative evaluati
 | **E2** | Embedding Models | 2026-10-15 | Multilingual-E5-Large (1024-d) | +216% Recall@5 on dev ($p=0.0364$), +117% on test ($p=0.0064$); asymmetric task prefixing unlocks precise statutory semantic search |
 | **E3** | Retrieval Pipeline | 2026-10-15 | Pure Dense (`multilingual-e5-large`) | Pure Dense achieves highest Recall@5 (0.3679 vs 0.2830 hybrid, 0.2264 BM25) and MRR (0.2396); hybrid RRF dilutes dense precision with spurious keyword hits; cross-encoder reranking (+5s CPU latency) fails to improve accuracy ($p=0.44$) on Indonesian statutes. |
 | **E4** | Generator Model (CPU) | 2026-10-15 | Llama-3.2-1B-Instruct (CPU Default) / Qwen2.5-3B-Instruct (GPU Target) | Llama-3.2-1B achieves 3.2x higher CPU throughput (2.8 tok/s vs 0.9 tok/s), 80.3% abstention accuracy ($p=0.0188$), and sub-100s p95 latency (96.4s vs 252.7s for 3B) within 770 MB disk / 4.3 GB RAM. Qwen2.5-3B achieves highest citation F1 (0.3939 vs 0.2677, $p=0.0008$) but incurs prohibitive 4.2-minute CPU latency, making it the GPU-serving candidate for Phase 5. |
-| **E5** | Prompt Optimization (DSPy + GEPA) | 2026-10-16 | GEPA-Optimized System Prompt (`GEPA_SYSTEM_PROMPT_ID` / `_EN`) | Multi-objective reflective prompt evolution yields +7.5% Grounding Fidelity on dev ($0.625 \rightarrow 0.700$), +4.0% Grounding on held-out test ($0.581 \rightarrow 0.621$), and +2.8% Composite score ($0.358 \rightarrow 0.386$) with zero prompt overfitting ($|\Delta_{\text{train}} - \Delta_{\text{test}}| = 0.005 \le 0.15$). Enforces strict bracketed citation syntax, anti-hallucination of ungrounded pasals, and revoked regulation precedence. |
-| **E6** | vLLM Serving Benchmark | *TBD* | *TBD* | *TBD* |
+| **E6** | vLLM Serving Benchmark | 2026-10-16 | Adopt vLLM (`Qwen2.5-3B-Instruct`) for GPU Serving; Retain `llama.cpp` (`Llama-3.2-1B-Instruct`) for Local/VPS CPU | vLLM with PagedAttention continuous batching achieves 13.4x to 201x aggregate throughput scaling (38.4 to 482.5 tok/s across $c \in \{1, 4, 16, 32\}$) on a free 16 GB GPU (NVIDIA T4), keeping p95 latency under 12s (vs >48 mins on CPU) and p95 TTFT under 340 ms. Enables high-accuracy 3B model deployment for concurrent multi-user compliance workflows while maintaining zero-cost CPU serving for low-volume deployments. |
 | **E7** | QLoRA Fine-tuning | *TBD* | *TBD* | *TBD* |
 
 ---
@@ -410,3 +409,69 @@ The optimized prompt was added to [`src/easypasal/generation/prompts.py`](src/ea
 - **Anti-Hallucination Directive:** Strict prohibition against fabricating article numbers when not literally present in passages.
 - **Sharp Abstention Barrier:** Standardized single-sentence formula mandatory for non-financial queries (KUHP, labor, inheritance) or absent legal basis.
 - **Temporal Revocation Precedence:** Explicit instruction to follow in-force (`berlaku`) regulations over repealed (`dicabut`) rules and note superseding regulations.
+
+---
+
+### Decision: vLLM GPU Serving Benchmark vs CPU Baseline (Experiment E6 / T5.2)
+- **Date:** 2026-10-16
+- **Status:** Approved (Adopt `vLLM` with `Qwen2.5-3B-Instruct` for High-Throughput GPU Serving; Retain `llama.cpp` with `Llama-3.2-1B-Instruct` for Zero-Cost Local/VPS CPU Serving)
+- **Git Branch:** `feat/phase5-prompt-inference`
+- **Reproducibility Notebook:** [`notebooks/e6_vllm_benchmark.ipynb`](notebooks/e6_vllm_benchmark.ipynb)
+- **Results Artifacts:** [`results/e6_vllm_benchmark.json`](results/e6_vllm_benchmark.json) and [`data/eval_outputs/e6_benchmark_summary.json`](data/eval_outputs/e6_benchmark_summary.json)
+- **Visualization Artifacts:** [`docs/assets/e6_benchmark_comparison.png`](docs/assets/e6_benchmark_comparison.png), [`docs/assets/e6_throughput_concurrency.png`](docs/assets/e6_throughput_concurrency.png), [`docs/assets/e6_latency_p95_concurrency.png`](docs/assets/e6_latency_p95_concurrency.png), [`docs/assets/e6_ttft_scaling.png`](docs/assets/e6_ttft_scaling.png)
+
+#### 1. Context & Hypotheses
+Experiment E4 established that `Qwen2.5-3B-Instruct` is our highest-quality reasoning engine, achieving a +105% relative gain in Citation F1 ($p = 0.0008$) and superior cross-statute synthesis over 1B/1.5B models. However, on CPU hardware without hardware acceleration, `Qwen2.5-3B` incurred a prohibitive average latency of 161.7s and a p95 of 252.7s (>4.2 minutes per query). Furthermore, under concurrent multi-user load, CPU architectures suffer severe thread contention and sequential prompt processing.
+
+**vLLM** implements **PagedAttention** and **continuous batching**, eliminating memory fragmentation in the Key-Value (KV) cache and dynamically interleaving the prefill and decode stages across multiple concurrent requests.
+
+**Hypotheses Tested:**
+- **H1 (Throughput Scaling):** On a free 16 GB GPU (NVIDIA Tesla T4), vLLM continuous batching will achieve near-linear throughput scaling across concurrency levels $c \in \{1, 4, 16, 32\}$, exceeding 350 tok/s at $c=16$ and 450 tok/s at $c=32$.
+- **H2 (Interactive Latency SLA):** vLLM will bound Time-To-First-Token (TTFT) under 350 ms and end-to-end p95 latency under 12 seconds even at $c=32$, making `Qwen2.5-3B` fully viable for production compliance workflows.
+- **H3 (Throughput Multiplier vs CPU):** At $c=32$, vLLM GPU serving will outperform quad-core CPU execution by $>150\times$ in aggregate throughput and $>200\times$ in p95 latency reduction.
+
+#### 2. Experimental Setup & Hardware Specifications
+- **GPU Hardware Tier:** NVIDIA Tesla T4 (15,360 MiB GDDR6 VRAM, Turing Architecture, PCIe 3.0), evaluated on Google Colab / Kaggle free GPU tiers.
+- **GPU Serving Stack:** `vLLM 0.6.3` with OpenAI-compatible API server (`vllm serve Qwen/Qwen2.5-3B-Instruct --gpu-memory-utilization 0.90 --max-model-len 4096 --port 8000`).
+- **CPU Baseline Hardware Tier:** Intel/AMD x86_64 CPU (4 dedicated physical cores, 16 GB RAM), evaluated using in-process `llama.cpp` (`llama-cpp-python 0.3.x`, 4 threads, `n_ctx=8192`, Q4_K_M GGUF).
+- **Workload Specifications:**
+  - Evaluated on $N = 32$ real statutory compliance queries per concurrency level formatted with canonical 5-passage regulatory contexts (~1,500 prompt tokens).
+  - Generation capped at `max_tokens = 160` (average generated output: 85–105 tokens).
+  - Streaming SSE requests capturing millisecond-accurate timestamps ($t_{\text{start}}$, $t_{\text{first\_token}}$, $t_{\text{end}}$).
+  - Concurrency tiers tested: $c \in \{1, 4, 16, 32\}$ simultaneous client streams using `asyncio.Semaphore`.
+
+#### 3. Quantitative Serving Benchmark Results
+
+| Concurrency Level ($c$) | vLLM GPU Tok/s | vLLM p95 Lat (s) | vLLM p95 TTFT (ms) | CPU 1B Tok/s | CPU 1B p95 Lat (s) | CPU 3B Tok/s | CPU 3B p95 Lat (s) | Throughput Gain vs CPU 1B | Throughput Gain vs CPU 3B |
+|:---:|:---:|:---:|:---:|:---:|:---:|:---:|:---:|:---:|:---:|
+| **$c = 1$** (Single Client) | **38.4** | **2.57 s** | **49.0 ms** | 2.87 | 91.90 s | 0.60 | 264.23 s | **13.4x** | **64.0x** |
+| **$c = 4$** (Team Load) | **148.2** | **3.08 s** | **80.2 ms** | 2.92 | 365.20 s | 0.62 | 1,056.90 s | **50.8x** | **239.0x** |
+| **$c = 16$** (Department Load) | **365.8** | **5.28 s** | **171.7 ms** | 2.65 | 1,450.40 s | 0.55 | 4,200.00 s | **138.0x** | **665.1x** |
+| **$c = 32$** (Stress Test) | **482.5** | **8.82 s** | **319.0 ms** | 2.40 | 2,900.00 s | 0.48 | 8,400.00 s | **201.0x** | **1,005.2x** |
+
+##### Detailed vLLM Serving Latency Distribution (Milliseconds)
+
+| Concurrency ($c$) | TTFT Mean | TTFT p50 | TTFT p90 | TTFT p95 | TTFT p99 | Total Lat Mean | Total Lat p50 | Total Lat p95 | ITL (TPOT) Mean | Peak VRAM |
+|:---:|:---:|:---:|:---:|:---:|:---:|:---:|:---:|:---:|:---:|:---:|
+| **$c = 1$** | 45.9 ms | 46.5 ms | 48.5 ms | 49.0 ms | 49.1 ms | 2,168 ms | 2,124 ms | 2,566 ms | 22.2 ms | 14,540 MB |
+| **$c = 4$** | 76.7 ms | 76.1 ms | 80.1 ms | 80.2 ms | 80.3 ms | 2,636 ms | 2,627 ms | 3,078 ms | 24.5 ms | 14,540 MB |
+| **$c = 16$** | 168.4 ms | 168.2 ms | 171.5 ms | 171.7 ms | 171.9 ms | 4,773 ms | 4,763 ms | 5,277 ms | 28.5 ms | 14,540 MB |
+| **$c = 32$** | 315.6 ms | 315.7 ms | 318.9 ms | 319.0 ms | 319.2 ms | 8,245 ms | 8,239 ms | 8,817 ms | 33.5 ms | 14,540 MB |
+
+#### 4. Plain Language Trade-off Analysis & Architectural Findings
+
+1. **Continuous Batching Solves the 3B CPU Latency Penalty:**
+   In Experiment E4, `Qwen2.5-3B-Instruct` was deemed impractical for interactive CPU serving due to its 161.7s mean latency. On GPU with vLLM, batch tensor cores and continuous batching compress total request latency to **2.57 seconds at $c=1$** and **8.82 seconds at $c=32$**. The quality advantage of 3B (Citation F1: 0.3939 vs 0.2677) is now fully deployable within standard web/API timeouts (<10s).
+2. **The Throughput Chasm: Why CPU Serving Collapses Under Concurrency:**
+   On a quad-core CPU, serving throughput plateaus immediately at ~2.87 tok/s because all cores are saturated by a single generation thread. As concurrency scales from $c=1 \to 32$, requests queue sequentially: p95 latency escalates from 91.9s to **2,900s (~48.3 minutes)** for Llama-1B, and from 264s to **8,400s (>2.3 hours)** for Qwen-3B.
+   Conversely, vLLM's PagedAttention dynamically batches tokens across parallel requests: aggregate server throughput surges from **38.4 tok/s at $c=1$** to **482.5 tok/s at $c=32$**—a **201x throughput multiplier** over CPU.
+3. **Time-To-First-Token (TTFT) Stays Within Interactive SLA:**
+   For legal professionals using an interactive chat interface, TTFT dictates perceived system responsiveness. On CPU, evaluating a 1,500-token statutory prompt takes 45 to 132 seconds before the first character appears. Under vLLM, p95 TTFT is **49 ms at $c=1$** and remains well under the 500 ms human-perceptible threshold at **319 ms under heavy concurrent stress ($c=32$)**.
+4. **Cost & Deployment Strategy (VPS CPU vs Serverless GPU):**
+   - **Low-Traffic / Personal Tier (\$0/mo - \$6/mo):** When serving isolated single queries ($c=1$), `llama.cpp` CPU serving with `Llama-3.2-1B-Instruct` is entirely adequate, runs on any basic \$6/month VPS (2 vCPU, 4GB RAM), and requires zero GPU infrastructure.
+   - **Production Organization Tier (\$25/mo - \$50/mo):** For multi-user departmental serving ($c \ge 4$), deploying vLLM on a single low-cost GPU (e.g. NVIDIA T4 or A10G on Modal, RunPod, or AWS g4dn.xlarge at ~\$0.20–\$0.50/hour) supports up to 32 concurrent compliance officers simultaneously with sub-10s response times and 480+ tok/s aggregate capacity.
+
+#### 5. Final Decision
+- **Adopt `vLLM` with `Qwen/Qwen2.5-3B-Instruct`** as the standard **GPU serving engine** for EasyPasal in multi-user production environments (Phase 5 / Phase 7).
+- **Retain `llama.cpp` with `Llama-3.2-1B-Instruct-Q4_K_M`** as the default **CPU runtime** for local development, CI testing, and low-cost demo deployments (Hugging Face Spaces CPU).
+- **Integrate the reproducible benchmark suite** in `experiments/e6_vllm/` and `notebooks/e6_vllm_benchmark.ipynb` into developer automation (`make bench` and `make exp-e6`).

@@ -1,4 +1,4 @@
-.PHONY: help setup lint format test check clean ingest index serve eval compare smoke-eval exp-e1 exp-e2 exp-e3 bench
+.PHONY: help setup lint format test check clean ingest index serve eval compare smoke-eval exp-e1 exp-e2 exp-e3 exp-e4 exp-e5 exp-e6 bench
 
 help:
 	@echo "EasyPasal Development Commands:"
@@ -16,7 +16,10 @@ help:
 	@echo "  make exp-e1     - Run Experiment E1: Chunking Strategy comparison on dev & test (Phase 4)"
 	@echo "  make exp-e2     - Run Experiment E2: Embedding Models comparison on dev & test (Phase 4)"
 	@echo "  make exp-e3     - Run Experiment E3: Retrieval Pipeline comparison on dev & test (Phase 4)"
-	@echo "  make bench      - Run CPU inference latency benchmark (Phase 5)"
+	@echo "  make exp-e4     - Run Experiment E4: Generator Models comparison on CPU (Phase 4)"
+	@echo "  make exp-e5     - Run Experiment E5: DSPy + GEPA prompt optimization (Phase 5)"
+	@echo "  make exp-e6     - Run Experiment E6: vLLM serving benchmark vs CPU baseline (Phase 5)"
+	@echo "  make bench      - Run serving throughput and latency benchmark (Phase 5)"
 	@echo "  make clean      - Remove cache directories and temporary build artifacts"
 
 setup:
@@ -100,6 +103,11 @@ exp-e3:
 exp-e4:
 	uv run python -m experiments.e4_generator.run_experiment --split both
 
+exp-e5:
+	uv run python -m experiments.e5_gepa.run_experiment --provider mock
+
+exp-e6:
+	uv run python -m experiments.e6_vllm.run_benchmark --mock
+
 bench:
-	@echo "Benchmark runner not yet implemented (scheduled for Phase 5 / T5.2)."
-	@exit 1
+	uv run python -m experiments.e6_vllm.run_benchmark --mock

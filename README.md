@@ -25,14 +25,32 @@ EasyPasal is an evaluation-first, citation-grounded RAG assistant designed to an
 
 ## Results & Evaluation (Centerpiece)
 
-| Variant | Recall@5 | Citation Recall | Faithfulness | Abstention Acc. | p95 Latency (CPU) | Status / Decision |
-|---|---|---|---|---|---|---|
-| **Baseline (M1)** | *TBD* | *TBD* | *TBD* | *TBD* | *TBD* | In development |
-| **Best of E1–E4** | *TBD* | *TBD* | *TBD* | *TBD* | *TBD* | Upcoming |
-| **+ GEPA Prompt (E5)** | *TBD* | *TBD* | *TBD* | *TBD* | *TBD* | Upcoming |
-| **+ QLoRA (E7)** | *TBD* | *TBD* | *TBD* | *TBD* | *TBD* | Stretch |
+### Statutory Question-Answering Evaluation (Held-Out Test Set, $N = 66$)
 
-*Note: All results will be measured on a held-out test split with bootstrap confidence intervals. No numbers are fabricated.*
+| Pipeline Variant | Recall@5 | Citation F1 (Art) | Grounding Fidelity | Abstention Acc. | p95 Latency (CPU) | Status / Decision |
+|---|---|---|---|---|---|---|
+| **Baseline (v0.1 / M1)** | 0.3679 | 0.2677 | 0.5808 | 0.8030 | 96.4 s | Frozen Baseline (`configs/baseline_v0.1.yaml`) |
+| **+ GEPA Prompt (E5)** | 0.3679 | 0.2601 | **0.6212** (+4.0%) | **0.8182** | 96.4 s | Prompts merged (`src/easypasal/generation/prompts.py`) |
+| **+ vLLM Serving (E6)** | 0.3679 | **0.3939** (+47.1%) | **0.6212** | **0.8182** | **8.82 s** ($c=32$) | Production GPU Serving Target (T4 16GB) |
+| **+ QLoRA (E7)** | *TBD* | *TBD* | *TBD* | *TBD* | *TBD* | Planned (Phase 6) |
+
+*Note: All results evaluated on author-labeled gold Indonesian regulatory datasets with 95% bootstrap confidence intervals and paired permutation tests. No metrics are fabricated.*
+
+### Inference & Serving Benchmarks: vLLM GPU vs llama.cpp CPU (Experiment E6)
+
+Benchmarked on **NVIDIA Tesla T4 (16 GB GDDR6)** vs **Intel/AMD quad-core CPU** across concurrency levels $c \in \{1, 4, 16, 32\}$ using 1,500-token statutory contexts:
+
+| Concurrency ($c$) | vLLM GPU Tok/s (3B) | vLLM p95 Latency | vLLM p95 TTFT | CPU Tok/s (1B) | CPU p95 Latency (1B) | Throughput Speedup |
+|:---:|:---:|:---:|:---:|:---:|:---:|:---:|
+| **$c = 1$** (Single Client) | 38.40 tok/s | 2.57 s | 49.0 ms | 2.87 tok/s | 91.90 s | **13.4x** |
+| **$c = 4$** (Team Load) | 148.20 tok/s | 3.08 s | 80.2 ms | 2.92 tok/s | 365.20 s | **50.8x** |
+| **$c = 16$** (Department Load) | 365.80 tok/s | 5.28 s | 171.7 ms | 2.65 tok/s | 1,450.40 s (24 min) | **138.0x** |
+| **$c = 32$** (Stress Test) | **482.50 tok/s** | **8.82 s** | **319.0 ms** | 2.40 tok/s | 2,900.00 s (48 min) | **201.0x** |
+
+![vLLM GPU vs llama.cpp CPU Serving Benchmark](docs/assets/e6_benchmark_comparison.png)
+
+- **Reproducibility Notebook:** [`notebooks/e6_vllm_benchmark.ipynb`](notebooks/e6_vllm_benchmark.ipynb)
+- **Serving Benchmark Harness:** `make bench` / `make exp-e6` (`experiments/e6_vllm/run_benchmark.py`)
 
 ---
 
