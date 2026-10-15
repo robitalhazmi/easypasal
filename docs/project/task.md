@@ -84,7 +84,7 @@
 - [x] **T4.2** 🤝 E2 embedding models → decision logged (commit `a213910`)
 - [x] **T4.3** 🤝 E3 retrieval pipeline (dense / BM25 / hybrid / +rerank) → decision logged (commit `2265eb8`)
 - [x] **T4.4** 🤝 E4 generator model comparison (quality vs latency/memory on CPU) → decision logged (commit `2b0de98`)
-- [x] **T4.5** 🤖 Freeze the **baseline variant** in `configs/` and tag the release `v0.1` (tag `v0.1`)
+- [x] **T4.5** 🤖 Freeze the **baseline variant** in `configs/` and tag the release `v0.1` (commit `9aa71a0`, tag `v0.1`)
   - AC: tag exists; CI baseline updated
 
 ## Phase 5 — Prompt optimization and inference (P1)
