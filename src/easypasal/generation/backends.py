@@ -443,6 +443,7 @@ def get_generator_backend(
     model_name: str | None = None,
     model_path: Path | str | None = None,
     repo_id: str | None = None,
+    filename: str | None = None,
     base_url: str | None = None,
     n_ctx: int = 8192,
     n_threads: int | None = None,
@@ -475,7 +476,7 @@ def get_generator_backend(
         return LlamaCppBackend(
             model_path=model_path,
             repo_id=repo_id or DEFAULT_GGUF_REPO,
-            filename=model_name or DEFAULT_GGUF_FILE,
+            filename=filename or model_name or DEFAULT_GGUF_FILE,
             n_ctx=n_ctx,
             n_threads=n_threads,
         )

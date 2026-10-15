@@ -33,10 +33,10 @@ DEFAULT_INDEX_DIR = Path("data/index")
 
 # Default regression thresholds
 DEFAULT_TOLERANCE = 0.05
-DEFAULT_MIN_RECALL_AT_5 = 0.18
-DEFAULT_MIN_MRR = 0.08
+DEFAULT_MIN_RECALL_AT_5 = 0.20
+DEFAULT_MIN_MRR = 0.10
 DEFAULT_MIN_ABSTENTION_ACCURACY = 0.90
-DEFAULT_MAX_P95_LATENCY_MS = 1000.0
+DEFAULT_MAX_P95_LATENCY_MS = 1500.0
 
 
 @dataclass(frozen=True)
@@ -209,6 +209,7 @@ class FixtureSmokeRetriever:
 def get_default_smoke_retriever(
     index_dir: Path | str = DEFAULT_INDEX_DIR,
     fixture_path: Path | str = DEFAULT_SMOKE_FIXTURE,
+    config_path: Path | str | None = None,
 ) -> Any:
     """Initialize default retriever for smoke eval.
 
@@ -217,10 +218,22 @@ def get_default_smoke_retriever(
     """
     idx_p = Path(index_dir)
     if (idx_p / "qdrant").exists() and (idx_p / "bm25").exists():
+        from easypasal.config import EasyPasalConfig
         from easypasal.retrieval.retriever import HybridRetriever
 
-        logger.info("Initializing HybridRetriever from %s...", idx_p)
-        return HybridRetriever.from_paths(index_dir=idx_p)
+        cfg = EasyPasalConfig.load_default(config_path)
+        logger.info(
+            "Initializing HybridRetriever from %s using config %s (model=%s)...",
+            idx_p,
+            cfg.variant_id,
+            cfg.embeddings.model_name,
+        )
+        return HybridRetriever.from_paths(
+            index_dir=idx_p,
+            strategy=cfg.chunking.strategy,
+            model_name=cfg.embeddings.model_name,
+            collection_name=cfg.retrieval.collection_name,
+        )
 
     fix_p = Path(fixture_path)
     if fix_p.exists():
@@ -257,6 +270,7 @@ def evaluate_smoke_gate(
     min_abstention_accuracy: float = DEFAULT_MIN_ABSTENTION_ACCURACY,
     max_p95_latency_ms: float = DEFAULT_MAX_P95_LATENCY_MS,
     raise_on_failure: bool = False,
+    mode: str = "dense",
 ) -> SmokeGateResult:
     """Execute smoke evaluation and check candidate metrics against baseline gates.
 
@@ -287,7 +301,7 @@ def evaluate_smoke_gate(
 
     for it in items:
         t0 = time.perf_counter()
-        ret_res = retriever.retrieve(query=it.question, top_k=10)
+        ret_res = retriever.retrieve(query=it.question, top_k=10, mode=mode)
         lat_ms = (time.perf_counter() - t0) * 1000.0
         latencies.append(lat_ms)
 
@@ -507,6 +521,18 @@ def main() -> None:
         help="Path to index directory (default: data/index)",
     )
     parser.add_argument(
+        "--config",
+        type=Path,
+        default=None,
+        help="Optional path to YAML configuration file (default: configs/default.yaml)",
+    )
+    parser.add_argument(
+        "--mode",
+        choices=["dense", "hybrid", "bm25"],
+        default="dense",
+        help="Retrieval search mode (default: dense)",
+    )
+    parser.add_argument(
         "--tolerance",
         type=float,
         default=DEFAULT_TOLERANCE,
@@ -535,6 +561,7 @@ def main() -> None:
         retriever = get_default_smoke_retriever(
             index_dir=args.index_dir,
             fixture_path=args.fixture,
+            config_path=args.config,
         )
 
         # 3. Evaluate gates
@@ -543,6 +570,7 @@ def main() -> None:
             items=items,
             baseline_data=baseline_data,
             tolerance=args.tolerance,
+            mode=args.mode,
         )
 
         # 4. Print report table

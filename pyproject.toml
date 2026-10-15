@@ -1,6 +1,6 @@
 [project]
 name = "easypasal"
-version = "0.1.0.dev0"
+version = "0.1.0"
 description = "Evaluated, cited answers on Indonesian financial regulation."
 readme = "README.md"
 requires-python = ">=3.11"
@@ -86,7 +86,7 @@ module = "tests.*"
 disallow_untyped_defs = false
 
 [[tool.mypy.overrides]]
-module = ["torch", "transformers"]
+module = ["torch", "transformers", "yaml"]
 ignore_missing_imports = true
 
 [tool.pytest.ini_options]

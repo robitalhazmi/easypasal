@@ -6,6 +6,7 @@ import argparse
 import logging
 from collections.abc import AsyncGenerator
 from contextlib import asynccontextmanager
+from pathlib import Path
 
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
@@ -22,6 +23,7 @@ def create_app(
     title: str = "EasyPasal API",
     version: str = "0.1.0",
     is_test: bool = False,
+    config_path: Path | str | None = None,
 ) -> FastAPI:
     """Create and configure the FastAPI application instance.
 
@@ -30,6 +32,7 @@ def create_app(
         title: API title metadata.
         version: API version string.
         is_test: Flag indicating automated test environment.
+        config_path: Optional path to YAML configuration file.
 
     Returns:
         Configured FastAPI application.
@@ -42,7 +45,7 @@ def create_app(
         ):
             try:
                 logger.info("Initializing default on-disk EasyPasal RAGPipeline on startup...")
-                app.state.pipeline = RAGPipeline.from_defaults()
+                app.state.pipeline = RAGPipeline.from_defaults(config_path=config_path)
                 logger.info("EasyPasal RAGPipeline loaded and ready.")
             except Exception as exc:
                 logger.warning(
@@ -93,6 +96,12 @@ def main() -> None:
         "--reload", action="store_true", help="Enable auto-reload for local development"
     )
     parser.add_argument(
+        "--config",
+        type=Path,
+        default=None,
+        help="Optional path to YAML configuration file (default: configs/default.yaml)",
+    )
+    parser.add_argument(
         "--provider",
         choices=["auto", "mock", "ollama", "llamacpp"],
         default="auto",
@@ -113,23 +122,27 @@ def main() -> None:
     )
 
     logger.info(
-        "Starting EasyPasal REST API server on %s:%d (provider=%s)",
+        "Starting EasyPasal REST API server on %s:%d (provider=%s, config=%s)",
         args.host,
         args.port,
         args.provider,
+        args.config,
     )
 
-    # If provider is explicitly specified other than auto, initialize upfront
+    # If provider or config is explicitly specified other than auto, initialize upfront
     configured_pipeline: RAGPipeline | None = None
-    if args.provider != "auto":
+    if args.provider != "auto" or args.config is not None:
         try:
-            configured_pipeline = RAGPipeline.from_defaults(provider=args.provider)
+            configured_pipeline = RAGPipeline.from_defaults(
+                provider=args.provider,
+                config_path=args.config,
+            )
         except Exception as exc:
             logger.warning(
                 "Could not initialize on-disk index with provider %s: %s", args.provider, exc
             )
 
-    app_instance = create_app(pipeline=configured_pipeline)
+    app_instance = create_app(pipeline=configured_pipeline, config_path=args.config)
 
     uvicorn.run(
         app_instance,

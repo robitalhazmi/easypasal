@@ -84,7 +84,7 @@
 - [x] **T4.2** 🤝 E2 embedding models → decision logged (commit `a213910`)
 - [x] **T4.3** 🤝 E3 retrieval pipeline (dense / BM25 / hybrid / +rerank) → decision logged (commit `2265eb8`)
 - [x] **T4.4** 🤝 E4 generator model comparison (quality vs latency/memory on CPU) → decision logged (commit `2b0de98`)
-- [ ] **T4.5** 🤖 Freeze the **baseline variant** in `configs/` and tag the release `v0.1`
+- [x] **T4.5** 🤖 Freeze the **baseline variant** in `configs/` and tag the release `v0.1` (tag `v0.1`)
   - AC: tag exists; CI baseline updated
 
 ## Phase 5 — Prompt optimization and inference (P1)
@@ -171,3 +171,4 @@ If time runs short, descope in this order and record it as future work: **E7 QLo
 | 2026-10-15 | T4.2: Evaluated multilingual embedding models (MiniLM vs MPNet vs Multilingual-E5-Large) on `dev` and `test` splits; logged decision for Multilingual-E5-Large in `docs/decision-log.md` (commit `a213910`). |
 | 2026-10-15 | T4.3: Evaluated retrieval pipeline architectures (pure dense vs pure BM25 vs hybrid RRF vs hybrid+reranker) on `dev` and `test` splits; logged decision for Pure Dense in `docs/decision-log.md` (commit `2265eb8`). |
 | 2026-10-15 | T4.4: Evaluated generator models on CPU (Llama-3.2-1B vs Qwen2.5-1.5B vs Qwen2.5-3B) across `dev` and `test` splits; logged decision for Llama-3.2-1B (CPU default) and Qwen2.5-3B (GPU target) in `docs/decision-log.md` (commit `2b0de98`). |
+| 2026-10-15 | T4.5: Frozen production baseline in `configs/baseline_v0.1.yaml` (Structure-Aware + Multilingual-E5-Large + Dense + Llama-3.2-1B CPU / Qwen2.5-3B GPU), implemented `EasyPasalConfig`, updated CI smoke and dev evaluation baselines, and tagged release `v0.1`. |
