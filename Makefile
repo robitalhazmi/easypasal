@@ -1,4 +1,4 @@
-.PHONY: help setup lint format test check clean ingest index serve eval compare smoke-eval exp-e1 exp-e2 exp-e3 exp-e4 exp-e5 exp-e6 bench
+.PHONY: help setup lint format test check clean ingest index serve eval compare smoke-eval exp-e1 exp-e2 exp-e3 exp-e4 exp-e5 exp-e6 bench replay-ab
 
 help:
 	@echo "EasyPasal Development Commands:"
@@ -20,6 +20,7 @@ help:
 	@echo "  make exp-e5     - Run Experiment E5: DSPy + GEPA prompt optimization (Phase 5)"
 	@echo "  make exp-e6     - Run Experiment E6: vLLM serving benchmark vs CPU baseline (Phase 5)"
 	@echo "  make bench      - Run serving throughput and latency benchmark (Phase 5)"
+	@echo "  make replay-ab  - Run offline counterfactual replay-based A/B simulation (Phase 6 / T6.1)"
 	@echo "  make clean      - Remove cache directories and temporary build artifacts"
 
 setup:
@@ -111,3 +112,9 @@ exp-e6:
 
 bench:
 	uv run python -m experiments.e6_vllm.run_benchmark --mock
+
+DATASET ?= data/gold/dev.jsonl
+OUTPUT ?= results/t6_1_replay_ab_simulation_dev.json
+
+replay-ab:
+	uv run python -m eval.replay_ab_simulation --dataset $(DATASET) --output $(OUTPUT)
