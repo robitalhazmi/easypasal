@@ -12,6 +12,8 @@ from easypasal.generation.backends import GeneratorBackend, get_generator_backen
 from easypasal.generation.citations import check_abstention, extract_citations
 from easypasal.generation.models import GenerationOutput
 from easypasal.generation.prompts import build_rag_prompt, detect_language
+from easypasal.guardrails.question_router import QuestionRouter
+from easypasal.retrieval.models import RetrievedChunk
 from easypasal.retrieval.retriever import HybridRetriever
 
 logging.basicConfig(
@@ -32,10 +34,16 @@ class RAGPipeline:
         retriever: HybridRetriever,
         generator: GeneratorBackend,
         config: EasyPasalConfig | None = None,
+        router: QuestionRouter | None = None,
     ) -> None:
         self.retriever = retriever
         self.generator = generator
         self.config = config
+        self.router = router or (
+            QuestionRouter(config=config.guardrails if config else None)
+            if (config is None or config.guardrails.enable_router)
+            else None
+        )
 
     @classmethod
     def from_config(
@@ -146,6 +154,8 @@ class RAGPipeline:
         variant: str | None = None,
         verify_citations: bool | None = None,
         strict_grounding: bool | None = None,
+        retrieved_chunks: list[RetrievedChunk] | None = None,
+        enable_router: bool | None = None,
     ) -> GenerationOutput:
         """Answer a regulatory question with citations and cite-or-abstain behavior.
 
@@ -162,6 +172,8 @@ class RAGPipeline:
             variant: Optional high-level pipeline variant ID (e.g. 'baseline_v0.1', 'gepa_v0.2', 'A', 'B').
             verify_citations: Validate that cited pasal/ayat exist in retrieved passages (default: True).
             strict_grounding: Fall back to abstention if ungrounded citations are detected (default: False).
+            retrieved_chunks: Optional pre-retrieved chunks to reuse (skips redundant retrieval in paired A/B replays).
+            enable_router: Enable front-line guardrail question routing and safety triage (default: from config or True).
 
         Returns:
             GenerationOutput with answer text, extracted citations, and abstention status.
@@ -201,6 +213,11 @@ class RAGPipeline:
             if strict_grounding is not None
             else (self.config.guardrails.strict_grounding if self.config else False)
         )
+        eff_enable_router = (
+            enable_router
+            if enable_router is not None
+            else (self.config.guardrails.enable_router if self.config else True)
+        )
 
         # Resolve effective variant and prompt variant
         eff_variant = variant or (self.config.variant_id if self.config else "baseline_v0.1")
@@ -215,18 +232,62 @@ class RAGPipeline:
         # 1. Detect Question Language
         lang = language if language is not None else detect_language(clean_question)
 
-        # 2. Retrieve Candidate Passages
-        retrieval_res = self.retriever.retrieve(
-            query=clean_question,
-            top_k=eff_top_k,
-            mode=eff_mode,
-            status_filter=eff_status,
-        )
+        # 2. Front-Line Guardrail Router Triage (Task T6.4 / Experiment E7)
+        route_decision = None
+        if eff_enable_router and self.router is not None:
+            route_decision = self.router.route(clean_question, language=lang)
+            if route_decision.should_block:
+                total_latency_ms = round((time.perf_counter() - start_time) * 1000, 2)
+                logger.info(
+                    "Query blocked by router guardrail (theme=%r, reason=%s): %s",
+                    route_decision.theme,
+                    route_decision.refusal_reason,
+                    clean_question[:60],
+                )
+                return GenerationOutput(
+                    question=clean_question,
+                    answer=route_decision.refusal_response or "",
+                    language=lang,
+                    citations=[],
+                    abstained=True,
+                    retrieved_chunks=[],
+                    prompt_tokens=0,
+                    completion_tokens=0,
+                    latency_ms=total_latency_ms,
+                    tokens_per_second=0.0,
+                    model_name="qlora_router",
+                    metadata={
+                        "variant": eff_variant,
+                        "prompt_variant": eff_prompt_variant,
+                        "routed": True,
+                        "theme": route_decision.theme,
+                        "is_answerable": route_decision.is_answerable,
+                        "is_injection": route_decision.is_injection,
+                        "refusal_reason": route_decision.refusal_reason,
+                        "routing_latency_ms": route_decision.latency_ms,
+                    },
+                )
+
+        # 3. Retrieve Candidate Passages (or reuse pre-retrieved chunks)
+        if retrieved_chunks is not None:
+            chunks = retrieved_chunks
+            retrieval_ms = 0.0
+            total_candidates = len(chunks)
+        else:
+            retrieval_res = self.retriever.retrieve(
+                query=clean_question,
+                top_k=eff_top_k,
+                mode=eff_mode,
+                status_filter=eff_status,
+            )
+            chunks = retrieval_res.chunks
+            retrieval_ms = retrieval_res.duration_ms
+            total_candidates = retrieval_res.total_candidates
 
         # 3. Assemble Grounded Prompt
         prompt = build_rag_prompt(
             question=clean_question,
-            chunks=retrieval_res.chunks,
+            chunks=chunks,
             language=lang,
             system_prompt_override=system_prompt_override,
             prompt_variant=eff_prompt_variant,
@@ -251,7 +312,7 @@ class RAGPipeline:
 
             v_res = verify_fn(
                 answer=gen_res.text,
-                retrieved_chunks=retrieval_res.chunks,
+                retrieved_chunks=chunks,
                 citations=citations,
             )
             verification_dict = {
@@ -285,7 +346,7 @@ class RAGPipeline:
             language=lang,
             citations=citations,
             abstained=abstained,
-            retrieved_chunks=retrieval_res.chunks,
+            retrieved_chunks=chunks,
             prompt_tokens=gen_res.prompt_tokens,
             completion_tokens=gen_res.completion_tokens,
             latency_ms=total_latency_ms,
@@ -294,12 +355,14 @@ class RAGPipeline:
             metadata={
                 "variant": eff_variant,
                 "prompt_variant": eff_prompt_variant,
-                "retrieval_ms": retrieval_res.duration_ms,
+                "retrieval_ms": retrieval_ms,
                 "generation_ms": gen_res.latency_ms,
                 "tokens_per_second": gen_res.tokens_per_second,
                 "retrieval_mode": mode,
-                "total_candidates": retrieval_res.total_candidates,
+                "total_candidates": total_candidates,
                 "citation_verification": verification_dict,
+                "routed": bool(eff_enable_router and self.router),
+                "theme": route_decision.theme if route_decision else None,
             },
         )
 

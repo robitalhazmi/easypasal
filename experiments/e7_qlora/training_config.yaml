@@ -1,0 +1,39 @@
+base_model_name: Qwen/Qwen2.5-0.5B-Instruct
+output_dir: experiments/e7_qlora/adapter
+train_data_path: data/e7_router/train.jsonl
+dev_data_path: data/e7_router/dev.jsonl
+test_data_path: data/e7_router/test.jsonl
+
+load_in_4bit: true
+bnb_4bit_quant_type: nf4
+bnb_4bit_use_double_quant: true
+bnb_4bit_compute_dtype: bfloat16
+
+lora_r: 16
+lora_alpha: 32
+lora_dropout: 0.05
+target_modules:
+  - q_proj
+  - k_proj
+  - v_proj
+  - o_proj
+  - gate_proj
+  - up_proj
+  - down_proj
+
+learning_rate: 0.0002
+lr_scheduler_type: cosine
+warmup_ratio: 0.1
+num_train_epochs: 3
+per_device_train_batch_size: 4
+per_device_eval_batch_size: 4
+gradient_accumulation_steps: 4
+max_seq_length: 512
+weight_decay: 0.01
+logging_steps: 5
+eval_strategy: steps
+eval_steps: 25
+save_strategy: steps
+save_steps: 25
+save_total_limit: 2
+seed: 42

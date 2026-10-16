@@ -130,6 +130,8 @@ class GuardrailsConfig(BaseModel):
     strict_grounding: bool = False
     status_filter: str | None = "berlaku"
     default_language: str = "id"
+    enable_router: bool = True
+    router_adapter_path: str | None = "experiments/e7_qlora/adapter"
 
 
 class TrafficSplitConfig(BaseModel):
