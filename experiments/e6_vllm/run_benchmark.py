@@ -228,12 +228,13 @@ async def run_e6_benchmark(
         json.dump(report.to_dict(), f, indent=2)
     logger.info("Saved benchmark report to %s", out_json)
 
-    # Also mirror to data/eval_outputs/
-    eval_mirror = Path("data/eval_outputs/e6_benchmark_summary.json")
-    eval_mirror.parent.mkdir(parents=True, exist_ok=True)
-    with open(eval_mirror, "w", encoding="utf-8") as f:
-        json.dump(report.to_dict(), f, indent=2)
-    logger.info("Mirrored benchmark report to %s", eval_mirror)
+    # Also mirror to data/eval_outputs/ when executing canonical non-mock benchmark
+    if not mock and Path(output_file).name == "e6_vllm_benchmark.json":
+        eval_mirror = Path("data/eval_outputs/e6_benchmark_summary.json")
+        eval_mirror.parent.mkdir(parents=True, exist_ok=True)
+        with open(eval_mirror, "w", encoding="utf-8") as f:
+            json.dump(report.to_dict(), f, indent=2)
+        logger.info("Mirrored benchmark report to %s", eval_mirror)
 
     # Generate visualization plots
     generate_benchmark_plots(report.to_dict(), output_dir=plot_dir)
