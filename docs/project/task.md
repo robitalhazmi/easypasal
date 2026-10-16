@@ -100,8 +100,8 @@
 
 - [x] **T6.1** 🤝 Replay-based A/B simulation: replay logged/dev queries through variants A and B, same judge, paired CIs (P1) (commit `0ff8b0c`)
   - AC: decision documented; clearly labeled as offline replay, not a user test
-- [ ] **T6.2** 👤 Choose E7 task (recommended: question router/classifier for theme + answerability + injection detection) (P2)
-  - AC: choice recorded in decision log
+- [x] **T6.2** 👤 Choose E7 task (recommended: question router/classifier for theme + answerability + injection detection) (P2)
+  - AC: choice recorded in decision log (Section 2.11)
 - [ ] **T6.3** 🤝 E7: QLoRA fine-tune on free GPU with PEFT + TRL (P2)
   - AC: adapter card, training config, before/after metrics, regression check on other categories
 - [ ] **T6.4** 🤖 Integrate router/adapter into guardrails only if it improves `dev` and `test` (P2)
@@ -144,8 +144,7 @@
 
 ## Phase 9 — Application packaging (P0)
 
-- [ ] **T9.1** 👤 Prepare a 20-minute walkthrough using `walkthrough.md` Part C and practice once aloud
-- [ ] **T9.2** 👤 Final check of every link (repo, demo, docs, video) from a logged-out browser
+- [ ] **T9.1** 👤 Final check of every link (repo, demo, docs, video) from a logged-out browser
 
 ---
 

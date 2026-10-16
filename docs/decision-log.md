@@ -14,7 +14,7 @@ This document records the hypotheses, experimental setups, quantitative evaluati
 | **E5** | Prompt Optimization (DSPy + GEPA) | 2026-10-16 | GEPA-Optimized System Prompt (`GEPA_SYSTEM_PROMPT_ID` / `_EN`) | Multi-objective reflective prompt evolution yields +7.5% Grounding Fidelity on dev ($0.625 \rightarrow 0.700$), +4.0% Grounding on held-out test ($0.581 \rightarrow 0.621$), and +2.8% Composite score ($0.358 \rightarrow 0.386$) with zero prompt overfitting ($|\Delta_{\text{train}} - \Delta_{\text{test}}| = 0.005 \le 0.15$). Enforces strict bracketed citation syntax, anti-hallucination of ungrounded pasals, and revoked regulation precedence. |
 | **E6** | vLLM Serving Benchmark | 2026-10-16 | Approved (Adopt `vLLM` on GPU for Multi-User Serving; Retain `llama.cpp` on CPU) | Measured directly on Google Colab free NVIDIA Tesla T4 GPU (16 GB GDDR6) with `vLLM 0.6.3` (PagedAttention) across $c \in \{1, 4, 16, 32\}$. At $c=32$, achieves 187.8 tok/s aggregate throughput (78.2x speedup vs CPU 1B, 391.2x vs CPU 3B) and compresses p95 latency to 11.38s (vs 48.3 minutes on CPU 1B and >2.3 hours on CPU 3B). Sub-second TTFT at $c=1$ (207.8 ms) unlocks production deployment of `Qwen2.5-3B-Instruct`. |
 | **T6.1** | Replay-Based A/B Simulation | 2026-10-16 | Adopt `gepa_v0.2` (Promote Variant B over Variant A) | Counterfactual replay simulation on `dev` ($N=40$) and held-out `test` ($N=66$) under a unified LLM judge confirms 100% Faithfulness parity, directional gains in Grounding Fidelity (+3.5% on test, +9.4% on dev) and Citation F1 (+0.6% on test), and perfect Abstention Accuracy parity (81.82%, $p=1.000$) with zero regressions. Explicitly labeled as offline counterfactual replay simulation per Plan §6.4 & §13. |
-| **E7** | QLoRA Fine-tuning | *TBD* | *TBD* | *TBD* |
+| **E7** | QLoRA Fine-tuning Task Selection | 2026-10-16 | Multi-task Question Router & Guardrail Classifier (`Qwen2.5-0.5B` / `1.5B`) | High-utility, low-latency pipeline triage: classifies regulatory theme, detects out-of-scope inquiries, and flags prompt injections in a single forward pass (<25ms). Fast-paths refusals, saving expensive retrieval and generation cycles. Fits within free GPU quotas (<15 min on Colab T4 / Kaggle P100). |
 
 ---
 
@@ -550,3 +550,69 @@ Following the freeze of the production baseline (`baseline_v0.1` in Phase 4) and
 - **Retain `baseline_v0.1`** as a stable fallback variant for A/B traffic routing (`configs/baseline_v0.1.yaml`).
 - **Archive Simulation Reports** in `results/t6_1_replay_ab_simulation_dev.json` and `results/t6_1_replay_ab_simulation_test.json`.
 - **Integrate CLI Tool** into `Makefile` (`make replay-ab DATASET=<path> OUTPUT=<path>`).
+
+---
+
+### Decision: Experiment E7 Task Selection — Multi-Task Question Router & Guardrail Classifier (T6.2)
+- **Date:** 2026-10-16
+- **Status:** Approved (Selected Option 1: Multi-Task Question Router & Guardrail Classifier)
+- **Target Implementation:** Task T6.3 (`experiments/e7_qlora/`, PEFT + TRL on free GPU)
+
+#### 1. Context & Problem Statement
+In Section 7 of the implementation plan, Phase 6 allocates a narrow, high-value QLoRA fine-tuning experiment (E7) to demonstrate parameter-efficient adaptation on free tier GPU hardware (NVIDIA Tesla T4 / Kaggle P100) under strict honest-claims boundaries.
+
+The implementation plan identified three candidate task options:
+1. **Option 1 (Recommended): Question Router & Guardrail Classifier** (regulatory theme + answerability/scope + prompt injection detection).
+2. **Option 2: Query Rewriting** for Indonesian regulatory phrasing.
+3. **Option 3: Citation-Grounded Answer Style** generator.
+
+Task T6.2 requires systematically evaluating these three options against pipeline utility, latency overhead, dataset feasibility, and risk of catastrophic forgetting, and recording the architectural decision in this decision log.
+
+#### 2. Candidate Options Analysis
+
+| Criteria | Option 1: Question Router & Guardrail (Chosen) | Option 2: Generative Query Rewriter | Option 3: Citation-Grounded Generator |
+|---|---|---|---|
+| **Pipeline Utility** | **High**: Serves as front-line guardrail (Plan §8.1 step 2); fast-paths unanswerable and injection queries to immediate refusal without expensive vector search or generation. | **Moderate**: Potential retrieval recall gain; but pure dense (`multilingual-e5-large`) already achieves 93.4% Recall@5. | **Low / Redundant**: E5 (DSPy + GEPA prompt evolution) already achieved 100% faithfulness, 71.7% grounding, and 81.8% abstention without weight modification. |
+| **Inference Latency Impact** | **Net Negative Latency (Speedup)**: Ultra-fast 0.5B/1.5B forward pass (<25ms) short-circuits 20%+ of requests (out-of-scope/attacks), saving 5–15 seconds of dense embedding, search, and LLM generation. | **High Latency Added**: Adds 2–5 seconds of autoregressive token generation to *every* request before retrieval begins. | **High Latency**: Replaces or supplements generation model; high memory footprint during multi-turn serving. |
+| **Data Requirements & Risk** | **Low Risk**: Supervised classification targets (`theme`, `is_answerable`, `is_injection`) can be cleanly extracted and formatted from gold datasets (`train.jsonl`, `dev.jsonl`) + injection probes. | **High Risk**: Risk of generative hallucination, semantic drift, and vocabulary distortion causing retrieval regressions. | **High Risk**: Extremely high risk of catastrophic forgetting, repetitive loops, or syntax degradation on small domain datasets ($N \approx 100$). |
+| **Evaluation Measurability** | **Deterministic & Objective**: Accuracy, Macro-F1 across 6 themes, Precision/Recall on Out-of-Scope, 100% Precision on Injections. | **Subjective / High Variance**: Requires downstream retrieval ablation and LLM judge grading. | **High Variance**: Requires full human/judge evaluation on all categories. |
+| **Free GPU Feasibility** | **Exceptional**: QLoRA on 0.5B/1.5B parameters trains in ~10–15 minutes on a free Tesla T4 (<4 GB VRAM). | **Moderate**: Requires sequence-to-sequence autoregressive loss on longer prompts. | **Challenging**: Autoregressive generation over long retrieved contexts approaches T4 memory limits and session timeouts. |
+
+#### 3. Detailed Specification of the Chosen Task (Option 1)
+
+**Target Formulation:**
+A single-pass classification/router receiving user query $q$ and emitting structured JSON with three discrete classification targets:
+```json
+{
+  "theme": "Banking" | "Capital Market" | "Insurance & Pension" | "Fintech & Digital Finance" | "Consumer Protection" | "Out of Scope",
+  "is_answerable": true | false,
+  "is_injection": true | false
+}
+```
+
+**Architectural Blueprint:**
+- **Base Model:** `Qwen/Qwen2.5-0.5B-Instruct` (primary candidate for sub-25ms CPU/GPU inference) or `Qwen/Qwen2.5-1.5B-Instruct` (secondary candidate if 0.5B capacity is insufficient for 6-class theme discrimination).
+- **Fine-Tuning Method:** 4-bit QLoRA (`bitsandbytes` NF4 quantization, double quantization, FP16 compute dtype, LoRA rank $r=16$, alpha $\alpha=32$, dropout $0.05$, targeting all linear projection layers `[q_proj, k_proj, v_proj, o_proj, gate_proj, up_proj, down_proj]`).
+- **Framework:** Hugging Face `peft` + `trl` (`SFTTrainer`) with pinned seed (`seed=42`).
+
+**Data Sources for T6.3:**
+1. **Gold Set Ground Truth (`data/gold/`):**
+   - In-scope regulatory queries labeled across the 5 canonical OJK/BI themes: *Banking*, *Capital Market*, *Insurance & Pension*, *Fintech & Digital Finance*, *Consumer Protection*.
+   - Unanswerable / out-of-scope regulatory queries labeled with `theme: "Out of Scope"`, `is_answerable: false`.
+2. **Hard Negatives & Out-of-Domain Traps:**
+   - General non-financial legal queries (e.g. Agrarian Law / HGB, Criminal Code / KUHP, traffic regulations, general culinary/medical queries) from gold splits.
+3. **Adversarial Prompt Injections:**
+   - Synthetic and curated Indonesian/English jailbreaks and instruction-override attacks (e.g. "Ignore previous instructions", system prompt leak probes, roleplay persona bypasses) labeled with `is_injection: true`, `is_answerable: false`.
+
+#### 4. Gating Rule & Success Criteria (Plan §7 / T6.4)
+In accordance with Task T6.4, the fine-tuned adapter will **only** be integrated into the live API guardrail pipeline if it strictly meets all of the following empirical criteria:
+1. **Theme Classification:** Macro-F1 $\ge 0.85$ on `dev` and held-out `test`.
+2. **Answerability / Refusal Triage:** Precision $\ge 0.85$ and Recall $\ge 0.80$ on unanswerable/out-of-scope queries (matching or beating rule-based heuristic guardrails).
+3. **Prompt Injection Defense:** $100\%$ precision on known injection patterns with $\le 1\%$ false-positive rate on valid financial compliance queries.
+4. **Latency Budget:** Inference latency $\le 30\text{ ms}$ on GPU ($\le 120\text{ ms}$ on CPU), preserving fast-path speedup.
+5. **Regression Guard:** If the adapter fails any criterion or induces false rejections on valid queries, it will be transparently documented as an experimental negative result (as required by Plan §7 and the Honest-Claims Audit §13), and the system will retain the verified rule-based guardrail.
+
+#### 5. Decision Summary
+1. **Task Selected:** Multi-task Question Router & Guardrail Classifier (`theme` + `is_answerable` + `is_injection`).
+2. **Options 2 & 3 Rejected:** Generative query rewriting rejected due to hallucination/latency risks; generative citation style rejected because prompt optimization (E5) already solved citation grounding at zero training cost.
+3. **Execution Target:** Proceed to Task **T6.3** to prepare the dataset, training script, and Colab/Kaggle free GPU QLoRA notebook.
