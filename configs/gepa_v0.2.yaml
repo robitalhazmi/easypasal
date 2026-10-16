@@ -1,0 +1,86 @@
+# EasyPasal v0.2 GEPA Optimized Variant Configuration
+# Variant B following Experiment E5 (DSPy + GEPA prompt evolution).
+# Reference: docs/decision-log.md Section 2.8
+
+version: "0.2"
+variant_id: "gepa_v0.2"
+prompt_variant: "gepa"
+description: "EasyPasal v0.2 Production Variant (DSPy + GEPA Reflective Prompt Optimization)"
+created_at: "2026-10-16"
+
+corpus:
+  total_documents: 21
+  manifest_path: "data/corpus_manifest.json"
+  raw_dir: "data/raw"
+  parsed_dir: "data/parsed"
+  themes:
+    - "General Financial Regulation"
+    - "Capital Markets"
+    - "IT & Cyber Risk"
+    - "Consumer Protection"
+    - "AML / CFT"
+
+chunking:
+  strategy: "structure_aware"
+  include_breadcrumbs: true
+  target_chunk_size: 512
+  overlap: 64
+  chunks_path: "data/chunks/structure_aware_chunks.json"
+
+embeddings:
+  model_name: "intfloat/multilingual-e5-large"
+  dimension: 1024
+  backend: "fastembed"
+  max_length: 512
+  prefix_query: "query: "
+  prefix_passage: "passage: "
+  batch_size: 64
+
+retrieval:
+  mode: "dense"
+  top_k: 5
+  vector_store: "qdrant"
+  index_dir: "data/index"
+  collection_name: "easypasal_structure_aware_multilingual_e5_large"
+  distance: "Cosine"
+  score_threshold: null
+  reranker: null
+
+generator:
+  cpu_default:
+    provider: "llamacpp"
+    repo_id: "bartowski/Llama-3.2-1B-Instruct-GGUF"
+    filename: "Llama-3.2-1B-Instruct-Q4_K_M.gguf"
+    quantization: "Q4_K_M"
+    n_ctx: 8192
+    n_threads: 4
+    max_tokens: 160
+    temperature: 0.1
+    stop_tokens:
+      - "<|eot_id|>"
+      - "<|im_end|>"
+      - "<|end_of_text|>"
+      - "<|endoftext|>"
+      - "</answer>"
+      - "\n\n\n"
+  gpu_target:
+    provider: "vllm"
+    repo_id: "Qwen/Qwen2.5-3B-Instruct-GGUF"
+    filename: "qwen2.5-3b-instruct-q4_k_m.gguf"
+    n_ctx: 8192
+    max_tokens: 160
+    temperature: 0.1
+
+guardrails:
+  verify_citations: true
+  strict_grounding: false
+  status_filter: "berlaku"
+  default_language: "id"
+
+traffic_split:
+  enabled: false
+  default_variant: "gepa_v0.2"
+  weights:
+    baseline_v0.1: 0.5
+    gepa_v0.2: 0.5
+  salt: "easypasal-traffic-split-v1"

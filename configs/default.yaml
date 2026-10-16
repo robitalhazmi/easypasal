@@ -74,3 +74,11 @@ guardrails:
   strict_grounding: false
   status_filter: "berlaku"
   default_language: "id"
+
+traffic_split:
+  enabled: false
+  default_variant: "baseline_v0.1"
+  weights:
+    baseline_v0.1: 0.5
+    gepa_v0.2: 0.5
+  salt: "easypasal-traffic-split-v1"

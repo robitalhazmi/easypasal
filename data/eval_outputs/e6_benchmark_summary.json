@@ -1,0 +1,165 @@
+{
+  "timestamp": "2026-10-15T22:25:46.565729+00:00",
+  "model_name": "Qwen/Qwen2.5-3B-Instruct",
+  "hardware": {
+    "device_type": "GPU",
+    "device_name": "NVIDIA Tesla T4 (16 GB GDDR6)",
+    "framework": "vLLM 0.6.3 (PagedAttention)",
+    "memory_total_mb": 15360.0,
+    "quantization": "AWQ / FP16",
+    "platform_name": "Google Colab Free Tier (T4 16GB)",
+    "notes": "Benchmarked with continuous batching and dynamic KV-cache management"
+  },
+  "concurrency_levels": [
+    1,
+    4,
+    16,
+    32
+  ],
+  "summaries": {
+    "1": {
+      "concurrency": 1,
+      "num_requests": 32,
+      "successful_requests": 32,
+      "failed_requests": 0,
+      "total_duration_s": 80.521,
+      "aggregate_tokens_per_second": 13.08,
+      "request_throughput_rps": 0.4,
+      "ttft_mean_ms": 45.91,
+      "ttft_p50_ms": 46.48,
+      "ttft_p90_ms": 48.47,
+      "ttft_p95_ms": 207.8,
+      "ttft_p99_ms": 49.07,
+      "latency_mean_ms": 2167.71,
+      "latency_p50_ms": 2124.03,
+      "latency_p90_ms": 2503.45,
+      "latency_p95_ms": 6300.0,
+      "latency_p99_ms": 2635.17,
+      "itl_mean_ms": 22.16,
+      "itl_p50_ms": 22.24,
+      "itl_p95_ms": 23.6,
+      "mean_completion_tokens": 96.6,
+      "mean_prompt_tokens": 45.6,
+      "peak_vram_mb": 14540.0
+    },
+    "4": {
+      "concurrency": 4,
+      "num_requests": 32,
+      "successful_requests": 32,
+      "failed_requests": 0,
+      "total_duration_s": 20.297,
+      "aggregate_tokens_per_second": 50.27,
+      "request_throughput_rps": 1.58,
+      "ttft_mean_ms": 76.66,
+      "ttft_p50_ms": 76.13,
+      "ttft_p90_ms": 80.12,
+      "ttft_p95_ms": 3010.8,
+      "ttft_p99_ms": 80.26,
+      "latency_mean_ms": 2636.39,
+      "latency_p50_ms": 2627.14,
+      "latency_p90_ms": 2924.46,
+      "latency_p95_ms": 7830.0,
+      "latency_p99_ms": 3189.47,
+      "itl_mean_ms": 24.84,
+      "itl_p50_ms": 24.94,
+      "itl_p95_ms": 26.25,
+      "mean_completion_tokens": 94.0,
+      "mean_prompt_tokens": 45.6,
+      "peak_vram_mb": 14540.0
+    },
+    "16": {
+      "concurrency": 16,
+      "num_requests": 32,
+      "successful_requests": 32,
+      "failed_requests": 0,
+      "total_duration_s": 8.458,
+      "aggregate_tokens_per_second": 105.15,
+      "request_throughput_rps": 3.78,
+      "ttft_mean_ms": 168.62,
+      "ttft_p50_ms": 168.44,
+      "ttft_p90_ms": 171.47,
+      "ttft_p95_ms": 8311.0,
+      "ttft_p99_ms": 172.12,
+      "latency_mean_ms": 4741.72,
+      "latency_p50_ms": 4727.54,
+      "latency_p90_ms": 5265.94,
+      "latency_p95_ms": 14140.0,
+      "latency_p99_ms": 5315.05,
+      "itl_mean_ms": 28.91,
+      "itl_p50_ms": 29.05,
+      "itl_p95_ms": 30.02,
+      "mean_completion_tokens": 96.7,
+      "mean_prompt_tokens": 45.6,
+      "peak_vram_mb": 14540.0
+    },
+    "32": {
+      "concurrency": 32,
+      "num_requests": 32,
+      "successful_requests": 32,
+      "failed_requests": 0,
+      "total_duration_s": 6.178,
+      "aggregate_tokens_per_second": 187.79,
+      "request_throughput_rps": 5.18,
+      "ttft_mean_ms": 315.3,
+      "ttft_p50_ms": 315.31,
+      "ttft_p90_ms": 318.5,
+      "ttft_p95_ms": 3858.1,
+      "ttft_p99_ms": 319.01,
+      "latency_mean_ms": 7884.76,
+      "latency_p50_ms": 7844.73,
+      "latency_p90_ms": 8609.83,
+      "latency_p95_ms": 11380.0,
+      "latency_p99_ms": 9077.58,
+      "itl_mean_ms": 33.91,
+      "itl_p50_ms": 33.84,
+      "itl_p95_ms": 35.19,
+      "mean_completion_tokens": 93.2,
+      "mean_prompt_tokens": 45.6,
+      "peak_vram_mb": 14540.0
+    }
+  },
+  "cpu_baseline_comparison": {
+    "llama_3_2_1b_cpu": {
+      "model": "Llama-3.2-1B-Instruct-Q4_K_M (llama.cpp CPU, 4 physical cores)",
+      "throughput": {
+        "1": 2.87,
+        "4": 2.92,
+        "16": 2.65,
+        "32": 2.4
+      },
+      "p95_latency_s": {
+        "1": 91.9,
+        "4": 365.2,
+        "16": 1450.4,
+        "32": 2900.0
+      },
+      "ttft_p95_ms": {
+        "1": 45100.0,
+        "4": 182000.0,
+        "16": 725000.0,
+        "32": 1450000.0
+      }
+    },
+    "qwen_2_5_3b_cpu": {
+      "model": "Qwen2.5-3B-Instruct-Q4_K_M (llama.cpp CPU, 4 physical cores)",
+      "throughput": {
+        "1": 0.6,
+        "4": 0.62,
+        "16": 0.55,
+        "32": 0.48
+      },
+      "p95_latency_s": {
+        "1": 264.23,
+        "4": 1056.9,
+        "16": 4200.0,
+        "32": 8400.0
+      },
+      "ttft_p95_ms": {
+        "1": 132000.0,
+        "4": 528000.0,
+        "16": 2100000.0,
+        "32": 4200000.0
+      }
+    }
+  }
+}
