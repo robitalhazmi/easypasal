@@ -132,11 +132,39 @@ class GuardrailsConfig(BaseModel):
     default_language: str = "id"
 
 
+class TrafficSplitConfig(BaseModel):
+    """Configuration for deterministic traffic splitting and variant routing."""
+
+    enabled: bool = False
+    default_variant: str = "baseline_v0.1"
+    weights: dict[str, float] = Field(
+        default_factory=lambda: {
+            "baseline_v0.1": 0.5,
+            "gepa_v0.2": 0.5,
+        }
+    )
+    salt: str = "easypasal-traffic-split-v1"
+
+    @field_validator("weights")
+    @classmethod
+    def validate_weights(cls, v: dict[str, float]) -> dict[str, float]:
+        if not v:
+            raise ValueError("Traffic split weights dictionary cannot be empty")
+        for k, w in v.items():
+            if w < 0:
+                raise ValueError(f"Weight for variant '{k}' must be non-negative, got {w}")
+        total = sum(v.values())
+        if total <= 0:
+            raise ValueError("Sum of traffic split weights must be greater than zero")
+        return v
+
+
 class EasyPasalConfig(BaseModel):
     """Master configuration container for EasyPasal system."""
 
     version: str = "0.1"
     variant_id: str = "baseline_v0.1"
+    prompt_variant: Literal["gepa", "baseline"] = "baseline"
     description: str = "EasyPasal v0.1 Frozen Production Baseline"
     created_at: str | None = "2026-10-15"
     corpus: CorpusConfig = Field(default_factory=CorpusConfig)
@@ -145,6 +173,7 @@ class EasyPasalConfig(BaseModel):
     retrieval: RetrievalConfig = Field(default_factory=RetrievalConfig)
     generator: GeneratorConfig = Field(default_factory=GeneratorConfig)
     guardrails: GuardrailsConfig = Field(default_factory=GuardrailsConfig)
+    traffic_split: TrafficSplitConfig = Field(default_factory=TrafficSplitConfig)
 
     @classmethod
     def from_yaml(cls, path: Path | str) -> EasyPasalConfig:

@@ -6,7 +6,7 @@ import logging
 import uuid
 from typing import Annotated, Any
 
-from fastapi import APIRouter, Depends, HTTPException, Request
+from fastapi import APIRouter, Depends, HTTPException, Request, Response
 
 from easypasal.api.schemas import (
     AskRequest,
@@ -16,6 +16,7 @@ from easypasal.api.schemas import (
     HealthResponse,
     RetrievedChunkResponse,
 )
+from easypasal.api.traffic import VARIANT_BASELINE_V0_1, resolve_variant
 from easypasal.generation.pipeline import RAGPipeline
 
 logger = logging.getLogger("easypasal.api.routes")
@@ -84,6 +85,23 @@ async def health(request: Request) -> HealthResponse:
 
     environment = "test" if getattr(request.app.state, "is_test", False) else "development"
 
+    active_variant = getattr(request.app.state, "active_variant", None)
+    if not isinstance(active_variant, str):
+        pipe_cfg = getattr(pipeline, "config", None) if pipeline else None
+        if pipe_cfg is not None and isinstance(getattr(pipe_cfg, "variant_id", None), str):
+            active_variant = pipe_cfg.variant_id
+        else:
+            active_variant = VARIANT_BASELINE_V0_1
+
+    traffic_cfg = getattr(request.app.state, "traffic_split_config", None)
+    if not hasattr(traffic_cfg, "enabled") and pipeline is not None:
+        pipe_cfg = getattr(pipeline, "config", None)
+        if pipe_cfg is not None and hasattr(pipe_cfg, "traffic_split"):
+            traffic_cfg = pipe_cfg.traffic_split
+        else:
+            traffic_cfg = None
+    traffic_split_enabled = bool(getattr(traffic_cfg, "enabled", False))
+
     return HealthResponse(
         status="ok",
         version="0.1.0",
@@ -92,6 +110,8 @@ async def health(request: Request) -> HealthResponse:
         vector_count=vector_count,
         bm25_doc_count=bm25_count,
         backend_provider=provider_name,
+        active_variant=active_variant,
+        traffic_split_enabled=traffic_split_enabled,
     )
 
 
@@ -108,10 +128,44 @@ async def health(request: Request) -> HealthResponse:
 async def ask(
     payload: AskRequest,
     request: Request,
+    response: Response,
     pipeline: Annotated[RAGPipeline, Depends(get_pipeline)],
 ) -> AskResponse:
     """Answer a regulatory question with exact statutory citations and grounding verification."""
     request_id: str = getattr(request.state, "request_id", str(uuid.uuid4()))
+
+    # Resolve variant via payload override > header override > traffic split > default
+    header_variant = request.headers.get("X-EasyPasal-Variant") or request.headers.get("X-Variant")
+    client_key = (
+        request.headers.get("X-Forwarded-For")
+        or (request.client.host if request.client else None)
+        or payload.question
+    )
+
+    traffic_cfg = getattr(request.app.state, "traffic_split_config", None)
+    if not hasattr(traffic_cfg, "enabled") and pipeline is not None:
+        pipe_cfg = getattr(pipeline, "config", None)
+        if pipe_cfg is not None and hasattr(pipe_cfg, "traffic_split"):
+            traffic_cfg = pipe_cfg.traffic_split
+        else:
+            traffic_cfg = None
+
+    try:
+        resolved_variant = resolve_variant(
+            payload_variant=payload.variant,
+            header_variant=header_variant,
+            client_key=client_key,
+            traffic_config=traffic_cfg,
+        )
+    except ValueError as exc:
+        raise HTTPException(
+            status_code=422,
+            detail=f"Invalid variant configuration: {exc}",
+        ) from exc
+
+    # Set on request state for access log middleware and response header
+    request.state.variant = resolved_variant
+    response.headers["X-EasyPasal-Variant"] = resolved_variant
 
     try:
         output = pipeline.ask(
@@ -119,9 +173,15 @@ async def ask(
             language=payload.language,
             top_k=payload.top_k,
             strict_grounding=payload.strict_grounding,
+            variant=resolved_variant,
         )
     except Exception as exc:
-        logger.exception("Error executing RAG pipeline for request %s: %s", request_id, exc)
+        logger.exception(
+            "Error executing RAG pipeline for request %s (variant=%s): %s",
+            request_id,
+            resolved_variant,
+            exc,
+        )
         raise HTTPException(
             status_code=500,
             detail=f"Inference failure: {exc}",
@@ -161,6 +221,7 @@ async def ask(
         abstained=output.abstained,
         language=output.language,
         model=output.model_name,
+        variant=resolved_variant,
         latency_ms=output.latency_ms,
         retrieved_chunks=retrieved_chunks,
         verification=verification_resp,

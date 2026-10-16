@@ -25,6 +25,8 @@ logger = logging.getLogger("easypasal.generation.pipeline")
 class RAGPipeline:
     """Unified Question-Answering pipeline for Indonesian financial regulation."""
 
+    config: EasyPasalConfig | None = None
+
     def __init__(
         self,
         retriever: HybridRetriever,
@@ -141,6 +143,7 @@ class RAGPipeline:
         max_tokens: int | None = None,
         system_prompt_override: str | None = None,
         prompt_variant: str = "gepa",
+        variant: str | None = None,
         verify_citations: bool | None = None,
         strict_grounding: bool | None = None,
     ) -> GenerationOutput:
@@ -155,6 +158,8 @@ class RAGPipeline:
             temperature: LLM sampling temperature (default: from config or 0.1).
             max_tokens: Maximum tokens in generated completion (default: from config or 160).
             system_prompt_override: Custom system instructions if desired.
+            prompt_variant: Prompt template variant ('gepa' or 'baseline').
+            variant: Optional high-level pipeline variant ID (e.g. 'baseline_v0.1', 'gepa_v0.2', 'A', 'B').
             verify_citations: Validate that cited pasal/ayat exist in retrieved passages (default: True).
             strict_grounding: Fall back to abstention if ungrounded citations are detected (default: False).
 
@@ -197,6 +202,16 @@ class RAGPipeline:
             else (self.config.guardrails.strict_grounding if self.config else False)
         )
 
+        # Resolve effective variant and prompt variant
+        eff_variant = variant or (self.config.variant_id if self.config else "baseline_v0.1")
+        eff_prompt_variant = prompt_variant
+        if variant is not None:
+            v_lower = variant.lower()
+            if "gepa" in v_lower or v_lower == "b":
+                eff_prompt_variant = "gepa"
+            elif "baseline" in v_lower or v_lower == "a":
+                eff_prompt_variant = "baseline"
+
         # 1. Detect Question Language
         lang = language if language is not None else detect_language(clean_question)
 
@@ -214,7 +229,7 @@ class RAGPipeline:
             chunks=retrieval_res.chunks,
             language=lang,
             system_prompt_override=system_prompt_override,
-            prompt_variant=prompt_variant,
+            prompt_variant=eff_prompt_variant,
         )
 
         # 4. Generate Completion via Backend
@@ -277,6 +292,8 @@ class RAGPipeline:
             tokens_per_second=gen_res.tokens_per_second,
             model_name=self.generator.model_name,
             metadata={
+                "variant": eff_variant,
+                "prompt_variant": eff_prompt_variant,
                 "retrieval_ms": retrieval_res.duration_ms,
                 "generation_ms": gen_res.latency_ms,
                 "tokens_per_second": gen_res.tokens_per_second,

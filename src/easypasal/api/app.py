@@ -24,6 +24,8 @@ def create_app(
     version: str = "0.1.0",
     is_test: bool = False,
     config_path: Path | str | None = None,
+    variant: str | None = None,
+    traffic_split: bool | None = None,
 ) -> FastAPI:
     """Create and configure the FastAPI application instance.
 
@@ -33,6 +35,8 @@ def create_app(
         version: API version string.
         is_test: Flag indicating automated test environment.
         config_path: Optional path to YAML configuration file.
+        variant: Optional default variant override ('baseline_v0.1' or 'gepa_v0.2').
+        traffic_split: Optional boolean flag to enable or disable traffic splitting.
 
     Returns:
         Configured FastAPI application.
@@ -44,8 +48,15 @@ def create_app(
             app.state, "is_test", False
         ):
             try:
+                # If variant is specified and config_path not explicitly provided, map to variant yaml
+                eff_config_path = config_path
+                if variant and not eff_config_path:
+                    cand_path = Path(f"configs/{variant}.yaml")
+                    if cand_path.exists():
+                        eff_config_path = cand_path
+
                 logger.info("Initializing default on-disk EasyPasal RAGPipeline on startup...")
-                app.state.pipeline = RAGPipeline.from_defaults(config_path=config_path)
+                app.state.pipeline = RAGPipeline.from_defaults(config_path=eff_config_path)
                 logger.info("EasyPasal RAGPipeline loaded and ready.")
             except Exception as exc:
                 logger.warning(
@@ -53,6 +64,26 @@ def create_app(
                     "Endpoints requiring inference may return 503 until configured.",
                     exc,
                 )
+
+        # Set or override active variant and traffic split state
+        pip = getattr(app.state, "pipeline", None)
+        pip_cfg = getattr(pip, "config", None) if pip else None
+        active_var = variant
+        if (
+            not active_var
+            and pip_cfg is not None
+            and isinstance(getattr(pip_cfg, "variant_id", None), str)
+        ):
+            active_var = pip_cfg.variant_id
+        app.state.active_variant = active_var if isinstance(active_var, str) else "baseline_v0.1"
+
+        traffic_cfg = None
+        if pip_cfg is not None and hasattr(pip_cfg, "traffic_split"):
+            traffic_cfg = pip_cfg.traffic_split.model_copy()
+        if traffic_cfg is not None and traffic_split is not None:
+            traffic_cfg.enabled = traffic_split
+        app.state.traffic_split_config = traffic_cfg
+
         yield
 
     app = FastAPI(
@@ -68,6 +99,21 @@ def create_app(
     # State configuration
     app.state.pipeline = pipeline
     app.state.is_test = is_test
+    pip_cfg = getattr(pipeline, "config", None) if pipeline else None
+    if isinstance(variant, str):
+        app.state.active_variant = variant
+    elif pip_cfg and isinstance(getattr(pip_cfg, "variant_id", None), str):
+        app.state.active_variant = pip_cfg.variant_id
+    else:
+        app.state.active_variant = "baseline_v0.1"
+
+    if pip_cfg and hasattr(pip_cfg, "traffic_split"):
+        cfg = pip_cfg.traffic_split.model_copy()
+        if traffic_split is not None:
+            cfg.enabled = traffic_split
+        app.state.traffic_split_config = cfg
+    else:
+        app.state.traffic_split_config = None
 
     # Middleware registration (executed in reverse order of addition)
     app.add_middleware(RequestIDMiddleware)
@@ -108,6 +154,17 @@ def main() -> None:
         help="LLM provider for RAGPipeline (default: auto)",
     )
     parser.add_argument(
+        "--variant",
+        choices=["baseline_v0.1", "gepa_v0.2", "A", "B", "baseline", "gepa"],
+        default=None,
+        help="Active default pipeline variant (default: from config)",
+    )
+    parser.add_argument(
+        "--traffic-split",
+        action="store_true",
+        help="Enable deterministic traffic splitting across variants",
+    )
+    parser.add_argument(
         "--log-level",
         default="info",
         choices=["debug", "info", "warning", "error"],
@@ -122,27 +179,39 @@ def main() -> None:
     )
 
     logger.info(
-        "Starting EasyPasal REST API server on %s:%d (provider=%s, config=%s)",
+        "Starting EasyPasal REST API server on %s:%d (provider=%s, variant=%s, traffic_split=%s, config=%s)",
         args.host,
         args.port,
         args.provider,
+        args.variant,
+        args.traffic_split,
         args.config,
     )
 
     # If provider or config is explicitly specified other than auto, initialize upfront
     configured_pipeline: RAGPipeline | None = None
-    if args.provider != "auto" or args.config is not None:
+    if args.provider != "auto" or args.config is not None or args.variant is not None:
+        eff_cfg = args.config
+        if not eff_cfg and args.variant:
+            cand = Path(f"configs/{args.variant}.yaml")
+            if cand.exists():
+                eff_cfg = cand
         try:
             configured_pipeline = RAGPipeline.from_defaults(
                 provider=args.provider,
-                config_path=args.config,
+                config_path=eff_cfg,
             )
         except Exception as exc:
             logger.warning(
                 "Could not initialize on-disk index with provider %s: %s", args.provider, exc
             )
 
-    app_instance = create_app(pipeline=configured_pipeline, config_path=args.config)
+    app_instance = create_app(
+        pipeline=configured_pipeline,
+        config_path=args.config,
+        variant=args.variant,
+        traffic_split=True if args.traffic_split else None,
+    )
 
     uvicorn.run(
         app_instance,

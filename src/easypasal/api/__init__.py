@@ -14,6 +14,14 @@ if TYPE_CHECKING:
         HealthResponse,
         RetrievedChunkResponse,
     )
+    from easypasal.api.traffic import (
+        VARIANT_BASELINE_V0_1,
+        VARIANT_GEPA_V0_2,
+        compute_deterministic_variant,
+        map_variant_to_prompt,
+        normalize_variant,
+        resolve_variant,
+    )
 
 __all__ = [
     "AskRequest",
@@ -24,7 +32,13 @@ __all__ = [
     "HealthResponse",
     "RequestIDMiddleware",
     "RetrievedChunkResponse",
+    "VARIANT_BASELINE_V0_1",
+    "VARIANT_GEPA_V0_2",
+    "compute_deterministic_variant",
     "create_app",
+    "map_variant_to_prompt",
+    "normalize_variant",
+    "resolve_variant",
 ]
 
 _APP_SYMBOLS = {"create_app"}
@@ -37,6 +51,14 @@ _SCHEMA_SYMBOLS = {
     "ErrorResponse",
     "HealthResponse",
     "RetrievedChunkResponse",
+}
+_TRAFFIC_SYMBOLS = {
+    "VARIANT_BASELINE_V0_1",
+    "VARIANT_GEPA_V0_2",
+    "compute_deterministic_variant",
+    "map_variant_to_prompt",
+    "normalize_variant",
+    "resolve_variant",
 }
 
 
@@ -53,4 +75,8 @@ def __getattr__(name: str) -> object:
         import easypasal.api.schemas as _schemas
 
         return getattr(_schemas, name)
+    if name in _TRAFFIC_SYMBOLS:
+        import easypasal.api.traffic as _traffic
+
+        return getattr(_traffic, name)
     raise AttributeError(f"module {__name__!r} has no attribute {name!r}")

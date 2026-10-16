@@ -37,21 +37,28 @@ class RequestIDMiddleware(BaseHTTPMiddleware):
         # Inject X-Request-ID into outgoing response headers
         response.headers["X-Request-ID"] = request_id
 
-        # Determine client address
+        # Determine client address and active variant
         client_host = request.client.host if request.client else "unknown"
+        variant = (
+            getattr(request.state, "variant", None)
+            or response.headers.get("X-EasyPasal-Variant")
+            or "none"
+        )
 
         # Emit structured log
         logger.info(
-            "%s %s %s -> %d (%.2fms) [req_id=%s client=%s]",
+            "%s %s %s -> %d (%.2fms) [req_id=%s variant=%s client=%s]",
             request.method,
             request.url.path,
             f"?{request.url.query}" if request.url.query else "",
             response.status_code,
             duration_ms,
             request_id,
+            variant,
             client_host,
             extra={
                 "request_id": request_id,
+                "variant": variant,
                 "client_ip": client_host,
                 "method": request.method,
                 "path": request.url.path,

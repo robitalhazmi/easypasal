@@ -41,6 +41,11 @@ class AskRequest(BaseModel):
         description="If True, forces an abstention refusal if any cited statutory article is ungrounded.",
         examples=[False],
     )
+    variant: str | None = Field(
+        default=None,
+        description="Optional pipeline variant override (e.g. 'baseline_v0.1', 'gepa_v0.2', 'A', 'B').",
+        examples=["baseline_v0.1"],
+    )
 
 
 class RetrievedChunkResponse(BaseModel):
@@ -91,6 +96,11 @@ class AskResponse(BaseModel):
     abstained: bool
     language: str
     model: str
+    variant: str = Field(
+        default="baseline_v0.1",
+        description="Active pipeline variant that processed this request (e.g. 'baseline_v0.1', 'gepa_v0.2').",
+        examples=["baseline_v0.1"],
+    )
     latency_ms: float
     retrieved_chunks: list[RetrievedChunkResponse] = Field(default_factory=list)
     verification: CitationVerificationResponse | None = None
@@ -108,6 +118,14 @@ class HealthResponse(BaseModel):
     vector_count: int = Field(default=0, description="Number of indexed vectors in Qdrant.")
     bm25_doc_count: int = Field(default=0, description="Number of indexed documents in BM25.")
     backend_provider: str | None = Field(default=None, description="Active LLM generation backend.")
+    active_variant: str = Field(
+        default="baseline_v0.1",
+        description="Default or active pipeline variant ID.",
+    )
+    traffic_split_enabled: bool = Field(
+        default=False,
+        description="Whether deterministic traffic splitting is active across variants.",
+    )
 
 
 class ErrorResponse(BaseModel):
