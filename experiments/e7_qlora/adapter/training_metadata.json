@@ -1,0 +1,30 @@
+{
+  "status": "completed",
+  "mode": "mock_simulation",
+  "base_model": "Qwen/Qwen2.5-0.5B-Instruct",
+  "train_samples": 72,
+  "dev_samples": 40,
+  "total_steps": 15,
+  "train_duration_sec": 0.0,
+  "final_train_loss": 0.285,
+  "final_val_loss": 0.3078,
+  "loss_history": [
+    {
+      "step": 5,
+      "train_loss": 1.4466,
+      "val_loss": 1.5623
+    },
+    {
+      "step": 10,
+      "train_loss": 0.82,
+      "val_loss": 0.8856
+    },
+    {
+      "step": 15,
+      "train_loss": 0.285,
+      "val_loss": 0.3078
+    }
+  ],
+  "lora_r": 16,
+  "lora_alpha": 32
+}

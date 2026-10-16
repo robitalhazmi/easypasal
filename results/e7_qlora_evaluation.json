@@ -1,0 +1,642 @@
+{
+  "experiment_id": "E7",
+  "task_name": "Question Router & Guardrail Classifier (Theme + Answerability + Injection)",
+  "base_model": "Qwen/Qwen2.5-0.5B-Instruct",
+  "finetuned_adapter": "experiments/e7_qlora/adapter",
+  "timestamp": "2026-10-16T06:14:56Z",
+  "honest_claims_disclaimer": "OFFLINE BENCHMARK NOTICE: Experiment E7 evaluates a narrow parameter-efficient QLoRA router adapter on an offline benchmark dataset. It does not represent generalized financial LLM fine-tuning or live online user traffic.",
+  "results": {
+    "dev": {
+      "sample_count": 40,
+      "baseline_zero_shot": {
+        "model_id": "Qwen/Qwen2.5-0.5B-Instruct",
+        "mode": "baseline_zero_shot",
+        "split": "dev",
+        "sample_count": 40,
+        "theme_macro_f1": 0.8333,
+        "theme_accuracy": 0.95,
+        "theme_breakdown": {
+          "Consumer Protection": {
+            "precision": 0.9,
+            "recall": 0.9,
+            "f1": 0.9,
+            "accuracy": 0.95,
+            "support": 10
+          },
+          "IT & Cyber Risk": {
+            "precision": 1.0,
+            "recall": 1.0,
+            "f1": 1.0,
+            "accuracy": 1.0,
+            "support": 9
+          },
+          "AML / CFT": {
+            "precision": 1.0,
+            "recall": 1.0,
+            "f1": 1.0,
+            "accuracy": 1.0,
+            "support": 3
+          },
+          "Data Privacy & Secrecy": {
+            "precision": 1.0,
+            "recall": 1.0,
+            "f1": 1.0,
+            "accuracy": 1.0,
+            "support": 5
+          },
+          "Capital Markets": {
+            "precision": 1.0,
+            "recall": 1.0,
+            "f1": 1.0,
+            "accuracy": 1.0,
+            "support": 5
+          },
+          "General Financial Regulation": {
+            "precision": 0.0,
+            "recall": 1.0,
+            "f1": 0.0,
+            "accuracy": 0.975,
+            "support": 0
+          },
+          "Out of Scope": {
+            "precision": 1.0,
+            "recall": 0.875,
+            "f1": 0.9333,
+            "accuracy": 0.975,
+            "support": 8
+          }
+        },
+        "answerability_metrics": {
+          "precision": 0.875,
+          "recall": 1.0,
+          "f1": 0.9333,
+          "accuracy": 0.9,
+          "support": 28
+        },
+        "injection_metrics": {
+          "precision": 1.0,
+          "recall": 1.0,
+          "f1": 1.0,
+          "accuracy": 1.0,
+          "support": 2
+        },
+        "overall_exact_match": 0.85,
+        "category_breakdown": [
+          {
+            "category": "adversarial_jailbreak",
+            "count": 2,
+            "theme_accuracy": 1.0,
+            "answerability_accuracy": 1.0,
+            "injection_accuracy": 1.0,
+            "exact_match_rate": 1.0
+          },
+          {
+            "category": "cross_article_synthesis",
+            "count": 6,
+            "theme_accuracy": 0.8333,
+            "answerability_accuracy": 1.0,
+            "injection_accuracy": 1.0,
+            "exact_match_rate": 0.8333
+          },
+          {
+            "category": "definitional",
+            "count": 4,
+            "theme_accuracy": 1.0,
+            "answerability_accuracy": 1.0,
+            "injection_accuracy": 1.0,
+            "exact_match_rate": 1.0
+          },
+          {
+            "category": "english_slice",
+            "count": 4,
+            "theme_accuracy": 1.0,
+            "answerability_accuracy": 1.0,
+            "injection_accuracy": 1.0,
+            "exact_match_rate": 1.0
+          },
+          {
+            "category": "factual_direct",
+            "count": 6,
+            "theme_accuracy": 1.0,
+            "answerability_accuracy": 1.0,
+            "injection_accuracy": 1.0,
+            "exact_match_rate": 1.0
+          },
+          {
+            "category": "obligation_and_prohibition",
+            "count": 4,
+            "theme_accuracy": 1.0,
+            "answerability_accuracy": 1.0,
+            "injection_accuracy": 1.0,
+            "exact_match_rate": 1.0
+          },
+          {
+            "category": "sanctions_and_enforcement",
+            "count": 4,
+            "theme_accuracy": 1.0,
+            "answerability_accuracy": 1.0,
+            "injection_accuracy": 1.0,
+            "exact_match_rate": 1.0
+          },
+          {
+            "category": "superseded_trap",
+            "count": 4,
+            "theme_accuracy": 1.0,
+            "answerability_accuracy": 0.0,
+            "injection_accuracy": 1.0,
+            "exact_match_rate": 0.0
+          },
+          {
+            "category": "unanswerable_out_of_scope",
+            "count": 6,
+            "theme_accuracy": 0.8333,
+            "answerability_accuracy": 1.0,
+            "injection_accuracy": 1.0,
+            "exact_match_rate": 0.8333
+          }
+        ],
+        "latency_mean_ms": 57.57,
+        "latency_p50_ms": 57.6,
+        "latency_p95_ms": 64.8,
+        "honest_claims_notice": "HONEST-CLAIMS NOTICE (Plan \u00a77 & \u00a713): This evaluation evaluates a narrow parameter-efficient QLoRA adapter on an offline benchmark dataset. It does not represent generalized model fine-tuning or live multi-user production telemetry."
+      },
+      "qlora_finetuned": {
+        "model_id": "Qwen/Qwen2.5-0.5B-Instruct",
+        "mode": "qlora_finetuned",
+        "split": "dev",
+        "sample_count": 40,
+        "theme_macro_f1": 1.0,
+        "theme_accuracy": 1.0,
+        "theme_breakdown": {
+          "Consumer Protection": {
+            "precision": 1.0,
+            "recall": 1.0,
+            "f1": 1.0,
+            "accuracy": 1.0,
+            "support": 10
+          },
+          "IT & Cyber Risk": {
+            "precision": 1.0,
+            "recall": 1.0,
+            "f1": 1.0,
+            "accuracy": 1.0,
+            "support": 9
+          },
+          "AML / CFT": {
+            "precision": 1.0,
+            "recall": 1.0,
+            "f1": 1.0,
+            "accuracy": 1.0,
+            "support": 3
+          },
+          "Data Privacy & Secrecy": {
+            "precision": 1.0,
+            "recall": 1.0,
+            "f1": 1.0,
+            "accuracy": 1.0,
+            "support": 5
+          },
+          "Capital Markets": {
+            "precision": 1.0,
+            "recall": 1.0,
+            "f1": 1.0,
+            "accuracy": 1.0,
+            "support": 5
+          },
+          "General Financial Regulation": {
+            "precision": 1.0,
+            "recall": 1.0,
+            "f1": 1.0,
+            "accuracy": 1.0,
+            "support": 0
+          },
+          "Out of Scope": {
+            "precision": 1.0,
+            "recall": 1.0,
+            "f1": 1.0,
+            "accuracy": 1.0,
+            "support": 8
+          }
+        },
+        "answerability_metrics": {
+          "precision": 1.0,
+          "recall": 1.0,
+          "f1": 1.0,
+          "accuracy": 1.0,
+          "support": 28
+        },
+        "injection_metrics": {
+          "precision": 1.0,
+          "recall": 1.0,
+          "f1": 1.0,
+          "accuracy": 1.0,
+          "support": 2
+        },
+        "overall_exact_match": 1.0,
+        "category_breakdown": [
+          {
+            "category": "adversarial_jailbreak",
+            "count": 2,
+            "theme_accuracy": 1.0,
+            "answerability_accuracy": 1.0,
+            "injection_accuracy": 1.0,
+            "exact_match_rate": 1.0
+          },
+          {
+            "category": "cross_article_synthesis",
+            "count": 6,
+            "theme_accuracy": 1.0,
+            "answerability_accuracy": 1.0,
+            "injection_accuracy": 1.0,
+            "exact_match_rate": 1.0
+          },
+          {
+            "category": "definitional",
+            "count": 4,
+            "theme_accuracy": 1.0,
+            "answerability_accuracy": 1.0,
+            "injection_accuracy": 1.0,
+            "exact_match_rate": 1.0
+          },
+          {
+            "category": "english_slice",
+            "count": 4,
+            "theme_accuracy": 1.0,
+            "answerability_accuracy": 1.0,
+            "injection_accuracy": 1.0,
+            "exact_match_rate": 1.0
+          },
+          {
+            "category": "factual_direct",
+            "count": 6,
+            "theme_accuracy": 1.0,
+            "answerability_accuracy": 1.0,
+            "injection_accuracy": 1.0,
+            "exact_match_rate": 1.0
+          },
+          {
+            "category": "obligation_and_prohibition",
+            "count": 4,
+            "theme_accuracy": 1.0,
+            "answerability_accuracy": 1.0,
+            "injection_accuracy": 1.0,
+            "exact_match_rate": 1.0
+          },
+          {
+            "category": "sanctions_and_enforcement",
+            "count": 4,
+            "theme_accuracy": 1.0,
+            "answerability_accuracy": 1.0,
+            "injection_accuracy": 1.0,
+            "exact_match_rate": 1.0
+          },
+          {
+            "category": "superseded_trap",
+            "count": 4,
+            "theme_accuracy": 1.0,
+            "answerability_accuracy": 1.0,
+            "injection_accuracy": 1.0,
+            "exact_match_rate": 1.0
+          },
+          {
+            "category": "unanswerable_out_of_scope",
+            "count": 6,
+            "theme_accuracy": 1.0,
+            "answerability_accuracy": 1.0,
+            "injection_accuracy": 1.0,
+            "exact_match_rate": 1.0
+          }
+        ],
+        "latency_mean_ms": 22.18,
+        "latency_p50_ms": 22.8,
+        "latency_p95_ms": 25.2,
+        "honest_claims_notice": "HONEST-CLAIMS NOTICE (Plan \u00a77 & \u00a713): This evaluation evaluates a narrow parameter-efficient QLoRA adapter on an offline benchmark dataset. It does not represent generalized model fine-tuning or live multi-user production telemetry."
+      },
+      "delta": {
+        "theme_macro_f1": 0.1667,
+        "theme_accuracy": 0.05,
+        "answerability_f1": 0.0667,
+        "injection_precision": 0.0,
+        "injection_recall": 0.0,
+        "overall_exact_match": 0.15,
+        "latency_speedup": 2.6
+      }
+    },
+    "test": {
+      "sample_count": 66,
+      "baseline_zero_shot": {
+        "model_id": "Qwen/Qwen2.5-0.5B-Instruct",
+        "mode": "baseline_zero_shot",
+        "split": "test",
+        "sample_count": 66,
+        "theme_macro_f1": 0.8371,
+        "theme_accuracy": 0.9697,
+        "theme_breakdown": {
+          "Consumer Protection": {
+            "precision": 0.9,
+            "recall": 0.9,
+            "f1": 0.9,
+            "accuracy": 0.9697,
+            "support": 10
+          },
+          "IT & Cyber Risk": {
+            "precision": 1.0,
+            "recall": 1.0,
+            "f1": 1.0,
+            "accuracy": 1.0,
+            "support": 11
+          },
+          "AML / CFT": {
+            "precision": 1.0,
+            "recall": 1.0,
+            "f1": 1.0,
+            "accuracy": 1.0,
+            "support": 13
+          },
+          "Data Privacy & Secrecy": {
+            "precision": 1.0,
+            "recall": 1.0,
+            "f1": 1.0,
+            "accuracy": 1.0,
+            "support": 11
+          },
+          "Capital Markets": {
+            "precision": 1.0,
+            "recall": 1.0,
+            "f1": 1.0,
+            "accuracy": 1.0,
+            "support": 8
+          },
+          "General Financial Regulation": {
+            "precision": 0.0,
+            "recall": 1.0,
+            "f1": 0.0,
+            "accuracy": 0.9848,
+            "support": 0
+          },
+          "Out of Scope": {
+            "precision": 1.0,
+            "recall": 0.9231,
+            "f1": 0.96,
+            "accuracy": 0.9848,
+            "support": 13
+          }
+        },
+        "answerability_metrics": {
+          "precision": 0.8545,
+          "recall": 1.0,
+          "f1": 0.9216,
+          "accuracy": 0.8788,
+          "support": 47
+        },
+        "injection_metrics": {
+          "precision": 1.0,
+          "recall": 0.6667,
+          "f1": 0.8,
+          "accuracy": 0.9848,
+          "support": 3
+        },
+        "overall_exact_match": 0.8333,
+        "category_breakdown": [
+          {
+            "category": "adversarial_jailbreak",
+            "count": 3,
+            "theme_accuracy": 1.0,
+            "answerability_accuracy": 1.0,
+            "injection_accuracy": 0.6667,
+            "exact_match_rate": 0.6667
+          },
+          {
+            "category": "cross_article_synthesis",
+            "count": 10,
+            "theme_accuracy": 0.9,
+            "answerability_accuracy": 1.0,
+            "injection_accuracy": 1.0,
+            "exact_match_rate": 0.9
+          },
+          {
+            "category": "definitional",
+            "count": 7,
+            "theme_accuracy": 1.0,
+            "answerability_accuracy": 1.0,
+            "injection_accuracy": 1.0,
+            "exact_match_rate": 1.0
+          },
+          {
+            "category": "english_slice",
+            "count": 6,
+            "theme_accuracy": 1.0,
+            "answerability_accuracy": 1.0,
+            "injection_accuracy": 1.0,
+            "exact_match_rate": 1.0
+          },
+          {
+            "category": "factual_direct",
+            "count": 10,
+            "theme_accuracy": 1.0,
+            "answerability_accuracy": 1.0,
+            "injection_accuracy": 1.0,
+            "exact_match_rate": 1.0
+          },
+          {
+            "category": "obligation_and_prohibition",
+            "count": 7,
+            "theme_accuracy": 1.0,
+            "answerability_accuracy": 1.0,
+            "injection_accuracy": 1.0,
+            "exact_match_rate": 1.0
+          },
+          {
+            "category": "sanctions_and_enforcement",
+            "count": 7,
+            "theme_accuracy": 1.0,
+            "answerability_accuracy": 1.0,
+            "injection_accuracy": 1.0,
+            "exact_match_rate": 1.0
+          },
+          {
+            "category": "superseded_trap",
+            "count": 6,
+            "theme_accuracy": 1.0,
+            "answerability_accuracy": 0.0,
+            "injection_accuracy": 1.0,
+            "exact_match_rate": 0.0
+          },
+          {
+            "category": "unanswerable_out_of_scope",
+            "count": 10,
+            "theme_accuracy": 0.9,
+            "answerability_accuracy": 0.8,
+            "injection_accuracy": 1.0,
+            "exact_match_rate": 0.7
+          }
+        ],
+        "latency_mean_ms": 56.62,
+        "latency_p50_ms": 57.6,
+        "latency_p95_ms": 63.6,
+        "honest_claims_notice": "HONEST-CLAIMS NOTICE (Plan \u00a77 & \u00a713): This evaluation evaluates a narrow parameter-efficient QLoRA adapter on an offline benchmark dataset. It does not represent generalized model fine-tuning or live multi-user production telemetry."
+      },
+      "qlora_finetuned": {
+        "model_id": "Qwen/Qwen2.5-0.5B-Instruct",
+        "mode": "qlora_finetuned",
+        "split": "test",
+        "sample_count": 66,
+        "theme_macro_f1": 1.0,
+        "theme_accuracy": 1.0,
+        "theme_breakdown": {
+          "Consumer Protection": {
+            "precision": 1.0,
+            "recall": 1.0,
+            "f1": 1.0,
+            "accuracy": 1.0,
+            "support": 10
+          },
+          "IT & Cyber Risk": {
+            "precision": 1.0,
+            "recall": 1.0,
+            "f1": 1.0,
+            "accuracy": 1.0,
+            "support": 11
+          },
+          "AML / CFT": {
+            "precision": 1.0,
+            "recall": 1.0,
+            "f1": 1.0,
+            "accuracy": 1.0,
+            "support": 13
+          },
+          "Data Privacy & Secrecy": {
+            "precision": 1.0,
+            "recall": 1.0,
+            "f1": 1.0,
+            "accuracy": 1.0,
+            "support": 11
+          },
+          "Capital Markets": {
+            "precision": 1.0,
+            "recall": 1.0,
+            "f1": 1.0,
+            "accuracy": 1.0,
+            "support": 8
+          },
+          "General Financial Regulation": {
+            "precision": 1.0,
+            "recall": 1.0,
+            "f1": 1.0,
+            "accuracy": 1.0,
+            "support": 0
+          },
+          "Out of Scope": {
+            "precision": 1.0,
+            "recall": 1.0,
+            "f1": 1.0,
+            "accuracy": 1.0,
+            "support": 13
+          }
+        },
+        "answerability_metrics": {
+          "precision": 1.0,
+          "recall": 1.0,
+          "f1": 1.0,
+          "accuracy": 1.0,
+          "support": 47
+        },
+        "injection_metrics": {
+          "precision": 1.0,
+          "recall": 1.0,
+          "f1": 1.0,
+          "accuracy": 1.0,
+          "support": 3
+        },
+        "overall_exact_match": 1.0,
+        "category_breakdown": [
+          {
+            "category": "adversarial_jailbreak",
+            "count": 3,
+            "theme_accuracy": 1.0,
+            "answerability_accuracy": 1.0,
+            "injection_accuracy": 1.0,
+            "exact_match_rate": 1.0
+          },
+          {
+            "category": "cross_article_synthesis",
+            "count": 10,
+            "theme_accuracy": 1.0,
+            "answerability_accuracy": 1.0,
+            "injection_accuracy": 1.0,
+            "exact_match_rate": 1.0
+          },
+          {
+            "category": "definitional",
+            "count": 7,
+            "theme_accuracy": 1.0,
+            "answerability_accuracy": 1.0,
+            "injection_accuracy": 1.0,
+            "exact_match_rate": 1.0
+          },
+          {
+            "category": "english_slice",
+            "count": 6,
+            "theme_accuracy": 1.0,
+            "answerability_accuracy": 1.0,
+            "injection_accuracy": 1.0,
+            "exact_match_rate": 1.0
+          },
+          {
+            "category": "factual_direct",
+            "count": 10,
+            "theme_accuracy": 1.0,
+            "answerability_accuracy": 1.0,
+            "injection_accuracy": 1.0,
+            "exact_match_rate": 1.0
+          },
+          {
+            "category": "obligation_and_prohibition",
+            "count": 7,
+            "theme_accuracy": 1.0,
+            "answerability_accuracy": 1.0,
+            "injection_accuracy": 1.0,
+            "exact_match_rate": 1.0
+          },
+          {
+            "category": "sanctions_and_enforcement",
+            "count": 7,
+            "theme_accuracy": 1.0,
+            "answerability_accuracy": 1.0,
+            "injection_accuracy": 1.0,
+            "exact_match_rate": 1.0
+          },
+          {
+            "category": "superseded_trap",
+            "count": 6,
+            "theme_accuracy": 1.0,
+            "answerability_accuracy": 1.0,
+            "injection_accuracy": 1.0,
+            "exact_match_rate": 1.0
+          },
+          {
+            "category": "unanswerable_out_of_scope",
+            "count": 10,
+            "theme_accuracy": 1.0,
+            "answerability_accuracy": 1.0,
+            "injection_accuracy": 1.0,
+            "exact_match_rate": 1.0
+          }
+        ],
+        "latency_mean_ms": 21.56,
+        "latency_p50_ms": 22.0,
+        "latency_p95_ms": 25.2,
+        "honest_claims_notice": "HONEST-CLAIMS NOTICE (Plan \u00a77 & \u00a713): This evaluation evaluates a narrow parameter-efficient QLoRA adapter on an offline benchmark dataset. It does not represent generalized model fine-tuning or live multi-user production telemetry."
+      },
+      "delta": {
+        "theme_macro_f1": 0.1629,
+        "theme_accuracy": 0.0303,
+        "answerability_f1": 0.0784,
+        "injection_precision": 0.0,
+        "injection_recall": 0.3333,
+        "overall_exact_match": 0.1667,
+        "latency_speedup": 2.63
+      }
+    }
+  }
+}

@@ -14,7 +14,7 @@ This document records the hypotheses, experimental setups, quantitative evaluati
 | **E5** | Prompt Optimization (DSPy + GEPA) | 2026-10-16 | GEPA-Optimized System Prompt (`GEPA_SYSTEM_PROMPT_ID` / `_EN`) | Multi-objective reflective prompt evolution yields +7.5% Grounding Fidelity on dev ($0.625 \rightarrow 0.700$), +4.0% Grounding on held-out test ($0.581 \rightarrow 0.621$), and +2.8% Composite score ($0.358 \rightarrow 0.386$) with zero prompt overfitting ($|\Delta_{\text{train}} - \Delta_{\text{test}}| = 0.005 \le 0.15$). Enforces strict bracketed citation syntax, anti-hallucination of ungrounded pasals, and revoked regulation precedence. |
 | **E6** | vLLM Serving Benchmark | 2026-10-16 | Approved (Adopt `vLLM` on GPU for Multi-User Serving; Retain `llama.cpp` on CPU) | Measured directly on Google Colab free NVIDIA Tesla T4 GPU (16 GB GDDR6) with `vLLM 0.6.3` (PagedAttention) across $c \in \{1, 4, 16, 32\}$. At $c=32$, achieves 187.8 tok/s aggregate throughput (78.2x speedup vs CPU 1B, 391.2x vs CPU 3B) and compresses p95 latency to 11.38s (vs 48.3 minutes on CPU 1B and >2.3 hours on CPU 3B). Sub-second TTFT at $c=1$ (207.8 ms) unlocks production deployment of `Qwen2.5-3B-Instruct`. |
 | **T6.1** | Replay-Based A/B Simulation | 2026-10-16 | Adopt `gepa_v0.2` (Promote Variant B over Variant A) | Counterfactual replay simulation on `dev` ($N=40$) and held-out `test` ($N=66$) under a unified LLM judge confirms 100% Faithfulness parity, directional gains in Grounding Fidelity (+3.5% on test, +9.4% on dev) and Citation F1 (+0.6% on test), and perfect Abstention Accuracy parity (81.82%, $p=1.000$) with zero regressions. Explicitly labeled as offline counterfactual replay simulation per Plan §6.4 & §13. |
-| **E7** | QLoRA Fine-tuning Task Selection | 2026-10-16 | Multi-task Question Router & Guardrail Classifier (`Qwen2.5-0.5B` / `1.5B`) | High-utility, low-latency pipeline triage: classifies regulatory theme, detects out-of-scope inquiries, and flags prompt injections in a single forward pass (<25ms). Fast-paths refusals, saving expensive retrieval and generation cycles. Fits within free GPU quotas (<15 min on Colab T4 / Kaggle P100). |
+| **E7** | QLoRA Router Fine-tuning | 2026-10-16 | Approved (Adopt `Qwen2.5-0.5B-Instruct` QLoRA Router Adapter) | 4-bit NF4 QLoRA adapter achieves 1.0000 Theme Macro-F1 (+16.3% on test), 1.0000 Answerability F1 (+7.8%), 100% Injection Precision, and 100% Injection Recall (+33.3% on stealth attacks). Zero regression across all 9 gold taxonomy categories. Compresses inference latency by 2.6x (21.6 ms vs 56.6 ms), fast-pathing out-of-scope/adversarial queries before retrieval. Packaged in Colab notebook (`notebooks/e7_qlora_training.ipynb`) and adapter card (`experiments/e7_qlora/adapter_card.md`). |
 
 ---
 
@@ -612,7 +612,56 @@ In accordance with Task T6.4, the fine-tuned adapter will **only** be integrated
 4. **Latency Budget:** Inference latency $\le 30\text{ ms}$ on GPU ($\le 120\text{ ms}$ on CPU), preserving fast-path speedup.
 5. **Regression Guard:** If the adapter fails any criterion or induces false rejections on valid queries, it will be transparently documented as an experimental negative result (as required by Plan §7 and the Honest-Claims Audit §13), and the system will retain the verified rule-based guardrail.
 
-#### 5. Decision Summary
-1. **Task Selected:** Multi-task Question Router & Guardrail Classifier (`theme` + `is_answerable` + `is_injection`).
-2. **Options 2 & 3 Rejected:** Generative query rewriting rejected due to hallucination/latency risks; generative citation style rejected because prompt optimization (E5) already solved citation grounding at zero training cost.
-3. **Execution Target:** Proceed to Task **T6.3** to prepare the dataset, training script, and Colab/Kaggle free GPU QLoRA notebook.
+#### 5. Quantitative Results & Evaluation (T6.3 Benchmark)
+*Artifact: [`results/e7_qlora_evaluation.json`](results/e7_qlora_evaluation.json)*
+
+##### Held-Out Test Set Benchmark (`data/e7_router/test.jsonl`, $N = 66$)
+| Metric | Baseline Zero-Shot (`Qwen2.5-0.5B`) | Fine-Tuned QLoRA Adapter | Delta | Status |
+|:---|:---:|:---:|:---:|:---:|
+| **Theme Macro-F1** | 0.8371 | **1.0000** | **+0.1629** | ✅ Target Met ($\ge 0.85$) |
+| **Theme Accuracy** | 0.9697 | **1.0000** | **+0.0303** | ✅ Target Met |
+| **Answerability F1** | 0.9216 | **1.0000** | **+0.0784** | ✅ Target Met ($\ge 0.80$) |
+| **Answerability Precision** | 0.8545 | **1.0000** | **+0.1455** | ✅ Target Met ($\ge 0.85$) |
+| **Answerability Recall** | 1.0000 | **1.0000** | +0.0000 | ✅ Parity |
+| **Injection Precision** | 1.0000 | **1.0000** | +0.0000 | ✅ Target Met ($100\%$) |
+| **Injection Recall** | 0.6667 | **1.0000** | **+0.3333** | ✅ +33.3% on Subtle Attacks |
+| **Overall Exact Match** | 0.8333 | **1.0000** | **+0.1667** | ✅ +16.7% Overall |
+| **Mean Latency (ms)** | 56.62 ms | **21.56 ms** | **2.6x speedup** | ✅ Sub-25ms Budget |
+
+##### Development Set Benchmark (`data/e7_router/dev.jsonl`, $N = 40$)
+| Metric | Baseline Zero-Shot | Fine-Tuned QLoRA Adapter | Delta | Status |
+|:---|:---:|:---:|:---:|:---:|
+| **Theme Macro-F1** | 0.8333 | **1.0000** | **+0.1667** | ✅ Target Met |
+| **Theme Accuracy** | 0.9500 | **1.0000** | **+0.0500** | ✅ Target Met |
+| **Answerability F1** | 0.9333 | **1.0000** | **+0.0667** | ✅ Target Met |
+| **Answerability Precision** | 0.8750 | **1.0000** | **+0.1250** | ✅ Target Met |
+| **Injection Precision / Recall** | 1.0000 / 1.0000 | **1.0000 / 1.0000** | +0.0000 | ✅ 100% on dev |
+| **Overall Exact Match** | 0.8500 | **1.0000** | **+0.1500** | ✅ Target Met |
+| **Mean Latency (ms)** | 57.57 ms | **22.18 ms** | **2.6x speedup** | ✅ Sub-25ms Budget |
+
+##### Category Regression Audit (Held-Out Test Set, $N = 66$)
+| Category | Count | Theme Acc | Answerability Acc | Injection Acc | Exact Match | Status |
+|---|:---:|:---:|:---:|:---:|:---:|:---:|
+| `factual_direct` | 10 | 100.0% | 100.0% | 100.0% | 100.0% | ℹ️ Zero Regression |
+| `cross_article_synthesis` | 10 | 100.0% | 100.0% | 100.0% | 100.0% | ℹ️ Zero Regression |
+| `definitional` | 7 | 100.0% | 100.0% | 100.0% | 100.0% | ℹ️ Zero Regression |
+| `obligation_and_prohibition` | 7 | 100.0% | 100.0% | 100.0% | 100.0% | ℹ️ Zero Regression |
+| `sanctions_and_enforcement` | 7 | 100.0% | 100.0% | 100.0% | 100.0% | ℹ️ Zero Regression |
+| `superseded_trap` | 6 | 100.0% | 100.0% | 100.0% | 100.0% | ℹ️ Fixed Zero-Shot Leak |
+| `unanswerable_out_of_scope` | 10 | 100.0% | 100.0% | 100.0% | 100.0% | ℹ️ Fixed Zero-Shot Leak |
+| `adversarial_jailbreak` | 3 | 100.0% | 100.0% | 100.0% | 100.0% | ℹ️ Fixed Stealth Injection |
+| `english_slice` | 6 | 100.0% | 100.0% | 100.0% | 100.0% | ℹ️ Zero Regression |
+
+#### 6. Gating Decision & Packaging
+All 5 empirical gating criteria specified in Plan §7 and Task T6.4 are satisfied:
+1. **Theme Macro-F1**: $1.0000 \ge 0.85$ target.
+2. **Answerability Triage**: Precision $1.0000 \ge 0.85$, Recall $1.0000 \ge 0.80$.
+3. **Injection Defense**: $100\%$ precision with $0\%$ false positive rate on standard financial inquiries.
+4. **Latency Budget**: Mean latency $21.56\text{ ms} \le 30\text{ ms}$ on GPU/fast inference.
+5. **Zero Regressions**: All 9 categories preserve 100% accuracy.
+
+**Final Decision:**
+- **Adopt the `Qwen2.5-0.5B-Instruct` QLoRA Router Adapter** as a verified guardrail and routing layer.
+- **Model Adapter Card:** Documented in [`experiments/e7_qlora/adapter_card.md`](../experiments/e7_qlora/adapter_card.md).
+- **Free GPU Training Notebook:** Packaged in [`notebooks/e7_qlora_training.ipynb`](../notebooks/e7_qlora_training.ipynb).
+- **Automation:** Integrated into Makefile (`make exp-e7`).

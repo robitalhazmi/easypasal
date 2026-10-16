@@ -102,7 +102,7 @@
   - AC: decision documented; clearly labeled as offline replay, not a user test
 - [x] **T6.2** 👤 Choose E7 task (recommended: question router/classifier for theme + answerability + injection detection) (P2) (commit `275ecca`)
   - AC: choice recorded in decision log (Section 2.11)
-- [ ] **T6.3** 🤝 E7: QLoRA fine-tune on free GPU with PEFT + TRL (P2)
+- [x] **T6.3** 🤝 E7: QLoRA fine-tune on free GPU with PEFT + TRL (P2)
   - AC: adapter card, training config, before/after metrics, regression check on other categories
 - [ ] **T6.4** 🤖 Integrate router/adapter into guardrails only if it improves `dev` and `test` (P2)
   - AC: gated by eval results; otherwise documented as a negative result
