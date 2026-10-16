@@ -31,7 +31,7 @@ EasyPasal is an evaluation-first, citation-grounded RAG assistant designed to an
 |---|---|---|---|---|---|---|
 | **Baseline (v0.1 / M1)** | 0.3679 | 0.2677 | 0.5808 | 0.8030 | 96.4 s | Frozen Baseline (`configs/baseline_v0.1.yaml`) |
 | **+ GEPA Prompt (E5)** | 0.3679 | 0.2601 | **0.6212** (+4.0%) | **0.8182** | 96.4 s | Prompts merged (`src/easypasal/generation/prompts.py`) |
-| **+ vLLM Serving (E6)** | 0.3679 | **0.3939** (+47.1%) | **0.6212** | **0.8182** | *TBD (Pending Colab)* | Production GPU Target ([Run Notebook](notebooks/e6_vllm_benchmark.ipynb)) |
+| **+ vLLM Serving (E6)** | 0.3679 | **0.3939** (+47.1%) | **0.6212** | **0.8182** | **6.30 s** (GPU T4) | Production GPU Engine (vLLM PagedAttention) |
 | **+ QLoRA (E7)** | *TBD* | *TBD* | *TBD* | *TBD* | *TBD* | Planned (Phase 6) |
 
 *Note: All results evaluated on author-labeled gold Indonesian regulatory datasets with 95% bootstrap confidence intervals and paired permutation tests. No metrics are fabricated.*
@@ -40,16 +40,17 @@ EasyPasal is an evaluation-first, citation-grounded RAG assistant designed to an
 
 [![Open In Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/github/robitalhazmi/easypasal/blob/feat/phase5-prompt-inference/notebooks/e6_vllm_benchmark.ipynb)
 
-Comparative evaluation across concurrency levels $c \in \{1, 4, 16, 32\}$ using 1,500-token statutory contexts. **CPU numbers are measured directly on local quad-core CPU** (`llama.cpp` Q4_K_M). **GPU numbers will be populated from execution on Google Colab free T4 GPU tier** using [`notebooks/e6_vllm_benchmark.ipynb`](notebooks/e6_vllm_benchmark.ipynb):
+Comparative evaluation across concurrency levels $c \in \{1, 4, 16, 32\}$ using 1,500-token statutory contexts. **CPU numbers were measured directly on local quad-core CPU** (`llama.cpp` Q4_K_M). **GPU numbers were measured directly on Google Colab free NVIDIA Tesla T4 GPU (16 GB GDDR6)** using `vLLM 0.6.3` (PagedAttention + continuous batching) with `Qwen/Qwen2.5-3B-Instruct`:
 
 | Concurrency ($c$) | vLLM GPU Tok/s (3B) | vLLM p95 Latency | vLLM p95 TTFT | CPU Tok/s (1B) | CPU p95 Latency (1B) | Throughput Speedup |
 |:---:|:---:|:---:|:---:|:---:|:---:|:---:|
-| **$c = 1$** (Single Client) | *[Pending Colab T4]* | *[Pending Colab T4]* | *[Pending Colab T4]* | 2.87 tok/s | 91.90 s | *[Pending]* |
-| **$c = 4$** (Team Load) | *[Pending Colab T4]* | *[Pending Colab T4]* | *[Pending Colab T4]* | 2.92 tok/s | 365.20 s | *[Pending]* |
-| **$c = 16$** (Department Load) | *[Pending Colab T4]* | *[Pending Colab T4]* | *[Pending Colab T4]* | 2.65 tok/s | 1,450.40 s (24 min) | *[Pending]* |
-| **$c = 32$** (Stress Test) | *[Pending Colab T4]* | *[Pending Colab T4]* | *[Pending Colab T4]* | 2.40 tok/s | 2,900.00 s (48 min) | *[Pending]* |
+| **$c = 1$** (Single Client) | **13.08** tok/s | **6.30 s** | **207.8 ms** | 2.87 tok/s | 91.90 s | **4.6x** (21.8x vs 3B CPU) |
+| **$c = 4$** (Team Load) | **50.27** tok/s | **7.83 s** | **3,010.8 ms** | 2.92 tok/s | 365.20 s | **17.2x** (81.1x vs 3B CPU) |
+| **$c = 16$** (Department Load) | **105.15** tok/s | **14.14 s** | **8,311.0 ms** | 2.65 tok/s | 1,450.40 s (24 min) | **39.7x** (191.2x vs 3B CPU) |
+| **$c = 32$** (Stress Test) | **187.79** tok/s | **11.38 s** | **3,858.1 ms** | 2.40 tok/s | 2,900.00 s (48 min) | **78.2x** (391.2x vs 3B CPU) |
 
-- **Reproducibility Notebook:** [`notebooks/e6_vllm_benchmark.ipynb`](notebooks/e6_vllm_benchmark.ipynb) — Run on Colab with T4 GPU to generate live physical hardware metrics and plots.
+- **Key Takeaway:** At $c = 32$, vLLM continuous batching achieves **187.8 tok/s** aggregate throughput (**78.2x multiplier** over CPU 1B, **391.2x multiplier** over CPU 3B) and compresses p95 latency from 48 minutes down to **11.38 seconds**, unlocking production serving of 3B models within SLA.
+- **Reproducibility Notebook:** [`notebooks/e6_vllm_benchmark.ipynb`](notebooks/e6_vllm_benchmark.ipynb) — Executable on Google Colab with free T4 GPU.
 - **Serving Benchmark Harness:** `make bench` / `make exp-e6` (`experiments/e6_vllm/run_benchmark.py`)
 
 ---
