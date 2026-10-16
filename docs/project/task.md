@@ -98,7 +98,7 @@
 
 ## Phase 6 — Replay A/B and fine-tuning (P1/P2)
 
-- [x] **T6.1** 🤝 Replay-based A/B simulation: replay logged/dev queries through variants A and B, same judge, paired CIs (P1)
+- [x] **T6.1** 🤝 Replay-based A/B simulation: replay logged/dev queries through variants A and B, same judge, paired CIs (P1) (commit `0ff8b0c`)
   - AC: decision documented; clearly labeled as offline replay, not a user test
 - [ ] **T6.2** 👤 Choose E7 task (recommended: question router/classifier for theme + answerability + injection detection) (P2)
   - AC: choice recorded in decision log
@@ -175,4 +175,4 @@ If time runs short, descope in this order and record it as future work: **E7 QLo
 | 2026-10-16 | T5.1: Multi-objective DSPy + GEPA answer prompt optimization across train ($N=23$), val ($N=17$), dev ($N=40$), and test ($N=66$); Grounding Fidelity improved +7.5% on dev, +4.0% on test with zero overfitting (gap $0.0050 \le 0.15$); winning prompt committed to `src/easypasal/generation/prompts.py` (`GEPA_SYSTEM_PROMPT_ID` / `_EN`), decision logged in Section 2.8. |
 | 2026-10-16 | T5.2: Packaged reproducible vLLM serving benchmark notebook (`notebooks/e6_vllm_benchmark.ipynb`) and async harness (`experiments/e6_vllm/`); executed physical benchmark on Google Colab NVIDIA Tesla T4 GPU (16 GB GDDR6) measuring throughput (13.08 to 187.79 tok/s), TTFT (207.8 ms), and p95 latency (6.30s to 11.38s) across $c \in \{1, 4, 16, 32\}$; confirmed 78.2x throughput speedup vs CPU 1B and 391.2x vs CPU 3B; logged in `README.md` and Section 2.9. |
 | 2026-10-16 | T5.3: Implemented API variant routing and deterministic traffic splitting (`src/easypasal/api/traffic.py`), added `configs/gepa_v0.2.yaml`, updated `AskRequest` / `AskResponse` schemas and response headers (`X-EasyPasal-Variant`), enabled structured variant access logging, and verified side-by-side serving with 15/15 passing tests (commit `22daefc`). |
-| 2026-10-16 | T6.1: Implemented offline counterfactual replay-based A/B simulation engine (`eval/replay_ab_simulation.py` and `make replay-ab`); evaluated Variant A (`baseline_v0.1`) vs Variant B (`gepa_v0.2`) on `dev.jsonl` ($N=40$) and held-out `test.jsonl` ($N=66$) with unified judge and paired bootstrap CIs ($B=2{,}000, P=5{,}000$); confirmed 100% Faithfulness, +3.5% Grounding Fidelity gain, and 81.8% Abstention Accuracy parity with zero regressions; decision logged in Section 2.10. |
+| 2026-10-16 | T6.1: Implemented offline counterfactual replay-based A/B simulation engine (`eval/replay_ab_simulation.py` and `make replay-ab`); evaluated Variant A (`baseline_v0.1`) vs Variant B (`gepa_v0.2`) on `dev.jsonl` ($N=40$) and held-out `test.jsonl` ($N=66$) with unified judge and paired bootstrap CIs ($B=2{,}000, P=5{,}000$); confirmed 100% Faithfulness, +3.5% Grounding Fidelity gain, and 81.8% Abstention Accuracy parity with zero regressions; decision logged in Section 2.10 (commit `0ff8b0c`). |
