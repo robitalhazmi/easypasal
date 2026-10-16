@@ -91,7 +91,7 @@
 
 - [x] **T5.1** 🤝 E5: DSPy + GEPA run optimizing the answer prompt on `train`, tune on `dev`, report on `test` → decision logged (commit `d55f59e`, `af68c39`)
   - AC: before/after table with CIs; check for overfitting; optimized prompt committed
-- [x] **T5.2** 🤝 E6: vLLM benchmark notebook on free GPU (throughput, TTFT, p95 latency at concurrency 1/4/16/32) vs llama.cpp CPU baseline → completed on Colab T4 (187.8 tok/s, 78.2x gain over CPU 1B, 391.2x over CPU 3B; p95 latency 11.38s vs 48.3 min)
+- [x] **T5.2** 🤝 E6: vLLM benchmark notebook on free GPU (throughput, TTFT, p95 latency at concurrency 1/4/16/32) vs llama.cpp CPU baseline → completed on Colab T4 (187.8 tok/s, 78.2x gain over CPU 1B, 391.2x over CPU 3B; p95 latency 11.38s vs 48.3 min) (commit `1b4dfb7`, `0c5fb1e`)
   - AC: results table + plot in README; notebook reproducible; GPU type and settings recorded
 - [ ] **T5.3** 🤖 Variant switch in the API (config flag + deterministic hashing) and logging of variant
   - AC: two variants can serve side by side

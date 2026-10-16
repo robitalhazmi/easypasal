@@ -49,6 +49,8 @@ Comparative evaluation across concurrency levels $c \in \{1, 4, 16, 32\}$ using 
 | **$c = 16$** (Department Load) | **105.15** tok/s | **14.14 s** | **8,311.0 ms** | 2.65 tok/s | 1,450.40 s (24 min) | **39.7x** (191.2x vs 3B CPU) |
 | **$c = 32$** (Stress Test) | **187.79** tok/s | **11.38 s** | **3,858.1 ms** | 2.40 tok/s | 2,900.00 s (48 min) | **78.2x** (391.2x vs 3B CPU) |
 
+![vLLM GPU vs llama.cpp CPU Serving Benchmark](docs/assets/e6_benchmark_comparison.png)
+
 - **Key Takeaway:** At $c = 32$, vLLM continuous batching achieves **187.8 tok/s** aggregate throughput (**78.2x multiplier** over CPU 1B, **391.2x multiplier** over CPU 3B) and compresses p95 latency from 48 minutes down to **11.38 seconds**, unlocking production serving of 3B models within SLA.
 - **Reproducibility Notebook:** [`notebooks/e6_vllm_benchmark.ipynb`](notebooks/e6_vllm_benchmark.ipynb) — Executable on Google Colab with free T4 GPU.
 - **Serving Benchmark Harness:** `make bench` / `make exp-e6` (`experiments/e6_vllm/run_benchmark.py`)
