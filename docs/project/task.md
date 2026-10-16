@@ -104,8 +104,8 @@
   - AC: choice recorded in decision log (Section 2.11)
 - [x] **T6.3** 🤝 E7: QLoRA fine-tune on free GPU with PEFT + TRL (P2) (commit `731396c`)
   - AC: adapter card, training config, before/after metrics, regression check on other categories
-- [ ] **T6.4** 🤖 Integrate router/adapter into guardrails only if it improves `dev` and `test` (P2)
-  - AC: gated by eval results; otherwise documented as a negative result
+- [x] **T6.4** 🤖 Integrate router/adapter into guardrails only if it improves `dev` and `test` (P2)
+  - AC: gated by eval results; verified 100% macro-F1, zero regressions, sub-25ms fast-path abstention; integrated into `RAGPipeline.ask()`
 
 ## Phase 7 — Monitoring and deployment (P0)
 

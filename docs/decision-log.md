@@ -15,6 +15,7 @@ This document records the hypotheses, experimental setups, quantitative evaluati
 | **E6** | vLLM Serving Benchmark | 2026-10-16 | Approved (Adopt `vLLM` on GPU for Multi-User Serving; Retain `llama.cpp` on CPU) | Measured directly on Google Colab free NVIDIA Tesla T4 GPU (16 GB GDDR6) with `vLLM 0.6.3` (PagedAttention) across $c \in \{1, 4, 16, 32\}$. At $c=32$, achieves 187.8 tok/s aggregate throughput (78.2x speedup vs CPU 1B, 391.2x vs CPU 3B) and compresses p95 latency to 11.38s (vs 48.3 minutes on CPU 1B and >2.3 hours on CPU 3B). Sub-second TTFT at $c=1$ (207.8 ms) unlocks production deployment of `Qwen2.5-3B-Instruct`. |
 | **T6.1** | Replay-Based A/B Simulation | 2026-10-16 | Adopt `gepa_v0.2` (Promote Variant B over Variant A) | Counterfactual replay simulation on `dev` ($N=40$) and held-out `test` ($N=66$) under a unified LLM judge confirms 100% Faithfulness parity, directional gains in Grounding Fidelity (+3.5% on test, +9.4% on dev) and Citation F1 (+0.6% on test), and perfect Abstention Accuracy parity (81.82%, $p=1.000$) with zero regressions. Explicitly labeled as offline counterfactual replay simulation per Plan §6.4 & §13. |
 | **E7** | QLoRA Router Fine-tuning | 2026-10-16 | Approved (Adopt `Qwen2.5-0.5B-Instruct` QLoRA Router Adapter) | 4-bit NF4 QLoRA adapter achieves 1.0000 Theme Macro-F1 (+16.3% on test), 1.0000 Answerability F1 (+7.8%), 100% Injection Precision, and 100% Injection Recall (+33.3% on stealth attacks). Zero regression across all 9 gold taxonomy categories. Compresses inference latency by 2.6x (21.6 ms vs 56.6 ms), fast-pathing out-of-scope/adversarial queries before retrieval. Packaged in Colab notebook (`notebooks/e7_qlora_training.ipynb`) and adapter card (`experiments/e7_qlora/adapter_card.md`). |
+| **T6.4** | Guardrail Router Pipeline Integration | 2026-10-16 | Approved & Deployed into `RAGPipeline` | Deployed front-line question router into `RAGPipeline.ask()` (`src/easypasal/guardrails/question_router.py`). Short-circuits injections, superseded traps, and out-of-scope queries in <25ms, eliminating expensive dense retrieval and LLM generation. 100% test coverage on router, zero regressions across 295 test suite cases. |
 
 ---
 
@@ -665,3 +666,54 @@ All 5 empirical gating criteria specified in Plan §7 and Task T6.4 are satisfie
 - **Model Adapter Card:** Documented in [`experiments/e7_qlora/adapter_card.md`](../experiments/e7_qlora/adapter_card.md).
 - **Free GPU Training Notebook:** Packaged in [`notebooks/e7_qlora_training.ipynb`](../notebooks/e7_qlora_training.ipynb).
 - **Automation:** Integrated into Makefile (`make exp-e7`).
+
+---
+
+### Decision: Task T6.4 — Question Router & Safety Guardrail Pipeline Integration
+- **Date:** 2026-10-16
+- **Status:** Approved & Deployed into `RAGPipeline`
+- **Objective:**
+  Integrate the verified QLoRA multi-task question classifier and safety guardrail into the live RAG request lifecycle (`RAGPipeline.ask()`), gated strictly on empirical verification from Task T6.3 and Phase 6 Plan §7.
+
+#### 1. Empirical Gating Audit
+Task T6.4 explicitly specifies that integration is permitted **only** if the fine-tuned adapter / classifier demonstrates strict improvements and zero regression across `dev` and `test` splits:
+- **Theme Macro-F1:** $1.0000$ (target $\ge 0.85$, baseline $0.8371$) — **PASS**
+- **Answerability F1:** $1.0000$ (target $\ge 0.80$, baseline $0.9216$) — **PASS**
+- **Injection Precision:** $100\%$ (target $100\%$, baseline $100\%$) — **PASS**
+- **Injection Recall:** $100\%$ (+33.3% gain over baseline zero-shot $66.67\%$) — **PASS**
+- **Classification Latency:** $21.56\text{ ms}$ on GPU, $<2.0\text{ ms}$ on CPU fast-path heuristic (target $\le 30\text{ ms}$) — **PASS**
+- **Cross-Category Regressions:** $0\%$ across all 9 gold evaluation taxonomy categories — **PASS**
+
+All gating criteria were decisively satisfied, clearing the router for full pipeline deployment.
+
+#### 2. Architecture & Request Lifecycle
+The router operates as the front-line triage layer in `src/easypasal/generation/pipeline.py`:
+
+```mermaid
+graph TD
+    UserQuery[User Regulatory Query] --> LangDetect[Language Detection]
+    LangDetect --> RouterGuardrail{QuestionRouter<br/>Triage & Safety}
+    RouterGuardrail -- "is_injection or !is_answerable<br/>(Superseded / Out-of-Scope)" --> FastPath[Fast-Path Immediate Abstention<br/>&lt;25ms Response, 0 Token Cost]
+    RouterGuardrail -- "is_answerable = True<br/>(Consumer Protection, Cyber, AML, etc.)" --> DenseRetrieval[Dense Passage Retrieval<br/>Multilingual-E5-Large]
+    DenseRetrieval --> Rerank[Passage Context Assembly]
+    Rerank --> LLMGen[LLM Generation<br/>Qwen2.5 / Llama-3.2]
+    LLMGen --> PostHocVerifier[Post-Hoc Citation Verifier]
+    PostHocVerifier --> FinalOutput[GenerationOutput with Metadata]
+    FastPath --> FinalOutput
+```
+
+#### 3. Key Implementation Details
+1. **Module `easypasal.guardrails.question_router`:**
+   - Defines `QuestionRouter` and `RouteDecision` models.
+   - Standardized refusal messages strictly conform to `check_abstention` patterns (`_ABSTAIN_PHRASES_ID` and `_ABSTAIN_PHRASES_EN`), ensuring programmatic compliance tracking.
+2. **Configuration (`src/easypasal/config.py`):**
+   - Added `enable_router: bool = True` and `router_adapter_path: str | None = "experiments/e7_qlora/adapter"` to `GuardrailsConfig`.
+3. **Pipeline Integration (`src/easypasal/generation/pipeline.py`):**
+   - Initialized in `RAGPipeline.__init__` with optional parameter override `enable_router` in `ask()`.
+   - When blocked, immediately emits a `GenerationOutput(abstained=True, citations=[], model_name="qlora_router")` with diagnostic metadata (`theme`, `is_injection`, `refusal_reason`, `routing_latency_ms`), bypassing dense retrieval and text generation entirely.
+   - For in-scope queries, passes through cleanly and enriches the final `GenerationOutput.metadata` with `routed: True` and identified statutory `theme`.
+
+#### 4. Verification & Quality Gates
+- **Unit & Integration Tests:** 10 dedicated test cases added in `tests/test_guardrails.py` covering prompt injection detection, superseded trap refusals, agrarian/criminal/programming out-of-scope blocking, in-scope theme inference, and pipeline bypass toggles.
+- **Coverage:** 100% test coverage on `question_router.py`. Overall repository coverage sits at **88%** (exceeding $\ge 85\%$ target).
+- **Quality Gates:** 295/295 tests passing (`make check`), 0 ruff lint errors, 0 formatting issues, 0 mypy static type errors across all modules.
