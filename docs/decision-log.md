@@ -20,6 +20,7 @@ This document records the hypotheses, experimental setups, quantitative evaluati
 | **T7.2** | VPS Log Collector Microservice | 2026-10-17 | Approved & Deployed (FastAPI + SQLite WAL + Docker) | Dedicated low-memory (<55 MB RSS RAM under load, well under <= 90 MB VPS budget) microservice running on port 8080 with shared Bearer / X-Collector-Token authentication. SQLite WAL mode provides high concurrency without external DB dependencies. Single, atomic batch ingestion, user feedback linking, real-time telemetry query/stats summary, and unauthenticated /health probe. Multi-stage Dockerized non-root container with persistent /data volume. 18 dedicated tests, 335/335 full suite passing, 87% coverage. |
 | **T7.3** | Telemetry & Observability Dashboard | 2026-10-17 | Approved & Deployed (FastAPI HTML/JS + Chart.js + Infographic Generator) | Responsive single-page dashboard served directly by collector microservice at `/dashboard` (and root `/` redirect). Features 6 KPI metric cards, interactive Chart.js charts for latency percentiles (p50/p95/p99), variant split, retrieval score distribution with low-evidence alerts (<0.60), and theme frequency, plus live request log inspection with PII redaction and auto-refresh (5s–30s). Added automated infographic generator (`scripts/generate_dashboard_preview.py`) generating publication-grade screenshots in `docs/images/dashboard_monitoring.png`. 339/339 tests passing, 87% coverage. |
 | **T7.4** | Drift / Quality Monitoring (Evidently) | 2026-10-17 | Approved & Implemented (Evidently Data Drift Suite) | Statistical distribution drift detection comparing live query logs against the 322-item gold standard reference across query length, word count, regulatory legal theme, and abstention behavior. Generates interactive Plotly/HTML (`reports/drift_report.html`) and structured JSON telemetry (`reports/drift_summary.json`). Integrated into collector microservice endpoints (`GET /v1/reports/drift` and `GET /reports/drift`) with direct link in dashboard. 12 dedicated tests, 347/347 full suite passing, 86% coverage. |
+| **T7.5** | Threshold Alerts & Operational Drill | 2026-10-17 | Approved & Deployed (Automated Threshold Engine & Drill Harness) | Continuous operational threshold evaluation for abstention rate (>35%), p95 latency (>5000ms), and low-evidence queries (>30% with top-1 score <0.60). Persists flagged events in SQLite `alert_events` table and JSONL audit logs with WARNING/CRITICAL severities; supports webhook notifications and synthetic drill triggers (`--action drill` / `POST /v1/alerts/drill`). Live alert banner integrated in monitoring dashboard. 11 dedicated tests, 362/362 full suite passing, 88% coverage. |
 
 
 
@@ -862,5 +863,41 @@ Every incoming request processed by the API is validated against `RequestLogReco
 - **CLI Tool:** Executable via `python -m easypasal.monitoring.drift` supporting custom `--gold-dir`, `--db-path`, and report output destinations.
 
 #### 3. Verification & Quality Gates
-- **Dedicated Test Suite:** 12 tests in `tests/test_drift.py` covering reference dataset construction, database extraction, fallback handling, log file parsing (including corrupted and empty lines), HTML/JSON report generation, validation error handling, dynamic HTTP regeneration, and CLI invocation.
 - **Coverage & Lint:** 94% test coverage on `src/easypasal/monitoring/drift.py`, 347/347 repository test suite passing (`make check`), 86% overall repository coverage, 0 ruff lint errors, 0 mypy static type errors.
+
+---
+
+### Decision: Task T7.5 — Simple Threshold Alerts and Operational Drill
+- **Date:** 2026-10-17
+- **Status:** Approved & Deployed
+- **Objective:**
+  Implement continuous operational threshold monitoring for abstention rate, p95 latency, and low-evidence queries, persisting flagged events into SQLite and JSONL audit logs with automated drill execution.
+
+#### 1. Threshold Boundaries & Tiered Severities
+- **Minimum Evaluation Sample:** Enforces $N \ge 10$ request records (`min_sample_size = 10`) to eliminate spurious alerts during cold starts or low traffic periods (`status = "INSUFFICIENT_DATA"`).
+- **Abstention Rate (`abstain_rate`):**
+  - **Warning Threshold:** $> 35.0\%$ (`abstain_rate_max = 0.35`). Signals potential retrieval starvation, index corruption, or user prompt shifts.
+  - **Critical Threshold:** $\ge 50.0\%$. Indicates severe retrieval breakdown or sustained adversarial query floods.
+- **p95 Latency (`p95_latency_ms`):**
+  - **Warning Threshold:** $> 5{,}000\text{ ms}$ (`p95_latency_ms_max = 5000.0`). Prevents degradation of interactive client response times.
+  - **Critical Threshold:** $\ge 10{,}000\text{ ms}$ ($\ge 2\times$ threshold). Signals CPU thread starvation or model inference blockage.
+- **Low-Evidence Retrieval Rate (`low_evidence_rate`):**
+  - **Warning Threshold:** $> 30.0\%$ (`low_evidence_rate_max = 0.30`) of scored requests having top-1 retrieval score $< 0.60$.
+
+#### 2. Architecture & Persistence Engine
+- **Relational Storage:** Scaffolded `alert_events` table in SQLite `CollectorDB` (`src/easypasal/collector/db.py`) indexed by `timestamp`, `metric_name`, and `severity`.
+- **JSONL Audit Sink:** Flagged events are asynchronously mirrored to `logs/alerts.jsonl` for offline log ingestion and audit trails.
+- **Webhook Integration:** Standard library HTTP POST dispatcher (`dispatch_webhook`) delivering alert payloads to external incident channels (Discord, Slack, or webhook relays) with strict timeouts (5.0s) and exception handling.
+- **Automated Drill Testing:** Built-in drill simulator (`run_alert_drill`) creating synthetic metric spikes with `is_drill = True` to verify end-to-end event writing, database indexing, and dashboard alerts without requiring actual production failure states.
+- **Dashboard Alert Banner:** Added real-time operational status banner in `/dashboard` displaying green operational health or highlighted red alert notifications with one-click drill execution.
+
+#### 3. Collector Endpoints & CLI Interface
+- `POST /v1/alerts/check`: Authenticated evaluation check returning `AlertCheckResult`.
+- `POST /v1/alerts/drill`: Authenticated endpoint executing automated synthetic drills.
+- `GET /v1/alerts`: Paginated query interface with metric, severity, and drill filtering.
+- `GET /v1/alerts/active`: Recent active alert list within configurable lookback windows (`lookback_minutes = 60`).
+- **CLI Utility:** `python -m easypasal.monitoring.alerts --action [check|drill|list]`.
+
+#### 4. Verification & Quality Gates
+- **Unit & Integration Tests:** 11 dedicated tests in `tests/test_alerts.py` covering schema validation, SQLite persistence, threshold breaches (abstain rate, latency, low evidence), insufficient data handling, automated drills, webhook delivery, REST API endpoints, and CLI actions.
+- **Coverage & Suite Pass:** **95% test coverage** on `src/easypasal/monitoring/alerts.py`, **362/362 repository test suite passing** (`make check`), **88% overall repository coverage**, 0 ruff lint errors, 0 mypy static type errors.

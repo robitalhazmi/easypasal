@@ -19,6 +19,9 @@ from easypasal.collector.auth import get_collector_config, verify_collector_toke
 from easypasal.collector.config import CollectorConfig
 from easypasal.collector.db import CollectorDB
 from easypasal.monitoring.schemas import (
+    AlertCheckResult,
+    AlertEvent,
+    AlertThresholds,
     FeedbackLogRecord,
     RequestLogRecord,
 )
@@ -307,3 +310,90 @@ def get_drift_html_report(
     )
     with open(html_path, encoding="utf-8") as f:
         return HTMLResponse(content=f.read())
+
+
+@router.post(
+    "/v1/alerts/check",
+    summary="Evaluate operational metrics against alert thresholds",
+    response_model=AlertCheckResult,
+)
+def check_threshold_alerts(
+    db: Annotated[CollectorDB, Depends(get_db)],
+    _token: Annotated[str, Depends(verify_collector_token)],
+    thresholds: AlertThresholds | None = None,
+) -> AlertCheckResult:
+    """Evaluate current telemetry metrics against thresholds, persisting any triggered alert events."""
+    from easypasal.monitoring.alerts import evaluate_threshold_alerts
+
+    return evaluate_threshold_alerts(db=db, thresholds=thresholds)
+
+
+@router.post(
+    "/v1/alerts/drill",
+    summary="Execute an automated alert drill test",
+    response_model=AlertEvent,
+)
+def execute_alert_drill(
+    db: Annotated[CollectorDB, Depends(get_db)],
+    _token: Annotated[str, Depends(verify_collector_token)],
+    metric: Annotated[
+        str,
+        Query(description="Target metric: abstain_rate, p95_latency_ms, or low_evidence_rate"),
+    ] = "abstain_rate",
+) -> AlertEvent:
+    """Trigger a synthetic alert breach to test end-to-end alerting infrastructure (Plan §9 / Task T7.5 AC)."""
+    from easypasal.monitoring.alerts import run_alert_drill
+
+    return run_alert_drill(db=db, metric_to_test=metric)
+
+
+@router.get(
+    "/v1/alerts",
+    summary="Query persisted alert events",
+)
+def query_alerts(
+    db: Annotated[CollectorDB, Depends(get_db)],
+    _token: Annotated[str, Depends(verify_collector_token)],
+    metric_name: Annotated[str | None, Query(description="Filter by metric name")] = None,
+    severity: Annotated[
+        str | None, Query(description="Filter by severity (WARNING or CRITICAL)")
+    ] = None,
+    is_drill: Annotated[bool | None, Query(description="Filter by drill flag")] = None,
+    limit: Annotated[int, Query(ge=1, le=500, description="Page limit")] = 50,
+    offset: Annotated[int, Query(ge=0, description="Offset")] = 0,
+) -> dict[str, Any]:
+    """Retrieve historical alert events with pagination and filtering."""
+    items, total = db.get_alerts(
+        metric_name=metric_name,
+        severity=severity,
+        is_drill=is_drill,
+        limit=limit,
+        offset=offset,
+    )
+    return {
+        "items": items,
+        "total": total,
+        "limit": limit,
+        "offset": offset,
+    }
+
+
+@router.get(
+    "/v1/alerts/active",
+    summary="Query active alerts within recent lookback window",
+)
+def get_active_alerts(
+    db: Annotated[CollectorDB, Depends(get_db)],
+    _token: Annotated[str, Depends(verify_collector_token)],
+    lookback_minutes: Annotated[
+        int, Query(ge=1, le=1440, description="Lookback window in minutes")
+    ] = 60,
+    is_drill: Annotated[bool | None, Query(description="Filter by drill flag")] = None,
+) -> dict[str, Any]:
+    """Retrieve active alerts triggered in the last N minutes."""
+    alerts = db.get_active_alerts(lookback_minutes=lookback_minutes, is_drill=is_drill)
+    return {
+        "active_alerts": alerts,
+        "count": len(alerts),
+        "lookback_minutes": lookback_minutes,
+    }

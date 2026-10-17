@@ -332,6 +332,15 @@ def get_dashboard_html() -> str:
     </div>
   </header>
 
+  <!-- Threshold Alert Banner (Plan §9 / Task T7.5) -->
+  <div id="alertBanner" style="display:flex; margin: 1rem 2rem 0; padding: 0.75rem 1.25rem; border-radius: 8px; font-size: 0.85rem; font-weight: 500; align-items: center; justify-content: space-between; border: 1px solid rgba(52, 211, 153, 0.3); background: rgba(52, 211, 153, 0.08); color: var(--accent-green);">
+    <div style="display:flex; align-items:center; gap:0.6rem;">
+      <span id="alertIcon">🟢</span>
+      <span id="alertMessage">All operational metrics within normal limits (Abstain &le; 35%, p95 Latency &le; 5000ms).</span>
+    </div>
+    <button id="alertDrillBtn" onclick="triggerDrill()" style="background:rgba(255,255,255,0.08); border:1px solid var(--border); color:var(--text-secondary); padding:0.3rem 0.6rem; border-radius:4px; font-size:0.75rem; cursor:pointer;">Simulate Alert Drill</button>
+  </div>
+
   <main>
     <!-- KPI Summary Row -->
     <div class="kpi-grid">
@@ -716,10 +725,56 @@ def get_dashboard_html() -> str:
       });
     }
 
+    async function loadAlerts() {
+      try {
+        const res = await fetch("/v1/alerts/active?lookback_minutes=60", { headers: getAuthHeaders() });
+        if (!res.ok) return;
+        const data = await res.json();
+        const active = data.active_alerts || [];
+        const banner = document.getElementById("alertBanner");
+        const icon = document.getElementById("alertIcon");
+        const msg = document.getElementById("alertMessage");
+
+        if (active.length > 0) {
+          const topAlert = active[0];
+          banner.style.background = "rgba(244, 63, 94, 0.12)";
+          banner.style.borderColor = "rgba(244, 63, 94, 0.4)";
+          banner.style.color = "var(--accent-rose)";
+          icon.innerText = "🚨";
+          const drillPrefix = topAlert.is_drill ? "[DRILL] " : "";
+          msg.innerText = `${drillPrefix}Active Alert: ${topAlert.message}`;
+        } else {
+          banner.style.background = "rgba(52, 211, 153, 0.08)";
+          banner.style.borderColor = "rgba(52, 211, 153, 0.3)";
+          banner.style.color = "var(--accent-green)";
+          icon.innerText = "🟢";
+          msg.innerText = "All operational metrics within normal limits (Abstain \u2264 35%, p95 Latency \u2264 5000ms).";
+        }
+      } catch (err) {
+        console.warn("Failed to check active alerts:", err);
+      }
+    }
+
+    async function triggerDrill() {
+      try {
+        const res = await fetch("/v1/alerts/drill?metric=abstain_rate", {
+          method: "POST",
+          headers: getAuthHeaders(),
+        });
+        if (!res.ok) throw new Error(`HTTP ${res.status}`);
+        const alertObj = await res.json();
+        alert(`🚨 Alert drill executed successfully!\n\nAlert ID: ${alertObj.alert_id}\nMetric: ${alertObj.metric_name}\nMessage: ${alertObj.message}`);
+        loadAlerts();
+      } catch (err) {
+        alert("Failed to run alert drill: " + err);
+      }
+    }
+
     function loadAllTelemetry() {
       loadHealth();
       loadStatsSummary();
       loadRecentRequests();
+      loadAlerts();
     }
 
     function setupAutoRefresh(ms) {

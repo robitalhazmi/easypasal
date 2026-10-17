@@ -15,6 +15,7 @@ from pathlib import Path
 from typing import Any
 
 from easypasal.monitoring.schemas import (
+    AlertEvent,
     FeedbackLogRecord,
     RequestLogRecord,
 )
@@ -64,12 +65,31 @@ CREATE TABLE IF NOT EXISTS feedback_logs (
 );
 """
 
+_CREATE_ALERT_EVENTS_SQL = """
+CREATE TABLE IF NOT EXISTS alert_events (
+    alert_id TEXT PRIMARY KEY,
+    timestamp TEXT NOT NULL,
+    metric_name TEXT NOT NULL,
+    severity TEXT NOT NULL,
+    current_value REAL NOT NULL,
+    threshold_value REAL NOT NULL,
+    condition TEXT NOT NULL,
+    sample_size INTEGER NOT NULL,
+    message TEXT NOT NULL,
+    is_drill INTEGER NOT NULL DEFAULT 0,
+    created_at TEXT NOT NULL
+);
+"""
+
 _CREATE_INDICES_SQL = """
 CREATE INDEX IF NOT EXISTS idx_requests_timestamp ON request_logs(timestamp);
 CREATE INDEX IF NOT EXISTS idx_requests_variant ON request_logs(variant);
 CREATE INDEX IF NOT EXISTS idx_requests_abstained ON request_logs(abstained);
 CREATE INDEX IF NOT EXISTS idx_requests_theme ON request_logs(theme);
 CREATE INDEX IF NOT EXISTS idx_feedback_request_id ON feedback_logs(request_id);
+CREATE INDEX IF NOT EXISTS idx_alerts_timestamp ON alert_events(timestamp);
+CREATE INDEX IF NOT EXISTS idx_alerts_metric ON alert_events(metric_name);
+CREATE INDEX IF NOT EXISTS idx_alerts_severity ON alert_events(severity);
 """
 
 
@@ -112,6 +132,7 @@ class CollectorDB:
         with self._lock, self._get_connection() as conn:
             conn.execute(_CREATE_REQUEST_LOGS_SQL)
             conn.execute(_CREATE_FEEDBACK_LOGS_SQL)
+            conn.execute(_CREATE_ALERT_EVENTS_SQL)
             conn.executescript(_CREATE_INDICES_SQL)
             conn.commit()
         logger.info("Collector SQLite database initialized at %s", self.db_path)
@@ -468,3 +489,106 @@ class CollectorDB:
             "request_logs_count": req_count,
             "feedback_logs_count": fb_count,
         }
+
+    def insert_alert(self, alert: AlertEvent) -> None:
+        """Persist a flagged threshold alert event into SQLite."""
+        sql = """
+        INSERT OR REPLACE INTO alert_events (
+            alert_id, timestamp, metric_name, severity, current_value, threshold_value,
+            condition, sample_size, message, is_drill, created_at
+        ) VALUES (
+            ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?
+        )
+        """
+        now_utc = datetime.now(UTC).isoformat()
+        params = (
+            alert.alert_id,
+            alert.timestamp.isoformat(),
+            alert.metric_name,
+            alert.severity,
+            alert.current_value,
+            alert.threshold_value,
+            alert.condition,
+            alert.sample_size,
+            alert.message,
+            1 if alert.is_drill else 0,
+            now_utc,
+        )
+        with self._lock, self._get_connection() as conn:
+            conn.execute(sql, params)
+            conn.commit()
+
+    def get_alerts(
+        self,
+        metric_name: str | None = None,
+        severity: str | None = None,
+        is_drill: bool | None = None,
+        limit: int = 50,
+        offset: int = 0,
+    ) -> tuple[list[dict[str, Any]], int]:
+        """Query alert events with optional filtering and pagination."""
+        clauses: list[str] = []
+        params: list[Any] = []
+
+        if metric_name:
+            clauses.append("metric_name = ?")
+            params.append(metric_name)
+        if severity:
+            clauses.append("severity = ?")
+            params.append(severity)
+        if is_drill is not None:
+            clauses.append("is_drill = ?")
+            params.append(1 if is_drill else 0)
+
+        where_clause = f"WHERE {' AND '.join(clauses)}" if clauses else ""
+
+        count_sql = f"SELECT COUNT(*) AS total FROM alert_events {where_clause}"
+        query_sql = f"""
+        SELECT * FROM alert_events
+        {where_clause}
+        ORDER BY timestamp DESC
+        LIMIT ? OFFSET ?
+        """
+
+        with self._lock, self._get_connection() as conn:
+            total_count = conn.execute(count_sql, params).fetchone()["total"]
+            rows = conn.execute(query_sql, params + [limit, offset]).fetchall()
+
+            results: list[dict[str, Any]] = []
+            for row in rows:
+                d = dict(row)
+                d["is_drill"] = bool(d["is_drill"])
+                results.append(d)
+
+            return results, total_count
+
+    def get_active_alerts(
+        self,
+        lookback_minutes: int = 60,
+        is_drill: bool | None = None,
+    ) -> list[dict[str, Any]]:
+        """Return alerts generated within the specified lookback window."""
+        from datetime import timedelta
+
+        cutoff = (datetime.now(UTC) - timedelta(minutes=lookback_minutes)).isoformat()
+
+        clauses = ["timestamp >= ?"]
+        params: list[Any] = [cutoff]
+
+        if is_drill is not None:
+            clauses.append("is_drill = ?")
+            params.append(1 if is_drill else 0)
+
+        query_sql = f"""
+        SELECT * FROM alert_events
+        WHERE {" AND ".join(clauses)}
+        ORDER BY timestamp DESC
+        """
+        with self._lock, self._get_connection() as conn:
+            rows = conn.execute(query_sql, params).fetchall()
+            results: list[dict[str, Any]] = []
+            for row in rows:
+                d = dict(row)
+                d["is_drill"] = bool(d["is_drill"])
+                results.append(d)
+            return results

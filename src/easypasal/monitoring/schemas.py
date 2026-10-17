@@ -2,8 +2,9 @@
 
 from __future__ import annotations
 
+import uuid
 from datetime import UTC, datetime
-from typing import Literal
+from typing import Any, Literal
 
 from pydantic import BaseModel, ConfigDict, Field, model_validator
 
@@ -188,3 +189,116 @@ class FeedbackLogRecord(BaseModel):
     rating: int = Field(..., description="+1 or -1")
     comment_redacted: str | None = None
     tags: list[str] = Field(default_factory=list)
+
+
+class AlertEvent(BaseModel):
+    """Schema for a flagged threshold alert event (Plan §9 / Task T7.5)."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    alert_id: str = Field(
+        default_factory=lambda: str(uuid.uuid4()),
+        description="Unique alert identifier.",
+    )
+    timestamp: datetime = Field(
+        default_factory=lambda: datetime.now(UTC),
+        description="UTC timestamp when the alert condition was evaluated.",
+    )
+    metric_name: str = Field(
+        ...,
+        description="Name of the telemetry metric that breached threshold (e.g. 'abstain_rate', 'p95_latency_ms').",
+    )
+    severity: Literal["WARNING", "CRITICAL"] = Field(
+        default="WARNING",
+        description="Alert severity tier.",
+    )
+    current_value: float = Field(
+        ...,
+        description="Observed metric value triggering the alert.",
+    )
+    threshold_value: float = Field(
+        ...,
+        description="Configured boundary threshold for this metric.",
+    )
+    condition: str = Field(
+        default=">",
+        description="Comparison condition string (e.g. '>', '<').",
+    )
+    sample_size: int = Field(
+        ...,
+        ge=0,
+        description="Number of request records evaluated in this sample window.",
+    )
+    message: str = Field(
+        ...,
+        description="Human-readable alert summary explaining the breach.",
+    )
+    is_drill: bool = Field(
+        default=False,
+        description="Whether this alert was generated as part of a synthetic alert drill.",
+    )
+    created_at: datetime = Field(
+        default_factory=lambda: datetime.now(UTC),
+        description="UTC creation timestamp.",
+    )
+
+
+class AlertThresholds(BaseModel):
+    """Configurable boundaries for operational threshold alerting (Plan §9 / Task T7.5)."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    abstain_rate_max: float = Field(
+        default=0.35,
+        ge=0.0,
+        le=1.0,
+        description="Maximum permissible abstention rate (fraction between 0.0 and 1.0). Default 0.35 (35%).",
+    )
+    p95_latency_ms_max: float = Field(
+        default=5000.0,
+        gt=0.0,
+        description="Maximum permissible p95 latency in milliseconds. Default 5000.0 ms.",
+    )
+    low_evidence_rate_max: float = Field(
+        default=0.30,
+        ge=0.0,
+        le=1.0,
+        description="Maximum permissible share of queries with retrieval score < 0.60. Default 0.30 (30%).",
+    )
+    min_sample_size: int = Field(
+        default=10,
+        ge=1,
+        description="Minimum sample size required to trigger statistical threshold alerts.",
+    )
+    webhook_url: str | None = Field(
+        default=None,
+        description="Optional webhook URL (e.g. Discord, Slack, custom webhook) for alert notifications.",
+    )
+
+
+class AlertCheckResult(BaseModel):
+    """Result of an automated threshold alert evaluation check."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    timestamp: datetime = Field(
+        default_factory=lambda: datetime.now(UTC),
+        description="Evaluation timestamp.",
+    )
+    sample_size: int = Field(
+        ...,
+        ge=0,
+        description="Number of records analyzed.",
+    )
+    status: Literal["OK", "ALERT", "INSUFFICIENT_DATA"] = Field(
+        ...,
+        description="Overall check outcome status.",
+    )
+    alerts_triggered: list[AlertEvent] = Field(
+        default_factory=list,
+        description="List of threshold breach alert events generated.",
+    )
+    summary: dict[str, Any] = Field(
+        default_factory=dict,
+        description="Metric snapshot values evaluated.",
+    )

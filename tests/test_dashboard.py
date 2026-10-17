@@ -57,6 +57,8 @@ def test_get_dashboard_html_structure() -> None:
     assert 'id="kpiP50Latency"' in html
     assert 'id="kpiP95Latency"' in html
     assert 'id="kpiMemoryRss"' in html
+    assert 'id="alertBanner"' in html
+    assert 'id="alertDrillBtn"' in html
     assert "chart.umd.min.js" in html
 
 
