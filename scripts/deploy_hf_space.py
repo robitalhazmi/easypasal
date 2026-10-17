@@ -59,6 +59,16 @@ def prepare_space_bundle(output_dir: Path | str = "dist/hf_space") -> Path:
         "import sys\n\n"
         "# Ensure src/ is on Python search path\n"
         'sys.path.insert(0, os.path.abspath("src"))\n\n'
+        "try:\n"
+        "    import spaces\n"
+        "except ImportError:\n"
+        "    class _MockSpaces:\n"
+        "        @staticmethod\n"
+        "        def GPU(func=None, **kwargs):\n"
+        "            if func is not None:\n"
+        "                return func\n"
+        "            return lambda f: f\n"
+        "    spaces = _MockSpaces()\n\n"
         "from easypasal.generation.pipeline import RAGPipeline\n"
         "from easypasal.monitoring.logger import RequestLogger\n"
         "from easypasal.ui.app import build_ui\n\n"
@@ -77,6 +87,13 @@ def prepare_space_bundle(output_dir: Path | str = "dist/hf_space") -> Path:
         '    collector_url=os.getenv("EASYPASAL_COLLECTOR_URL"),\n'
         '    collector_token=os.getenv("EASYPASAL_COLLECTOR_TOKEN", "easypasal-vps-secret-token-v1"),\n'
         ")\n\n"
+        "@spaces.GPU\n"
+        "def query_regulatory_assistant(question: str, language: str = 'id') -> str:\n"
+        '    """ZeroGPU entrypoint for regulatory query processing."""\n'
+        "    if pipeline is not None:\n"
+        "        out = pipeline.ask(question=question, language=language)\n"
+        "        return out.answer\n"
+        '    return "EasyPasal is starting..."\n\n'
         "# Export demo at module level for Hugging Face Gradio runner\n"
         "demo = build_ui(pipeline=pipeline, request_logger=request_logger)\n\n"
         'if __name__ == "__main__":\n'
