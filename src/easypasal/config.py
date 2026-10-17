@@ -169,6 +169,8 @@ class MonitoringConfig(BaseModel):
     feedback_file: str | None = "logs/feedback.jsonl"
     redact_pii: bool = True
     salt: str = "easypasal-monitoring-salt-v1"
+    collector_url: str | None = None
+    collector_token: str | None = None
 
 
 class EasyPasalConfig(BaseModel):

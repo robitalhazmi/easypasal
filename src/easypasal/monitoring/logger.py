@@ -33,17 +33,53 @@ class RequestLogger:
         feedback_file: Path | str | None = "logs/feedback.jsonl",
         redact_pii: bool = True,
         salt: str = "easypasal-monitoring-salt-v1",
+        collector_url: str | None = None,
+        collector_token: str | None = None,
     ) -> None:
         self.log_file = Path(log_file) if log_file else None
         self.feedback_file = Path(feedback_file) if feedback_file else None
         self.redact_pii = redact_pii
         self.salt = salt
+        self.collector_url = collector_url.rstrip("/") if collector_url else None
+        self.collector_token = collector_token
         self._lock = threading.Lock()
+        self._executor = None
+        if self.collector_url:
+            from concurrent.futures import ThreadPoolExecutor
+
+            self._executor = ThreadPoolExecutor(
+                max_workers=2, thread_name_prefix="collector_forwarder"
+            )
 
         if self.log_file:
             self.log_file.parent.mkdir(parents=True, exist_ok=True)
         if self.feedback_file:
             self.feedback_file.parent.mkdir(parents=True, exist_ok=True)
+
+    def _forward_http(self, endpoint: str, payload: dict[str, Any]) -> None:
+        """Send payload to remote collector endpoint in background thread."""
+        if not self.collector_url:
+            return
+        import httpx
+
+        headers = {"Content-Type": "application/json"}
+        if self.collector_token:
+            headers["Authorization"] = f"Bearer {self.collector_token}"
+        url = f"{self.collector_url}{endpoint}"
+        try:
+            with httpx.Client(timeout=3.0) as client:
+                resp = client.post(url, json=payload, headers=headers)
+                if resp.status_code not in (200, 201):
+                    logger.warning(
+                        "Collector forwarding to %s returned status %d", url, resp.status_code
+                    )
+        except Exception as exc:
+            logger.warning("Failed to forward log to collector %s: %s", url, exc)
+
+    def close(self) -> None:
+        """Shutdown background forwarder thread pool if active."""
+        if self._executor is not None:
+            self._executor.shutdown(wait=False)
 
     def hash_client_ip(self, ip: str | None) -> str | None:
         """Compute a salted, one-way SHA-256 hash of a client IP address."""
@@ -80,6 +116,11 @@ class RequestLogger:
                 except OSError as exc:
                     logger.error("Failed to append request log to %s: %s", self.log_file, exc)
                     raise
+
+        if self._executor is not None:
+            self._executor.submit(
+                self._forward_http, "/v1/logs/requests", validated.model_dump(mode="json")
+            )
 
         return validated
 
@@ -118,6 +159,11 @@ class RequestLogger:
                 except OSError as exc:
                     logger.error("Failed to append feedback log to %s: %s", self.feedback_file, exc)
                     raise
+
+        if self._executor is not None:
+            self._executor.submit(
+                self._forward_http, "/v1/logs/feedback", record.model_dump(mode="json")
+            )
 
         return record
 

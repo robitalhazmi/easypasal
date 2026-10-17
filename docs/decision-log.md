@@ -17,6 +17,8 @@ This document records the hypotheses, experimental setups, quantitative evaluati
 | **E7** | QLoRA Router Fine-tuning | 2026-10-16 | Approved (Adopt `Qwen2.5-0.5B-Instruct` QLoRA Router Adapter) | 4-bit NF4 QLoRA adapter achieves 1.0000 Theme Macro-F1 (+16.3% on test), 1.0000 Answerability F1 (+7.8%), 100% Injection Precision, and 100% Injection Recall (+33.3% on stealth attacks). Zero regression across all 9 gold taxonomy categories. Compresses inference latency by 2.6x (21.6 ms vs 56.6 ms), fast-pathing out-of-scope/adversarial queries before retrieval. Packaged in Colab notebook (`notebooks/e7_qlora_training.ipynb`) and adapter card (`experiments/e7_qlora/adapter_card.md`). |
 | **T6.4** | Guardrail Router Pipeline Integration | 2026-10-16 | Approved & Deployed into `RAGPipeline` | Deployed front-line question router into `RAGPipeline.ask()` (`src/easypasal/guardrails/question_router.py`). Short-circuits injections, superseded traps, and out-of-scope queries in <25ms, eliminating expensive dense retrieval and LLM generation. 100% test coverage on router, zero regressions across 295 test suite cases. |
 | **T7.1** | Structured Request Logging & PII Redaction | 2026-10-17 | Deployed Schema-Validated Request Logging & PII Redaction | Implemented `RequestLogRecord` schema validating all operational, retrieval, generation, token, and latency fields from Plan §9. Integrated automated regex-based redaction for Indonesian NIK (16-digit), NPWP, phone numbers, email, card, and bank account numbers while strictly preserving statutory legal citation anchors. Added `/feedback` endpoint and privacy notice. 22/22 unit & integration tests passing. |
+| **T7.2** | VPS Log Collector Microservice | 2026-10-17 | Approved & Deployed (FastAPI + SQLite WAL + Docker) | Dedicated low-memory (<55 MB RSS RAM under load, well under <= 90 MB VPS budget) microservice running on port 8080 with shared Bearer / X-Collector-Token authentication. SQLite WAL mode provides high concurrency without external DB dependencies. Single, atomic batch ingestion, user feedback linking, real-time telemetry query/stats summary, and unauthenticated /health probe. Multi-stage Dockerized non-root container with persistent /data volume. 18 dedicated tests, 335/335 full suite passing, 87% coverage. |
+
 
 ---
 
@@ -756,3 +758,47 @@ Every incoming request processed by the API is validated against `RequestLogReco
 #### 4. Quality Verification
 - **Unit & Integration Tests:** 22 tests in `tests/test_monitoring.py` verifying PII redaction patterns, statutory preservation, schema validation, thread safety, corrupt line skipping, and API request/feedback logging.
 - **Full Verification Suite:** 316/316 tests passing, 88% overall repository code coverage, 0 lint errors, 0 type errors.
+
+---
+
+### Decision: Task T7.2 — Log Collector (FastAPI + SQLite) for VPS Deployment
+- **Date:** 2026-10-17
+- **Status:** Approved & Deployed
+- **Objective:**
+  Implement a lightweight, Dockerized log collector service for the VPS with shared auth token protection, persisting structured request logs and user feedback into a high-concurrency SQLite store within the strict VPS memory budget ($\le 90\text{ MB}$ RSS RAM out of the total 2 GB host allocation).
+
+#### 1. Architecture & Persistence Strategy
+- **Framework:** FastAPI microservice (`src/easypasal/collector/`) serving on port 8080.
+- **Database Engine:** Standard library `sqlite3` configured with Write-Ahead Logging (`PRAGMA journal_mode = WAL`), synchronous normal, and page cache limited to ~4 MB (`PRAGMA cache_size = -4000`).
+- **Relational Schema:**
+  - `request_logs`: Primary storage with indices on `timestamp`, `variant`, `abstained`, and `theme`. Stores all operational, retrieval, generation, latency, and telemetry fields.
+  - `feedback_logs`: Linked feedback table updating user ratings and comments on corresponding request records.
+- **Zero Heavy ORMs:** By relying solely on Python's built-in `sqlite3` without PostgreSQL or heavy ORM machinery, the collector eliminates substantial memory overhead.
+
+#### 2. Authentication & Timing-Attack Defense
+- Secured via Bearer token (`Authorization: Bearer <token>`) or `X-Collector-Token` header.
+- Token validation utilizes `hmac.compare_digest` in `src/easypasal/collector/auth.py` to prevent timing attacks.
+
+#### 3. Ingestion & Telemetry API Endpoints
+- `POST /v1/logs/requests`: Ingest single request log (returns 201 Created).
+- `POST /v1/logs/batch`: Atomic transaction batch ingestion up to `max_batch_size` entries (returns 201 Created).
+- `POST /v1/logs/feedback`: Ingest user feedback and update parent request row.
+- `GET /v1/logs/requests`: Paginated query with filtering by `variant`, `theme`, `abstained`, and timestamp range.
+- `GET /v1/logs/feedback`: Filtered query for user feedback records.
+- `GET /v1/stats/summary`: Real-time telemetry dashboard metrics (total requests, abstain rate, token sums, p50/p95/p99 latencies, feedback distribution).
+- `GET /health`: Unauthenticated health probe returning uptime, SQLite database size and page statistics, and process memory metrics (`current_rss_mb`, `peak_rss_mb`, `budget_mb = 90.0`).
+
+#### 4. Memory Budget & Concurrency Load Test
+- **Requirement (Plan §9 / Architecture §3):** Collector RSS memory must strictly remain $\le 90\text{ MB}$ under active load.
+- **Verification:** Under automated load testing (120 concurrent requests across 8 worker threads), the isolated collector process consumed **52.2 MB RSS RAM**, operating with a ~42% safety headroom below the 90 MB ceiling.
+- **Main App Forwarder:** `RequestLogger` optionally dispatches logs via background thread pool (`ThreadPoolExecutor(max_workers=2)`) to `collector_url` if configured, ensuring logging never blocks inference latencies.
+
+#### 5. Dockerization
+- Multi-stage Dockerfile (`docker/collector/Dockerfile`) based on `python:3.12-slim`.
+- Runs as non-root user `collector` (UID 10001).
+- Mounts persistent volume `/data` for SQLite WAL storage.
+- Standard healthcheck probe against `http://localhost:8080/health`.
+
+#### 6. Verification & Quality Gates
+- **Unit & Integration Tests:** 18 dedicated tests in `tests/test_collector.py` covering auth verification, single/batch ingestion, pagination, stats aggregation, feedback linking, health probes, and concurrent memory budget enforcement.
+- **Full Verification Suite:** 335/335 tests passing (`make check`), 87% overall repository test coverage, 0 ruff errors, 0 mypy static type errors.

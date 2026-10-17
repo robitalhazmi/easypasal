@@ -141,6 +141,8 @@ def create_app(
             feedback_file=active_fb_file if monitoring_cfg.enabled else None,
             redact_pii=monitoring_cfg.redact_pii,
             salt=monitoring_cfg.salt,
+            collector_url=monitoring_cfg.collector_url,
+            collector_token=monitoring_cfg.collector_token,
         )
 
     # Middleware registration (executed in reverse order of addition)

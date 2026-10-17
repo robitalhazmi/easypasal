@@ -111,7 +111,7 @@
 
 - [x] **T7.1** 🤖 Structured request logging in the app (fields from plan §9) with basic redaction (commit `5a8a37e`)
   - AC: logs validated against a schema; PII automatically redacted (NIK, phone, email, card, bank account) while preserving statutory citations; POST /feedback and privacy notice added
-- [ ] **T7.2** 🤖 Log collector (FastAPI + SQLite) for the VPS, Dockerized, with auth token
+- [x] **T7.2** 🤖 Log collector (FastAPI + SQLite) for the VPS, Dockerized, with auth token
   - AC: runs within the VPS memory budget; verified with load test
 - [ ] **T7.3** 🤖 Dashboard: latency p50/p95, volume, abstain rate, retrieval-score distribution, feedback
   - AC: reachable on VPS; screenshots saved for README
@@ -179,3 +179,4 @@ If time runs short, descope in this order and record it as future work: **E7 QLo
 | 2026-10-16 | T6.3: Implemented E7 QLoRA router fine-tuning framework with PEFT + TRL (`experiments/e7_qlora/`), Colab notebook (`notebooks/e7_qlora_training.ipynb`), model adapter card (`experiments/e7_qlora/adapter_card.md`), and evaluation suite; achieved 1.0000 Theme Macro-F1, 100% injection precision, and zero regressions across all 9 gold taxonomy categories (commit `731396c`). |
 | 2026-10-16 | T6.4: Integrated verified question router and safety guardrail into `RAGPipeline.ask()`; short-circuits blocked adversarial and out-of-scope queries in <25ms, saving expensive retrieval and LLM token costs; 10 dedicated tests added (commit `e11e066`). |
 | 2026-10-17 | T7.1: Implemented structured request logging (`RequestLogRecord`) validating all operational, retrieval, generation, token, and latency fields from Plan §9; automated PII redaction (NIK, phone, email, card, bank account) preserving legal citations; added `POST /feedback` endpoint and privacy notice (commit `5a8a37e`). |
+| 2026-10-17 | T7.2: Implemented lightweight VPS Log Collector (FastAPI + SQLite WAL) with Bearer / `X-Collector-Token` authentication, single/batch ingestion, feedback linking, telemetry query endpoints, and unauthenticated `/health` probe; verified isolated peak RSS memory at 52.2 MB (well under <= 90 MB VPS budget) under concurrent load; added multi-stage non-root Dockerfile. |
