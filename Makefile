@@ -1,4 +1,4 @@
-.PHONY: help setup lint format test check clean ingest index serve eval compare smoke-eval exp-e1 exp-e2 exp-e3 exp-e4 exp-e5 exp-e6 exp-e7 bench replay-ab
+.PHONY: help setup lint format test check clean ingest index serve ui space-bundle eval compare smoke-eval exp-e1 exp-e2 exp-e3 exp-e4 exp-e5 exp-e6 exp-e7 bench replay-ab
 
 help:
 	@echo "EasyPasal Development Commands:"
@@ -9,7 +9,9 @@ help:
 	@echo "  make check      - Run all linting and test suites"
 	@echo "  make ingest     - Download and parse regulatory documents from corpus manifest (Phase 1)"
 	@echo "  make index      - Build Qdrant vector store and BM25 sparse index (Phase 1)"
-	@echo "  make serve      - Start the FastAPI service and Gradio UI locally (Phase 1)"
+	@echo "  make serve      - Start the FastAPI service locally (Phase 1)"
+	@echo "  make ui         - Start the interactive Gradio demo UI locally (Phase 7 / T7.6)"
+	@echo "  make space-bundle - Stage Hugging Face Space deployment bundle (Phase 7 / T7.6)"
 	@echo "  make eval       - Run the evaluation harness on the gold evaluation set (Phase 3)"
 	@echo "  make compare    - Compare baseline and candidate runs with bootstrap CIs (Phase 3)"
 	@echo "  make smoke-eval - Run fast CI smoke evaluation gate against stored baseline (Phase 3)"
@@ -62,6 +64,12 @@ index:
 
 serve:
 	uv run python -m easypasal.api.app --host 0.0.0.0 --port 8000
+
+ui:
+	uv run python -m easypasal.ui.app --host 0.0.0.0 --port 7860
+
+space-bundle:
+	uv run python scripts/deploy_hf_space.py --dry-run
 
 label-helper:
 	uv run python -m eval.labeling_helper --sample

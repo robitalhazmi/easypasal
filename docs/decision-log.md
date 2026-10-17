@@ -21,6 +21,7 @@ This document records the hypotheses, experimental setups, quantitative evaluati
 | **T7.3** | Telemetry & Observability Dashboard | 2026-10-17 | Approved & Deployed (FastAPI HTML/JS + Chart.js + Infographic Generator) | Responsive single-page dashboard served directly by collector microservice at `/dashboard` (and root `/` redirect). Features 6 KPI metric cards, interactive Chart.js charts for latency percentiles (p50/p95/p99), variant split, retrieval score distribution with low-evidence alerts (<0.60), and theme frequency, plus live request log inspection with PII redaction and auto-refresh (5s–30s). Added automated infographic generator (`scripts/generate_dashboard_preview.py`) generating publication-grade screenshots in `docs/images/dashboard_monitoring.png`. 339/339 tests passing, 87% coverage. |
 | **T7.4** | Drift / Quality Monitoring (Evidently) | 2026-10-17 | Approved & Implemented (Evidently Data Drift Suite) | Statistical distribution drift detection comparing live query logs against the 322-item gold standard reference across query length, word count, regulatory legal theme, and abstention behavior. Generates interactive Plotly/HTML (`reports/drift_report.html`) and structured JSON telemetry (`reports/drift_summary.json`). Integrated into collector microservice endpoints (`GET /v1/reports/drift` and `GET /reports/drift`) with direct link in dashboard. 12 dedicated tests, 347/347 full suite passing, 86% coverage. |
 | **T7.5** | Threshold Alerts & Operational Drill | 2026-10-17 | Approved & Deployed (Automated Threshold Engine & Drill Harness) | Continuous operational threshold evaluation for abstention rate (>35%), p95 latency (>5000ms), and low-evidence queries (>30% with top-1 score <0.60). Persists flagged events in SQLite `alert_events` table and JSONL audit logs with WARNING/CRITICAL severities; supports webhook notifications and synthetic drill triggers (`--action drill` / `POST /v1/alerts/drill`). Live alert banner integrated in monitoring dashboard. 11 dedicated tests, 362/362 full suite passing, 88% coverage. |
+| **T7.6** | Hugging Face Space Demo Deployment | 2026-10-17 | Approved & Packaged (Gradio UI + Docker Space Bundle) | Responsive, bilingual (ID/EN) compliance assistant interface (`src/easypasal/ui/app.py`) featuring query input, legal disclaimer banner, variant comparison selector (`baseline_v0.1` vs `gepa_v0.2`), collapsible statutory citation inspector, abstention badge indicators, and user feedback dispatch (+1/-1 rating and comment). Packaged standalone Docker image (`docker/space/Dockerfile`) for free CPU Basic Tier (2 vCPUs, 16 GB RAM, port 7860) with prebuilt vector and BM25 indices (`data/index/`) baked into the image. Added automated staging and cold-start latency probe (`scripts/deploy_hf_space.py`). 6 dedicated tests, 368/368 full suite passing, 88% coverage. |
 
 
 
@@ -901,3 +902,36 @@ Every incoming request processed by the API is validated against `RequestLogReco
 #### 4. Verification & Quality Gates
 - **Unit & Integration Tests:** 11 dedicated tests in `tests/test_alerts.py` covering schema validation, SQLite persistence, threshold breaches (abstain rate, latency, low evidence), insufficient data handling, automated drills, webhook delivery, REST API endpoints, and CLI actions.
 - **Coverage & Suite Pass:** **95% test coverage** on `src/easypasal/monitoring/alerts.py`, **362/362 repository test suite passing** (`make check`), **88% overall repository coverage**, 0 ruff lint errors, 0 mypy static type errors.
+
+---
+
+### Decision: Task T7.6 — Hugging Face Space Demo Deployment (Plan §8.3 / Task T7.6)
+- **Date:** 2026-10-17
+- **Status:** Approved & Packaged
+- **Objective:**
+  Build and package an interactive web demonstration interface and standalone Hugging Face Space Docker container for public access on the free CPU Basic tier (2 vCPUs, 16 GB RAM), bundling prebuilt indices to ensure fast cold-start availability.
+
+#### 1. UI Architecture & Features (`src/easypasal/ui/app.py`)
+- **Framework:** Gradio 6.x (`gradio==6.30.0`) configured with modern CSS-injected theme layout conforming to Plan §8.3:
+  - **Legal Disclaimer Banner:** High-visibility notice explicitly informing users that EasyPasal is an AI research prototype and does not provide binding legal advice (`no legal advice`).
+  - **Bilingual Interface:** Instant language toggle between Indonesian (`id`) and English (`en`).
+  - **Pipeline Variant Selector:** Allows interactive evaluation of `baseline_v0.1` vs `gepa_v0.2` (DSPy GEPA-optimized prompt).
+  - **Representative Examples:** 5 pre-configured queries spanning Banking, Fintech P2P, Consumer Protection, Cyber Resilience, and out-of-scope non-regulatory questions.
+  - **Collapsible Statutory Citation Inspector:** Structured accordion rendering retrieved candidate statutory chunks with exact Document Number, Article (*Pasal*), Clause (*Ayat*), cosine relevance score, and verbatim excerpt.
+  - **Transparent Abstention Badging:** Prominent badges highlighting whether a response is backed by retrieved legal provisions or abstained due to lack of statutory grounding.
+  - **Telemetry & Feedback Collection:** Displays latency, model identifier, and variant metadata; captures thumbs up / thumbs down ratings and free-text comments dispatched asynchronously to `RequestLogger` and the Collector sink.
+
+#### 2. Hugging Face Space Containerization (`docker/space/Dockerfile`)
+- **Base Image:** `python:3.12-slim` multi-stage build.
+- **HF Space Compatibility:** Configured for non-root user `user` (UID 1000) on exposed port 7860.
+- **Prebuilt Indices Baked in Image:** Copies pre-indexed Qdrant vector database and BM25 postings (`data/index/`) and corpus manifest (`data/corpus_manifest.csv`) directly into the container image (~46 MB index size), eliminating index rebuilds on container startup.
+- **Metadata:** `docker/space/README.md` includes Hugging Face Space YAML frontmatter (`sdk: docker`, `app_port: 7860`, `emoji: ⚖️`, `license: apache-2.0`).
+
+#### 3. Automated Packaging & Cold-Start Probe (`scripts/deploy_hf_space.py`)
+- **Staging Bundle Builder:** Validates presence of indices and packages clean bundle into `dist/hf_space/` (supported via `make space-bundle`).
+- **Cold-Start Latency Probe:** HTTP wake-up probe measuring end-to-end time to first HTTP 200 OK from dormant state.
+- **Automated / Manual Push Support:** Supports direct deployment via `huggingface_hub.HfApi` when `HF_TOKEN` is supplied, or manual deployment via git remote `git push --force space main`.
+
+#### 4. Verification & Quality Gates
+- **Dedicated Test Suite:** 6 tests in `tests/test_ui.py` validating UI structure, citation markdown formatting, bundle preparation, cold-start latency probing, and CLI dry-run staging.
+- **Coverage & Suite Pass:** **100% test pass**, **368/368 repository test suite passing** (`make check`), **88% overall repository coverage**, 0 ruff lint errors, 0 mypy static type errors.

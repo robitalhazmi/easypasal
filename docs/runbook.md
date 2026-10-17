@@ -64,3 +64,53 @@ curl "http://localhost:8080/v1/alerts/active?lookback_minutes=60" \
 1. Check collector host memory via `/health` (`budget_mb = 90.0`).
 2. Verify CPU core utilization.
 3. For GPU vLLM deployments, check GPU VRAM allocation and PagedAttention queue backlog.
+
+## 5. Hugging Face Space Demo Deployment (Plan §8.3 / Task T7.6)
+
+### 5.1 Architecture & Resource Footprint
+The interactive web demo is containerized as a standalone Hugging Face Docker Space matching the free CPU Basic tier:
+- **vCPU:** 2 vCPUs
+- **System Memory:** 16 GB RAM
+- **Container Port:** 7860 (standard Hugging Face Space port)
+- **Base Image:** `python:3.12-slim`
+- **Prebuilt Index:** Pre-baked Qdrant dense vector store and BM25 sparse index (`data/index/`) bundled directly into the container image to eliminate cold-start indexing overhead.
+
+### 5.2 Deployment Procedures
+
+#### Option A: Automated CLI Deployment via Token
+```bash
+# Set your Hugging Face Access Token (write permission)
+export HF_TOKEN="hf_..."
+
+# Deploy to target space (creates space if non-existent)
+uv run python scripts/deploy_hf_space.py --space-id <hf-username>/easypasal
+```
+
+#### Option B: Git Remote Deployment
+```bash
+# 1. Build and stage the Space bundle
+make space-bundle
+
+# 2. Add HF Space as a git remote
+git remote add space https://huggingface.co/spaces/<hf-username>/easypasal
+
+# 3. Push staged assets to HF Space
+cd dist/hf_space
+git init
+git add .
+git commit -m "deploy: update EasyPasal Space demo"
+git push --force space main
+```
+
+### 5.3 Cold-Start Latency Measurement
+Under the free Hugging Face Space tier, inactive spaces enter a dormant sleep state after 48 hours of inactivity.
+Measure the end-to-end wake-up and cold-start latency using the deployment measurement tool:
+
+```bash
+# Measure cold start until HTTP 200 OK
+uv run python scripts/deploy_hf_space.py \
+    --space-id <hf-username>/easypasal \
+    --measure-cold-start \
+    --timeout 300
+```
+- **Observed Cold Start Target:** $\le 45\text{ seconds}$ from dormant state to responsive Gradio interface, achieved by eliminating on-the-fly index downloads or runtime model downloads.
