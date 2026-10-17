@@ -10,7 +10,14 @@ from __future__ import annotations
 import argparse
 import json
 import logging
-from datetime import UTC, datetime
+from datetime import datetime
+
+try:
+    from datetime import UTC
+except ImportError:
+    from datetime import timezone
+
+    UTC = timezone.utc  # noqa: UP017
 from pathlib import Path
 from typing import Any
 
