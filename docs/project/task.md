@@ -114,8 +114,7 @@
 - [x] **T7.2** 🤖 Log collector (FastAPI + SQLite) for the VPS, Dockerized, with auth token (commit `91eca95`, `406bba7`)
   - AC: runs within the VPS memory budget; verified with load test
 - [x] **T7.3** 🤖 Dashboard: latency p50/p95, volume, abstain rate, retrieval-score distribution, feedback (commit `2dc3d7a`)
-  - AC: reachable on VPS; screenshots saved for README
-- [ ] **T7.4** 🤝 Drift/quality report with Evidently (P2 if time is short)
+- [x] **T7.4** 🤝 Drift/quality report with Evidently (P2 if time is short)
   - AC: report generated from logs vs gold-set distribution
 - [ ] **T7.5** 🤖 Simple threshold alerts (abstain rate, p95 latency) writing flagged events
   - AC: test alert triggers in a drill
@@ -181,3 +180,4 @@ If time runs short, descope in this order and record it as future work: **E7 QLo
 | 2026-10-17 | T7.1: Implemented structured request logging (`RequestLogRecord`) validating all operational, retrieval, generation, token, and latency fields from Plan §9; automated PII redaction (NIK, phone, email, card, bank account) preserving legal citations; added `POST /feedback` endpoint and privacy notice (commit `5a8a37e`). |
 | 2026-10-17 | T7.2: Implemented lightweight VPS Log Collector (FastAPI + SQLite WAL) with Bearer / `X-Collector-Token` authentication, single/batch ingestion, feedback linking, telemetry query endpoints, and unauthenticated `/health` probe; verified isolated peak RSS memory at 52.2 MB (well under <= 90 MB VPS budget) under concurrent load; added multi-stage non-root Dockerfile (commit `91eca95`, `406bba7`). |
 | 2026-10-17 | T7.3: Built single-page interactive monitoring dashboard served at `/dashboard` (root `/` redirect) with 6 KPI cards, Chart.js visualizations (p50/p95/p99 latency, variant split, retrieval score distribution with low-evidence alert, theme frequency), recent request inspection, and auto-refresh (5s–30s); added automated preview generator `scripts/generate_dashboard_preview.py` saving screenshots to `docs/images/dashboard_monitoring.png`; 4 dedicated tests in `tests/test_dashboard.py` (339/339 full suite passing, 87% coverage; commit `2dc3d7a`). |
+| 2026-10-17 | T7.4: Implemented Evidently data and quality drift reporting engine (`src/easypasal/monitoring/drift.py`) comparing live collector query logs against 322 gold reference items across question length, word count, legal theme, and abstention behavior; generated interactive Plotly HTML (`reports/drift_report.html`) and JSON telemetry (`reports/drift_summary.json`); exposed collector endpoints (`GET /v1/reports/drift` and `GET /reports/drift`) with header link in dashboard; added 12 dedicated tests in `tests/test_drift.py` (347/347 full suite passing, 86% coverage). |

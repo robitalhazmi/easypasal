@@ -19,6 +19,7 @@ This document records the hypotheses, experimental setups, quantitative evaluati
 | **T7.1** | Structured Request Logging & PII Redaction | 2026-10-17 | Deployed Schema-Validated Request Logging & PII Redaction | Implemented `RequestLogRecord` schema validating all operational, retrieval, generation, token, and latency fields from Plan §9. Integrated automated regex-based redaction for Indonesian NIK (16-digit), NPWP, phone numbers, email, card, and bank account numbers while strictly preserving statutory legal citation anchors. Added `/feedback` endpoint and privacy notice. 22/22 unit & integration tests passing. |
 | **T7.2** | VPS Log Collector Microservice | 2026-10-17 | Approved & Deployed (FastAPI + SQLite WAL + Docker) | Dedicated low-memory (<55 MB RSS RAM under load, well under <= 90 MB VPS budget) microservice running on port 8080 with shared Bearer / X-Collector-Token authentication. SQLite WAL mode provides high concurrency without external DB dependencies. Single, atomic batch ingestion, user feedback linking, real-time telemetry query/stats summary, and unauthenticated /health probe. Multi-stage Dockerized non-root container with persistent /data volume. 18 dedicated tests, 335/335 full suite passing, 87% coverage. |
 | **T7.3** | Telemetry & Observability Dashboard | 2026-10-17 | Approved & Deployed (FastAPI HTML/JS + Chart.js + Infographic Generator) | Responsive single-page dashboard served directly by collector microservice at `/dashboard` (and root `/` redirect). Features 6 KPI metric cards, interactive Chart.js charts for latency percentiles (p50/p95/p99), variant split, retrieval score distribution with low-evidence alerts (<0.60), and theme frequency, plus live request log inspection with PII redaction and auto-refresh (5s–30s). Added automated infographic generator (`scripts/generate_dashboard_preview.py`) generating publication-grade screenshots in `docs/images/dashboard_monitoring.png`. 339/339 tests passing, 87% coverage. |
+| **T7.4** | Drift / Quality Monitoring (Evidently) | 2026-10-17 | Approved & Implemented (Evidently Data Drift Suite) | Statistical distribution drift detection comparing live query logs against the 322-item gold standard reference across query length, word count, regulatory legal theme, and abstention behavior. Generates interactive Plotly/HTML (`reports/drift_report.html`) and structured JSON telemetry (`reports/drift_summary.json`). Integrated into collector microservice endpoints (`GET /v1/reports/drift` and `GET /reports/drift`) with direct link in dashboard. 12 dedicated tests, 347/347 full suite passing, 86% coverage. |
 
 
 
@@ -831,3 +832,35 @@ Every incoming request processed by the API is validated against `RequestLogReco
 #### 3. Quality Verification
 - **Unit & Integration Tests:** 4 tests in `tests/test_dashboard.py` verifying HTML structure, canvas IDs, metric cards, root redirect, and preview generator script execution.
 - **Full Suite Pass:** 339/339 tests passing (`make check`), 87% overall test coverage, 0 ruff lint errors, 0 mypy static type errors.
+
+---
+
+### Decision: Task T7.4 — Drift and Quality Monitoring with Evidently
+- **Date:** 2026-10-17
+- **Status:** Approved & Implemented
+- **Objective:**
+  Implement statistical data and quality drift reporting engine comparing live production query logs against the curated gold standard dataset to detect covariate shifts, changes in user query complexity, theme redistribution, and abstention anomalies.
+
+#### 1. Statistical Methodology & Drift Features
+- **Reference Baseline:** Aggregated 322 gold standard evaluation items across `train.jsonl`, `dev.jsonl`, and `test.jsonl` (`src/easypasal/monitoring/drift.py:build_gold_reference_dataset`).
+- **Target / Production Distribution:** Extracted live query records from the SQLite collector database or raw JSONL logs (`build_current_dataset_from_db`, `build_current_dataset_from_file`). Gracefully samples the baseline with bootstrap jitter if live production volume has $<10$ items.
+- **Analyzed Dimensions:**
+  1. `question_length` (character length of input queries): Evaluated via two-sample Kolmogorov-Smirnov (K-S) test ($\alpha = 0.05$).
+  2. `word_count` (token/word density): Evaluated via two-sample Kolmogorov-Smirnov (K-S) test ($\alpha = 0.05$).
+  3. `theme` (categorical legal domain frequency, e.g. Perbankan, Fintech, Pasar Modal): Evaluated via Pearson Chi-Square ($\chi^2$) test ($\alpha = 0.05$).
+  4. `abstained` (binary safety / out-of-scope proportion): Evaluated via two-proportion Z-test ($\alpha = 0.05$).
+- **Overall Dataset Drift Decision:** Triggered when $\ge 50\%$ (`drift_share >= 0.50`) of monitored features exhibit statistically significant distributional drift.
+
+#### 2. Artifacts & Telemetry Endpoints
+- **Evidently 0.7.23 Architecture:** Runs `Report(metrics=[DataDriftPreset(drift_share=0.50)])` and extracts both rich interactive Plotly visual HTML and compact machine-readable JSON summaries:
+  - `reports/drift_report.html` (interactive standalone report with distribution plots and p-value curves).
+  - `reports/drift_summary.json` (compact payload with p-values, drift flags, reference vs current record counts, and timestamps).
+- **Collector Microservice Integration:**
+  - `GET /v1/reports/drift`: Authenticated endpoint returning JSON drift telemetry for alerting pipelines.
+  - `GET /reports/drift`: Public endpoint serving the standalone HTML report with dynamic on-demand generation when not precomputed.
+  - **Dashboard Header Link:** Accessible directly from the monitoring dashboard navbar via `"Evidently Drift Report"` link.
+- **CLI Tool:** Executable via `python -m easypasal.monitoring.drift` supporting custom `--gold-dir`, `--db-path`, and report output destinations.
+
+#### 3. Verification & Quality Gates
+- **Dedicated Test Suite:** 12 tests in `tests/test_drift.py` covering reference dataset construction, database extraction, fallback handling, log file parsing (including corrupted and empty lines), HTML/JSON report generation, validation error handling, dynamic HTTP regeneration, and CLI invocation.
+- **Coverage & Lint:** 94% test coverage on `src/easypasal/monitoring/drift.py`, 347/347 repository test suite passing (`make check`), 86% overall repository coverage, 0 ruff lint errors, 0 mypy static type errors.

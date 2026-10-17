@@ -9,9 +9,11 @@ from __future__ import annotations
 import logging
 import os
 import sys
+from pathlib import Path
 from typing import Annotated, Any
 
 from fastapi import APIRouter, Depends, HTTPException, Query, Request, status
+from fastapi.responses import HTMLResponse
 
 from easypasal.collector.auth import get_collector_config, verify_collector_token
 from easypasal.collector.config import CollectorConfig
@@ -240,3 +242,68 @@ def get_stats_summary(
 ) -> dict[str, Any]:
     """Compute aggregate request counts, p50/p95/p99 latencies, token consumption, and abstain rates."""
     return db.get_stats_summary()
+
+
+@router.get(
+    "/v1/reports/drift",
+    summary="Compute or retrieve Evidently data drift summary",
+)
+def get_drift_report_summary(
+    db: Annotated[CollectorDB, Depends(get_db)],
+    _token: Annotated[str, Depends(verify_collector_token)],
+) -> dict[str, Any]:
+    """Return structured data drift summary comparing production query logs to the gold dataset."""
+    from easypasal.monitoring.drift import (
+        build_current_dataset_from_db,
+        build_gold_reference_dataset,
+        generate_drift_report,
+    )
+
+    try:
+        ref_df = build_gold_reference_dataset()
+        cur_df = build_current_dataset_from_db(db)
+        summary = generate_drift_report(
+            reference_df=ref_df,
+            current_df=cur_df,
+            output_html_path="reports/drift_report.html",
+            output_json_path="reports/drift_summary.json",
+        )
+        return summary
+    except Exception as exc:
+        logger.error("Failed to generate drift report: %s", exc)
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Drift report generation failed: {exc}",
+        ) from exc
+
+
+@router.get(
+    "/reports/drift",
+    response_class=HTMLResponse,
+    summary="Interactive Evidently Data Drift HTML Report",
+)
+def get_drift_html_report(
+    db: Annotated[CollectorDB, Depends(get_db)],
+) -> HTMLResponse:
+    """Serve the interactive HTML Evidently drift report."""
+    html_path = Path("reports/drift_report.html")
+    if html_path.exists():
+        with open(html_path, encoding="utf-8") as f:
+            return HTMLResponse(content=f.read())
+
+    from easypasal.monitoring.drift import (
+        build_current_dataset_from_db,
+        build_gold_reference_dataset,
+        generate_drift_report,
+    )
+
+    ref_df = build_gold_reference_dataset()
+    cur_df = build_current_dataset_from_db(db)
+    generate_drift_report(
+        reference_df=ref_df,
+        current_df=cur_df,
+        output_html_path=html_path,
+        output_json_path="reports/drift_summary.json",
+    )
+    with open(html_path, encoding="utf-8") as f:
+        return HTMLResponse(content=f.read())

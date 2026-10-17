@@ -75,6 +75,9 @@ mlflow.db
 *.log
 logs/
 data/sqlite/*.db
+reports/*.html
+reports/*.json
+!reports/.gitkeep
 
 # IDE & OS
 .DS_Store
