@@ -161,6 +161,16 @@ class TrafficSplitConfig(BaseModel):
         return v
 
 
+class MonitoringConfig(BaseModel):
+    """Configuration for structured request logging, PII redaction, and feedback (Plan §9)."""
+
+    enabled: bool = True
+    log_file: str | None = "logs/requests.jsonl"
+    feedback_file: str | None = "logs/feedback.jsonl"
+    redact_pii: bool = True
+    salt: str = "easypasal-monitoring-salt-v1"
+
+
 class EasyPasalConfig(BaseModel):
     """Master configuration container for EasyPasal system."""
 
@@ -176,6 +186,7 @@ class EasyPasalConfig(BaseModel):
     generator: GeneratorConfig = Field(default_factory=GeneratorConfig)
     guardrails: GuardrailsConfig = Field(default_factory=GuardrailsConfig)
     traffic_split: TrafficSplitConfig = Field(default_factory=TrafficSplitConfig)
+    monitoring: MonitoringConfig = Field(default_factory=MonitoringConfig)
 
     @classmethod
     def from_yaml(cls, path: Path | str) -> EasyPasalConfig:

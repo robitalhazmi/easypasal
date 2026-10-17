@@ -16,6 +16,7 @@ This document records the hypotheses, experimental setups, quantitative evaluati
 | **T6.1** | Replay-Based A/B Simulation | 2026-10-16 | Adopt `gepa_v0.2` (Promote Variant B over Variant A) | Counterfactual replay simulation on `dev` ($N=40$) and held-out `test` ($N=66$) under a unified LLM judge confirms 100% Faithfulness parity, directional gains in Grounding Fidelity (+3.5% on test, +9.4% on dev) and Citation F1 (+0.6% on test), and perfect Abstention Accuracy parity (81.82%, $p=1.000$) with zero regressions. Explicitly labeled as offline counterfactual replay simulation per Plan §6.4 & §13. |
 | **E7** | QLoRA Router Fine-tuning | 2026-10-16 | Approved (Adopt `Qwen2.5-0.5B-Instruct` QLoRA Router Adapter) | 4-bit NF4 QLoRA adapter achieves 1.0000 Theme Macro-F1 (+16.3% on test), 1.0000 Answerability F1 (+7.8%), 100% Injection Precision, and 100% Injection Recall (+33.3% on stealth attacks). Zero regression across all 9 gold taxonomy categories. Compresses inference latency by 2.6x (21.6 ms vs 56.6 ms), fast-pathing out-of-scope/adversarial queries before retrieval. Packaged in Colab notebook (`notebooks/e7_qlora_training.ipynb`) and adapter card (`experiments/e7_qlora/adapter_card.md`). |
 | **T6.4** | Guardrail Router Pipeline Integration | 2026-10-16 | Approved & Deployed into `RAGPipeline` | Deployed front-line question router into `RAGPipeline.ask()` (`src/easypasal/guardrails/question_router.py`). Short-circuits injections, superseded traps, and out-of-scope queries in <25ms, eliminating expensive dense retrieval and LLM generation. 100% test coverage on router, zero regressions across 295 test suite cases. |
+| **T7.1** | Structured Request Logging & PII Redaction | 2026-10-17 | Deployed Schema-Validated Request Logging & PII Redaction | Implemented `RequestLogRecord` schema validating all operational, retrieval, generation, token, and latency fields from Plan §9. Integrated automated regex-based redaction for Indonesian NIK (16-digit), NPWP, phone numbers, email, card, and bank account numbers while strictly preserving statutory legal citation anchors. Added `/feedback` endpoint and privacy notice. 22/22 unit & integration tests passing. |
 
 ---
 
@@ -717,3 +718,41 @@ graph TD
 - **Unit & Integration Tests:** 10 dedicated test cases added in `tests/test_guardrails.py` covering prompt injection detection, superseded trap refusals, agrarian/criminal/programming out-of-scope blocking, in-scope theme inference, and pipeline bypass toggles.
 - **Coverage:** 100% test coverage on `question_router.py`. Overall repository coverage sits at **88%** (exceeding $\ge 85\%$ target).
 - **Quality Gates:** 295/295 tests passing (`make check`), 0 ruff lint errors, 0 formatting issues, 0 mypy static type errors across all modules.
+
+---
+
+### Decision: Task T7.1 — Structured Request Logging & PII Redaction
+- **Date:** 2026-10-17
+- **Status:** Approved & Deployed in API
+- **Objective:**
+  Implement structured request logging in the API adhering strictly to the telemetry fields defined in Plan §9, validated against a schema with automated redaction of sensitive personal identifiable information (PII).
+
+#### 1. Schema Validation (Plan §9 Compliance)
+Every incoming request processed by the API is validated against `RequestLogRecord` (`src/easypasal/monitoring/schemas.py`) before persistence:
+- **Request Telemetry:** `request_id`, UTC `timestamp`, `variant`, `language`, `question_length`, `question_redacted`.
+- **Retrieval Observability:** `retrieval_score_top1`, `retrieval_scores_topk`, `retrieved_doc_ids`.
+- **Abstention & Guardrails:** `abstained`, `routed`, `theme`.
+- **Latency Breakdown:** `retrieval_latency_ms`, `generation_latency_ms`, `total_latency_ms`.
+- **Token Telemetry:** `prompt_tokens`, `completion_tokens`, `total_tokens`.
+- **Grounding Verification:** `citation_count`, `grounded_citation_count`, `ungrounded_citation_count`.
+- **Privacy & Feedback:** Salted one-way SHA-256 `client_ip_hash`, `feedback_rating`, `feedback_comment`.
+
+#### 2. PII Redaction Engine
+`src/easypasal/monitoring/redaction.py` automatically detects and redacts personal identifiers prior to disk logging:
+- Indonesian National ID (NIK - 16 digits) $\rightarrow$ `[REDACTED_NIK]`
+- Indonesian Tax ID (NPWP) $\rightarrow$ `[REDACTED_NPWP]`
+- Indonesian & international phone numbers $\rightarrow$ `[REDACTED_PHONE]`
+- Email addresses $\rightarrow$ `[REDACTED_EMAIL]`
+- Credit / Debit card numbers $\rightarrow$ `[REDACTED_CARD]`
+- Bank account numbers $\rightarrow$ `[REDACTED_ACCOUNT]`
+- **Statutory Anchor Preservation:** Verified zero false-positive redaction on Indonesian regulatory citations (e.g. `POJK 22 Tahun 2023, Pasal 71 ayat (1)`, `UU Nomor 4 Tahun 2023 Pasal 243`).
+
+#### 3. API & Feedback Integration
+- Integrated `RequestLogger` (`src/easypasal/monitoring/logger.py`) into FastAPI request lifecycle (`src/easypasal/api/routes.py`).
+- Added `POST /feedback` endpoint for logging user ratings (+1 / -1) and comments linked to `request_id`.
+- Added privacy notice in `GET /` root metadata informing users of evaluation logging and automated redaction per Plan §9.
+- Added `MonitoringConfig` in `src/easypasal/config.py`.
+
+#### 4. Quality Verification
+- **Unit & Integration Tests:** 22 tests in `tests/test_monitoring.py` verifying PII redaction patterns, statutory preservation, schema validation, thread safety, corrupt line skipping, and API request/feedback logging.
+- **Full Verification Suite:** 316/316 tests passing, 88% overall repository code coverage, 0 lint errors, 0 type errors.

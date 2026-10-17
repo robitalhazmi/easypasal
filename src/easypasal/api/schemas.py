@@ -6,6 +6,8 @@ from typing import Literal
 
 from pydantic import BaseModel, ConfigDict, Field
 
+from easypasal.monitoring.schemas import FeedbackPayload
+
 
 class AskRequest(BaseModel):
     """Request payload for legal question answering."""
@@ -133,3 +135,25 @@ class ErrorResponse(BaseModel):
 
     detail: str
     request_id: str | None = None
+
+
+class FeedbackResponse(BaseModel):
+    """Response returned upon successfully recording user feedback."""
+
+    status: str = Field(default="ok")
+    request_id: str
+    rating: int
+    message: str = Field(default="Feedback recorded successfully.")
+
+
+__all__ = [
+    "AskRequest",
+    "AskResponse",
+    "CitationCheckResponse",
+    "CitationVerificationResponse",
+    "ErrorResponse",
+    "FeedbackPayload",
+    "FeedbackResponse",
+    "HealthResponse",
+    "RetrievedChunkResponse",
+]

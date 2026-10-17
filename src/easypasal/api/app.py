@@ -7,6 +7,7 @@ import logging
 from collections.abc import AsyncGenerator
 from contextlib import asynccontextmanager
 from pathlib import Path
+from typing import TYPE_CHECKING
 
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
@@ -14,6 +15,9 @@ from fastapi.middleware.cors import CORSMiddleware
 from easypasal.api.middleware import RequestIDMiddleware
 from easypasal.api.routes import api_router
 from easypasal.generation.pipeline import RAGPipeline
+
+if TYPE_CHECKING:
+    from easypasal.monitoring.logger import RequestLogger
 
 logger = logging.getLogger("easypasal.api.app")
 
@@ -26,6 +30,7 @@ def create_app(
     config_path: Path | str | None = None,
     variant: str | None = None,
     traffic_split: bool | None = None,
+    request_logger: RequestLogger | None = None,
 ) -> FastAPI:
     """Create and configure the FastAPI application instance.
 
@@ -37,6 +42,7 @@ def create_app(
         config_path: Optional path to YAML configuration file.
         variant: Optional default variant override ('baseline_v0.1' or 'gepa_v0.2').
         traffic_split: Optional boolean flag to enable or disable traffic splitting.
+        request_logger: Optional pre-configured RequestLogger instance.
 
     Returns:
         Configured FastAPI application.
@@ -114,6 +120,28 @@ def create_app(
         app.state.traffic_split_config = cfg
     else:
         app.state.traffic_split_config = None
+
+    # RequestLogger configuration (Plan §9 / Task T7.1)
+    if request_logger is not None:
+        app.state.request_logger = request_logger
+    else:
+        monitoring_cfg = getattr(pip_cfg, "monitoring", None) if pip_cfg else None
+        if monitoring_cfg is None:
+            from easypasal.config import MonitoringConfig
+
+            monitoring_cfg = MonitoringConfig()
+
+        from easypasal.monitoring.logger import RequestLogger
+
+        active_log_file = None if is_test else monitoring_cfg.log_file
+        active_fb_file = None if is_test else monitoring_cfg.feedback_file
+
+        app.state.request_logger = RequestLogger(
+            log_file=active_log_file if monitoring_cfg.enabled else None,
+            feedback_file=active_fb_file if monitoring_cfg.enabled else None,
+            redact_pii=monitoring_cfg.redact_pii,
+            salt=monitoring_cfg.salt,
+        )
 
     # Middleware registration (executed in reverse order of addition)
     app.add_middleware(RequestIDMiddleware)

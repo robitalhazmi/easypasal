@@ -109,8 +109,8 @@
 
 ## Phase 7 — Monitoring and deployment (P0)
 
-- [ ] **T7.1** 🤖 Structured request logging in the app (fields from plan §9) with basic redaction
-  - AC: logs validated against a schema
+- [x] **T7.1** 🤖 Structured request logging in the app (fields from plan §9) with basic redaction
+  - AC: logs validated against a schema; PII automatically redacted (NIK, phone, email, card, bank account) while preserving statutory citations; POST /feedback and privacy notice added
 - [ ] **T7.2** 🤖 Log collector (FastAPI + SQLite) for the VPS, Dockerized, with auth token
   - AC: runs within the VPS memory budget; verified with load test
 - [ ] **T7.3** 🤖 Dashboard: latency p50/p95, volume, abstain rate, retrieval-score distribution, feedback
