@@ -124,16 +124,86 @@ def build_ui(
     #example-queries,
     #example-queries .dataset,
     #example-queries .table-wrap,
+    #example-queries .gallery,
     #example-queries table,
     .example-queries-container,
     .example-queries-container .dataset,
     .example-queries-container .table-wrap,
+    .example-queries-container .gallery,
     .example-queries-container table {
         overflow: visible !important;
         max-height: none !important;
         height: auto !important;
         width: 100% !important;
     }
+
+    /* Gallery card layout (Gradio single visible column mode) */
+    #example-queries .gallery,
+    .example-queries-container .gallery {
+        display: flex !important;
+        flex-direction: column !important;
+        gap: 8px !important;
+        width: 100% !important;
+    }
+    #example-queries .gallery-item,
+    .example-queries-container .gallery-item {
+        display: block !important;
+        width: 100% !important;
+        max-width: 100% !important;
+        height: auto !important;
+        min-height: unset !important;
+        max-height: none !important;
+        overflow: visible !important;
+        background: #0f172a !important;
+        border: 1px solid #334155 !important;
+        border-radius: 8px !important;
+        padding: 10px 14px !important;
+        text-align: left !important;
+        cursor: pointer !important;
+        transition: all 0.15s ease-in-out !important;
+        box-sizing: border-box !important;
+    }
+    #example-queries .gallery-item:hover,
+    .example-queries-container .gallery-item:hover {
+        background: #1e293b !important;
+        border-color: #38bdf8 !important;
+        transform: translateY(-1px);
+    }
+    #example-queries .gallery-item *,
+    #example-queries .gallery-item div,
+    #example-queries .gallery-item span,
+    #example-queries .gallery-item p,
+    .example-queries-container .gallery-item *,
+    .example-queries-container .gallery-item div,
+    .example-queries-container .gallery-item span,
+    .example-queries-container .gallery-item p,
+    #example-queries button,
+    #example-queries button div,
+    #example-queries button span,
+    .example-queries-container button,
+    .example-queries-container button div,
+    .example-queries-container button span {
+        white-space: normal !important;
+        word-break: break-word !important;
+        overflow-wrap: break-word !important;
+        text-overflow: clip !important;
+        overflow: visible !important;
+        line-height: 1.45 !important;
+        font-size: 0.875rem !important;
+        text-align: left !important;
+        max-width: 100% !important;
+        width: 100% !important;
+        display: block !important;
+        color: #cbd5e1 !important;
+    }
+    #example-queries .gallery-item:hover *,
+    #example-queries .gallery-item:hover div,
+    .example-queries-container .gallery-item:hover *,
+    .example-queries-container .gallery-item:hover div {
+        color: #38bdf8 !important;
+    }
+
+    /* Table layout fallback (if rendered as table) */
     #example-queries thead,
     .example-queries-container thead {
         display: none !important;
@@ -143,6 +213,7 @@ def build_ui(
         border-collapse: separate !important;
         border-spacing: 0 6px !important;
         width: 100% !important;
+        table-layout: auto !important;
     }
     #example-queries tbody tr,
     .example-queries-container tbody tr {
@@ -165,7 +236,7 @@ def build_ui(
         white-space: normal !important;
         word-break: break-word !important;
         overflow-wrap: break-word !important;
-        text-overflow: unset !important;
+        text-overflow: clip !important;
         overflow: visible !important;
         padding: 10px 14px !important;
         font-size: 0.875rem !important;
@@ -178,11 +249,13 @@ def build_ui(
         white-space: normal !important;
         word-break: break-word !important;
         overflow-wrap: break-word !important;
-        text-overflow: unset !important;
+        text-overflow: clip !important;
         overflow: visible !important;
         line-height: 1.45 !important;
         text-align: left !important;
         max-width: none !important;
+        width: 100% !important;
+        display: block !important;
     }
     #example-queries tbody tr:hover td,
     #example-queries tbody tr:hover td *,
@@ -263,6 +336,7 @@ def build_ui(
 
             with gr.Column(
                 scale=2,
+                min_width=320,
                 elem_id="example-queries-col",
                 elem_classes=["example-queries-container"],
             ):
