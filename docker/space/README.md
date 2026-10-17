@@ -3,8 +3,9 @@ title: EasyPasal - Indonesian Financial Regulatory Compliance AI
 emoji: ⚖️
 colorFrom: blue
 colorTo: indigo
-sdk: docker
-app_port: 7860
+sdk: gradio
+sdk_version: 6.30.0
+app_file: app.py
 pinned: false
 license: apache-2.0
 short_description: AI assistant for OJK & Bank Indonesia compliance

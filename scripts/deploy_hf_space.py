@@ -54,24 +54,51 @@ def prepare_space_bundle(output_dir: Path | str = "dist/hf_space") -> Path:
     # 4. Generate root app.py and requirements.txt for native Gradio SDK Space compatibility
     app_wrapper = (
         '"""Hugging Face Space Gradio entrypoint."""\n'
+        "import logging\n"
         "import os\n"
         "import sys\n\n"
-        'sys.path.insert(0, os.path.abspath("src"))\n'
-        "from easypasal.ui.app import main\n\n"
+        "# Ensure src/ is on Python search path\n"
+        'sys.path.insert(0, os.path.abspath("src"))\n\n'
+        "from easypasal.generation.pipeline import RAGPipeline\n"
+        "from easypasal.monitoring.logger import RequestLogger\n"
+        "from easypasal.ui.app import build_ui\n\n"
+        "logging.basicConfig(\n"
+        '    level=logging.INFO, format="%(asctime)s [%(levelname)s] %(name)s: %(message)s"\n'
+        ")\n"
+        'logger = logging.getLogger("easypasal.space")\n\n'
+        "# Initialize RAGPipeline with mock fallback\n"
+        "try:\n"
+        '    pipeline = RAGPipeline.from_defaults(provider="auto")\n'
+        '    logger.info("RAGPipeline loaded successfully.")\n'
+        "except Exception as exc:\n"
+        '    logger.warning("Pipeline fallback to mock: %s", exc)\n'
+        '    pipeline = RAGPipeline.from_defaults(provider="mock")\n\n'
+        "request_logger = RequestLogger(\n"
+        '    collector_url=os.getenv("EASYPASAL_COLLECTOR_URL"),\n'
+        '    collector_token=os.getenv("EASYPASAL_COLLECTOR_TOKEN", "easypasal-vps-secret-token-v1"),\n'
+        ")\n\n"
+        "# Export demo at module level for Hugging Face Gradio runner\n"
+        "demo = build_ui(pipeline=pipeline, request_logger=request_logger)\n\n"
         'if __name__ == "__main__":\n'
-        "    main()\n"
+        '    demo.launch(server_name="0.0.0.0", server_port=7860)\n'
     )
     (out_path / "app.py").write_text(app_wrapper, encoding="utf-8")
 
     requirements_txt = (
-        "gradio>=6.0.0\n"
-        "pydantic>=2.0.0\n"
-        "pyyaml>=6.0\n"
-        "qdrant-client>=1.9.0\n"
-        "rank-bm25>=0.2.2\n"
+        "gradio==6.30.0\n"
+        "pydantic>=2.10.0\n"
+        "pydantic-settings>=2.6.0\n"
         "httpx>=0.27.0\n"
+        "qdrant-client>=1.11.0\n"
+        "fastembed>=0.3.0\n"
+        "rank-bm25>=0.2.2\n"
+        "huggingface-hub>=0.20.0\n"
+        "fastapi>=0.115.0\n"
+        "uvicorn>=0.32.0\n"
+        "tqdm>=4.66.0\n"
+        "pyyaml>=6.0\n"
         "numpy>=1.26.0\n"
-        "fastapi>=0.110.0\n"
+        "flashrank>=0.2.10\n"
     )
     (out_path / "requirements.txt").write_text(requirements_txt, encoding="utf-8")
 

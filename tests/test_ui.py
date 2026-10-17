@@ -124,8 +124,8 @@ def test_prepare_space_bundle(tmp_path: Path) -> None:
 
     # Verify HF Space frontmatter metadata in staged README
     readme_content = (prepared / "README.md").read_text(encoding="utf-8")
-    assert "sdk: docker" in readme_content
-    assert "app_port: 7860" in readme_content
+    assert "sdk: gradio" in readme_content
+    assert "app_file: app.py" in readme_content
 
 
 def test_measure_cold_start_unreachable() -> None:
