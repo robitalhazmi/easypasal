@@ -72,6 +72,31 @@ def test_build_ui_structure(mock_pipeline: MagicMock, mock_request_logger: Reque
     assert "EasyPasal" in str(demo.title)
 
 
+def test_example_queries_configuration(
+    mock_pipeline: MagicMock, mock_request_logger: RequestLogger
+) -> None:
+    """Verify that example queries are fully visible, unmasked, and properly wired."""
+    from easypasal.ui.app import DEFAULT_EXAMPLES
+
+    assert len(DEFAULT_EXAMPLES) == 6
+    for item in DEFAULT_EXAMPLES:
+        assert len(item) == 3
+        question, lang, variant = item
+        assert isinstance(question, str) and len(question) > 10
+        assert lang in ("id", "en")
+        assert variant in ("baseline_v0.1", "gepa_v0.2")
+
+    demo = build_ui(pipeline=mock_pipeline, request_logger=mock_request_logger)
+    # Verify dataset configuration inside demo blocks
+    datasets = [comp for comp in demo.blocks.values() if isinstance(comp, gr.Dataset)]
+    assert len(datasets) >= 1
+    dataset = datasets[0]
+    assert dataset.samples_per_page >= len(DEFAULT_EXAMPLES)
+    assert len(dataset.samples) == len(DEFAULT_EXAMPLES)
+    # Check visible column is only the question column to prevent masking
+    assert len(dataset.samples[0]) == 1
+
+
 def test_format_citations_markdown() -> None:
     """Verify that format_citations_markdown produces properly formatted legal citations."""
     # 1. Output with chunks

@@ -120,6 +120,86 @@ def build_ui(
         padding: 10px 14px;
         font-size: 0.85rem;
     }
+    /* Example Queries - Full Visibility & No Masking */
+    #example-queries,
+    #example-queries .dataset,
+    #example-queries .table-wrap,
+    #example-queries table,
+    .example-queries-container,
+    .example-queries-container .dataset,
+    .example-queries-container .table-wrap,
+    .example-queries-container table {
+        overflow: visible !important;
+        max-height: none !important;
+        height: auto !important;
+        width: 100% !important;
+    }
+    #example-queries thead,
+    .example-queries-container thead {
+        display: none !important;
+    }
+    #example-queries table,
+    .example-queries-container table {
+        border-collapse: separate !important;
+        border-spacing: 0 6px !important;
+        width: 100% !important;
+    }
+    #example-queries tbody tr,
+    .example-queries-container tbody tr {
+        background: #0f172a !important;
+        border: 1px solid #334155 !important;
+        border-radius: 8px !important;
+        cursor: pointer !important;
+        transition: all 0.15s ease-in-out !important;
+    }
+    #example-queries tbody tr:hover,
+    .example-queries-container tbody tr:hover {
+        background: #1e293b !important;
+        border-color: #38bdf8 !important;
+    }
+    #example-queries td,
+    .example-queries-container td {
+        max-width: none !important;
+        width: 100% !important;
+        text-align: left !important;
+        white-space: normal !important;
+        word-break: break-word !important;
+        overflow-wrap: break-word !important;
+        text-overflow: unset !important;
+        overflow: visible !important;
+        padding: 10px 14px !important;
+        font-size: 0.875rem !important;
+        line-height: 1.45 !important;
+        border: none !important;
+        color: #cbd5e1 !important;
+    }
+    #example-queries td *,
+    .example-queries-container td * {
+        white-space: normal !important;
+        word-break: break-word !important;
+        overflow-wrap: break-word !important;
+        text-overflow: unset !important;
+        overflow: visible !important;
+        line-height: 1.45 !important;
+        text-align: left !important;
+        max-width: none !important;
+    }
+    #example-queries tbody tr:hover td,
+    #example-queries tbody tr:hover td *,
+    .example-queries-container tbody tr:hover td,
+    .example-queries-container tbody tr:hover td * {
+        color: #38bdf8 !important;
+    }
+    #example-queries table th:nth-child(n+2),
+    #example-queries table td:nth-child(n+2),
+    .example-queries-container table th:nth-child(n+2),
+    .example-queries-container table td:nth-child(n+2) {
+        display: none !important;
+    }
+    #example-queries .paginate,
+    .example-queries-container .paginate {
+        display: none !important;
+    }
     """
 
     with gr.Blocks(title="EasyPasal — Indonesian Regulatory Compliance AI") as demo:
@@ -181,12 +261,19 @@ def build_ui(
                     )
                     clear_btn = gr.Button("Bersihkan / Clear", scale=1)
 
-            with gr.Column(scale=2):
+            with gr.Column(
+                scale=2,
+                elem_id="example-queries-col",
+                elem_classes=["example-queries-container"],
+            ):
                 gr.Markdown("### ⚡ Pertanyaan Uji / Example Queries")
                 gr.Examples(
                     examples=DEFAULT_EXAMPLES,
                     inputs=[question_input, lang_toggle, variant_selector],
                     label="Pilih pertanyaan untuk menguji sistem:",
+                    visible_columns=[0],
+                    examples_per_page=len(DEFAULT_EXAMPLES),
+                    elem_id="example-queries",
                 )
 
         # Response Section
