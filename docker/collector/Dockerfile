@@ -16,7 +16,8 @@ RUN python -m venv /opt/venv && \
         "fastapi>=0.115.0" \
         "uvicorn>=0.32.0" \
         "pydantic>=2.10.0" \
-        "httpx>=0.27.0" && \
+        "httpx>=0.27.0" \
+        "pyyaml>=6.0.0" && \
     /opt/venv/bin/pip install --no-cache-dir --no-deps -e .
 
 FROM python:3.12-slim AS runner
