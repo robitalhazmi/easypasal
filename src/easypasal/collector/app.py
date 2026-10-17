@@ -7,11 +7,13 @@ import logging
 from collections.abc import AsyncGenerator
 from contextlib import asynccontextmanager
 from pathlib import Path
+from typing import Any
 
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
 from easypasal.collector.config import CollectorConfig
+from easypasal.collector.dashboard import dashboard_router
 from easypasal.collector.db import CollectorDB
 from easypasal.collector.routes import router
 
@@ -77,6 +79,13 @@ def create_collector_app(
 
     # Register API endpoints
     app.include_router(router)
+    app.include_router(dashboard_router)
+
+    @app.get("/", include_in_schema=False)
+    def root_redirect() -> Any:
+        from fastapi.responses import RedirectResponse
+
+        return RedirectResponse(url="/dashboard")
 
     return app
 

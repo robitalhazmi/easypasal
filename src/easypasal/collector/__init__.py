@@ -6,6 +6,7 @@ if TYPE_CHECKING:
     from easypasal.collector.app import create_collector_app
     from easypasal.collector.auth import verify_collector_token
     from easypasal.collector.config import CollectorConfig
+    from easypasal.collector.dashboard import dashboard_router
     from easypasal.collector.db import CollectorDB
     from easypasal.collector.routes import router
 
@@ -13,6 +14,7 @@ __all__ = [
     "CollectorConfig",
     "CollectorDB",
     "create_collector_app",
+    "dashboard_router",
     "router",
     "verify_collector_token",
 ]
@@ -20,6 +22,7 @@ __all__ = [
 _APP_SYMBOLS = {"create_collector_app"}
 _AUTH_SYMBOLS = {"verify_collector_token"}
 _CONFIG_SYMBOLS = {"CollectorConfig"}
+_DASHBOARD_SYMBOLS = {"dashboard_router"}
 _DB_SYMBOLS = {"CollectorDB"}
 _ROUTE_SYMBOLS = {"router"}
 
@@ -37,6 +40,10 @@ def __getattr__(name: str) -> object:
         import easypasal.collector.config as _config
 
         return getattr(_config, name)
+    if name in _DASHBOARD_SYMBOLS:
+        import easypasal.collector.dashboard as _dashboard
+
+        return getattr(_dashboard, name)
     if name in _DB_SYMBOLS:
         import easypasal.collector.db as _db
 

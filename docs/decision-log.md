@@ -18,6 +18,8 @@ This document records the hypotheses, experimental setups, quantitative evaluati
 | **T6.4** | Guardrail Router Pipeline Integration | 2026-10-16 | Approved & Deployed into `RAGPipeline` | Deployed front-line question router into `RAGPipeline.ask()` (`src/easypasal/guardrails/question_router.py`). Short-circuits injections, superseded traps, and out-of-scope queries in <25ms, eliminating expensive dense retrieval and LLM generation. 100% test coverage on router, zero regressions across 295 test suite cases. |
 | **T7.1** | Structured Request Logging & PII Redaction | 2026-10-17 | Deployed Schema-Validated Request Logging & PII Redaction | Implemented `RequestLogRecord` schema validating all operational, retrieval, generation, token, and latency fields from Plan §9. Integrated automated regex-based redaction for Indonesian NIK (16-digit), NPWP, phone numbers, email, card, and bank account numbers while strictly preserving statutory legal citation anchors. Added `/feedback` endpoint and privacy notice. 22/22 unit & integration tests passing. |
 | **T7.2** | VPS Log Collector Microservice | 2026-10-17 | Approved & Deployed (FastAPI + SQLite WAL + Docker) | Dedicated low-memory (<55 MB RSS RAM under load, well under <= 90 MB VPS budget) microservice running on port 8080 with shared Bearer / X-Collector-Token authentication. SQLite WAL mode provides high concurrency without external DB dependencies. Single, atomic batch ingestion, user feedback linking, real-time telemetry query/stats summary, and unauthenticated /health probe. Multi-stage Dockerized non-root container with persistent /data volume. 18 dedicated tests, 335/335 full suite passing, 87% coverage. |
+| **T7.3** | Telemetry & Observability Dashboard | 2026-10-17 | Approved & Deployed (FastAPI HTML/JS + Chart.js + Infographic Generator) | Responsive single-page dashboard served directly by collector microservice at `/dashboard` (and root `/` redirect). Features 6 KPI metric cards, interactive Chart.js charts for latency percentiles (p50/p95/p99), variant split, retrieval score distribution with low-evidence alerts (<0.60), and theme frequency, plus live request log inspection with PII redaction and auto-refresh (5s–30s). Added automated infographic generator (`scripts/generate_dashboard_preview.py`) generating publication-grade screenshots in `docs/images/dashboard_monitoring.png`. 339/339 tests passing, 87% coverage. |
+
 
 
 ---
@@ -802,3 +804,30 @@ Every incoming request processed by the API is validated against `RequestLogReco
 #### 6. Verification & Quality Gates
 - **Unit & Integration Tests:** 18 dedicated tests in `tests/test_collector.py` covering auth verification, single/batch ingestion, pagination, stats aggregation, feedback linking, health probes, and concurrent memory budget enforcement.
 - **Full Verification Suite:** 335/335 tests passing (`make check`), 87% overall repository test coverage, 0 ruff errors, 0 mypy static type errors.
+
+---
+
+### Decision: Task T7.3 — Telemetry & Observability Dashboard
+- **Date:** 2026-10-17
+- **Status:** Approved & Deployed
+- **Objective:**
+  Implement an interactive monitoring dashboard displaying latency percentiles (p50/p95/p99), request volume, abstain rate, retrieval score distribution, and user feedback, reachable on the VPS and with exportable visual artifacts for documentation.
+
+#### 1. Architecture & Zero-Overhead Serving Strategy
+- **Web Dashboard:** Single-page application served directly by the FastAPI collector microservice (`src/easypasal/collector/dashboard.py`) at `/dashboard`, with root `/` redirecting to `/dashboard`.
+- **Memory Footprint:** Running the dashboard natively within the collector adds $\approx 1.5\text{ MB}$ memory, avoiding heavy standalone frameworks like Streamlit (which idles at 150–300 MB) and strictly respecting the 2 GB VPS allocation.
+- **Client-Side Visualizations:** Leverages Chart.js via CDN for responsive, hardware-accelerated dark-mode charts:
+  - **Latency Percentiles:** Bar chart comparing p50 (median), mean, p95, and p99 response durations.
+  - **Variant Traffic Split:** Donut chart tracking A/B serving proportions (`baseline_v0.1` vs `gepa_v0.2`).
+  - **Retrieval Top-1 Score Distribution:** Histogram bucketed by relevance scores, with a visual alert threshold for low-evidence queries ($< 0.60$).
+  - **Theme Distribution:** Polar area chart visualizing query traffic across Indonesian financial legal themes.
+  - **Live Request Feed:** Filterable table displaying the 15 most recent requests with PII redaction, latency, theme, and abstention badges.
+  - **Auto-Refresh Controls:** Toggleable polling intervals (5s, 10s, 30s) and token persistence via `localStorage`.
+
+#### 2. Documentation & Readme Visual Artifacts
+- Implemented `scripts/generate_dashboard_preview.py` using `matplotlib` to render publication-ready dashboard infographics.
+- Saved generated screenshots to `docs/images/dashboard_monitoring.png` for README inclusion and runbooks.
+
+#### 3. Quality Verification
+- **Unit & Integration Tests:** 4 tests in `tests/test_dashboard.py` verifying HTML structure, canvas IDs, metric cards, root redirect, and preview generator script execution.
+- **Full Suite Pass:** 339/339 tests passing (`make check`), 87% overall test coverage, 0 ruff lint errors, 0 mypy static type errors.
