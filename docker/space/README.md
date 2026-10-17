@@ -7,7 +7,7 @@ sdk: docker
 app_port: 7860
 pinned: false
 license: apache-2.0
-short_description: Citation-grounded AI assistant for OJK & Bank Indonesia regulations
+short_description: AI assistant for OJK & Bank Indonesia compliance
 ---
 
 # ⚖️ EasyPasal — Live Demo on Hugging Face Spaces

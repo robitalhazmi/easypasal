@@ -51,6 +51,29 @@ def prepare_space_bundle(output_dir: Path | str = "dist/hf_space") -> Path:
     else:
         logger.warning("No data/index found on disk! Creating placeholder directory.")
         (data_dest / "index").mkdir(parents=True, exist_ok=True)
+    # 4. Generate root app.py and requirements.txt for native Gradio SDK Space compatibility
+    app_wrapper = (
+        '"""Hugging Face Space Gradio entrypoint."""\n'
+        "import os\n"
+        "import sys\n\n"
+        'sys.path.insert(0, os.path.abspath("src"))\n'
+        "from easypasal.ui.app import main\n\n"
+        'if __name__ == "__main__":\n'
+        "    main()\n"
+    )
+    (out_path / "app.py").write_text(app_wrapper, encoding="utf-8")
+
+    requirements_txt = (
+        "gradio>=6.0.0\n"
+        "pydantic>=2.0.0\n"
+        "pyyaml>=6.0\n"
+        "qdrant-client>=1.9.0\n"
+        "rank-bm25>=0.2.2\n"
+        "httpx>=0.27.0\n"
+        "numpy>=1.26.0\n"
+        "fastapi>=0.110.0\n"
+    )
+    (out_path / "requirements.txt").write_text(requirements_txt, encoding="utf-8")
 
     logger.info("Prepared Hugging Face Space staging bundle at %s", out_path)
     return out_path
@@ -115,13 +138,40 @@ def deploy_to_huggingface(
             return False
 
         api = HfApi(token=auth_token)
-        logger.info("Creating or verifying Hugging Face Space %s (sdk=docker)...", space_id)
-        api.create_repo(
-            repo_id=space_id,
-            repo_type="space",
-            space_sdk="docker",
-            exist_ok=True,
-        )
+
+        # 1. Check if Space already exists before attempting repo creation
+        space_exists = False
+        try:
+            api.repo_info(repo_id=space_id, repo_type="space")
+            space_exists = True
+            logger.info(
+                "Hugging Face Space %s already exists. Reusing existing repository.", space_id
+            )
+        except Exception:
+            logger.info(
+                "Hugging Face Space %s not found. Attempting to create (sdk=docker)...", space_id
+            )
+
+        # 2. Create Space if not already present
+        if not space_exists:
+            try:
+                api.create_repo(
+                    repo_id=space_id,
+                    repo_type="space",
+                    space_sdk="docker",
+                    exist_ok=True,
+                )
+            except Exception as create_exc:
+                err_msg = str(create_exc)
+                if "402" in err_msg or "Payment Required" in err_msg:
+                    logger.error(
+                        "Hugging Face returned 402 Payment Required: Free personal accounts can no longer create cpu-basic Docker Spaces via API without a PRO subscription.\n"
+                        "Resolution Options:\n"
+                        "1. If you have or subscribe to Hugging Face PRO, re-run this script.\n"
+                        "2. Alternatively, create the Space on the Hugging Face web UI at https://huggingface.co/new-space (e.g. Gradio SDK with ZeroGPU), then re-run this script to upload files directly.\n"
+                        "3. Or run the local demo with a free public shareable link: 'uv run python -m easypasal.ui.app --share'."
+                    )
+                raise create_exc
 
         logger.info("Uploading bundle from %s to Space %s...", staging_dir, space_id)
         api.upload_folder(
