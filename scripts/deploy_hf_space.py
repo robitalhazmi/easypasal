@@ -71,8 +71,8 @@ def prepare_space_bundle(output_dir: Path | str = "dist/hf_space") -> Path:
         '    pipeline = RAGPipeline.from_defaults(provider="auto")\n'
         '    logger.info("RAGPipeline loaded successfully.")\n'
         "except Exception as exc:\n"
-        '    logger.warning("Pipeline fallback to mock: %s", exc)\n'
-        '    pipeline = RAGPipeline.from_defaults(provider="mock")\n\n'
+        '    logger.error("Failed to initialize RAGPipeline: %s", exc)\n'
+        "    pipeline = None\n\n"
         "request_logger = RequestLogger(\n"
         '    collector_url=os.getenv("EASYPASAL_COLLECTOR_URL"),\n'
         '    collector_token=os.getenv("EASYPASAL_COLLECTOR_TOKEN", "easypasal-vps-secret-token-v1"),\n'

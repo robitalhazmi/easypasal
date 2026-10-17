@@ -491,8 +491,8 @@ def main() -> None:
         pipeline = RAGPipeline.from_defaults(provider=args.provider)
         logger.info("RAGPipeline loaded successfully.")
     except Exception as exc:
-        logger.warning("Pipeline fallback to mock: %s", exc)
-        pipeline = RAGPipeline.from_defaults(provider="mock")
+        logger.error("Failed to initialize RAGPipeline: %s", exc)
+        pipeline = None
 
     # Initialize RequestLogger
     request_logger = RequestLogger(

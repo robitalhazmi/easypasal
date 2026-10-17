@@ -103,21 +103,30 @@ class RAGPipeline:
         """Initialize RAG pipeline using default configuration and optional parameter overrides."""
         try:
             config = EasyPasalConfig.load_default(config_path)
-            effective_strategy = strategy or config.chunking.strategy
-            effective_model = model_name or config.embeddings.model_name
-            effective_provider = (
-                provider if provider != "auto" else config.generator.cpu_default.provider
+        except Exception as cfg_exc:
+            logger.warning(
+                "Could not load config from %s: %s. Using default EasyPasalConfig.",
+                config_path,
+                cfg_exc,
             )
+            config = EasyPasalConfig()
 
-            logger.info("Initializing HybridRetriever from %s...", index_dir)
-            retriever = HybridRetriever.from_paths(
-                index_dir=index_dir,
-                strategy=effective_strategy,
-                model_name=effective_model,
-                collection_name=config.retrieval.collection_name,
-            )
+        effective_strategy = strategy or config.chunking.strategy
+        effective_model = model_name or config.embeddings.model_name
+        effective_provider = (
+            provider if provider != "auto" else config.generator.cpu_default.provider
+        )
 
-            logger.info("Initializing GeneratorBackend (provider=%r)...", effective_provider)
+        logger.info("Initializing HybridRetriever from %s...", index_dir)
+        retriever = HybridRetriever.from_paths(
+            index_dir=index_dir,
+            strategy=effective_strategy,
+            model_name=effective_model,
+            collection_name=config.retrieval.collection_name,
+        )
+
+        logger.info("Initializing GeneratorBackend (provider=%r)...", effective_provider)
+        try:
             generator = get_generator_backend(
                 provider=effective_provider,
                 model_name=model_name,
@@ -128,17 +137,18 @@ class RAGPipeline:
                 n_ctx=config.generator.cpu_default.n_ctx,
                 n_threads=config.generator.cpu_default.n_threads,
             )
-            return cls(retriever=retriever, generator=generator, config=config)
-        except Exception as exc:
-            logger.warning("Initializing pipeline with standard defaults without config: %s", exc)
-            retriever = HybridRetriever.from_paths(index_dir=index_dir, strategy=strategy)
-            generator = get_generator_backend(
-                provider=provider,
-                model_name=model_name,
-                model_path=model_path,
-                base_url=base_url,
+        except Exception as gen_exc:
+            logger.warning(
+                "Generator backend %r failed (%s), falling back to MockGeneratorBackend.",
+                effective_provider,
+                gen_exc,
             )
-            return cls(retriever=retriever, generator=generator)
+            generator = get_generator_backend(
+                provider="mock",
+                model_name=model_name or "mock-generator",
+            )
+
+        return cls(retriever=retriever, generator=generator, config=config)
 
     def ask(
         self,
