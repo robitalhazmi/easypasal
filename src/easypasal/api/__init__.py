@@ -11,6 +11,8 @@ if TYPE_CHECKING:
         CitationCheckResponse,
         CitationVerificationResponse,
         ErrorResponse,
+        FeedbackPayload,
+        FeedbackResponse,
         HealthResponse,
         RetrievedChunkResponse,
     )
@@ -29,6 +31,8 @@ __all__ = [
     "CitationCheckResponse",
     "CitationVerificationResponse",
     "ErrorResponse",
+    "FeedbackPayload",
+    "FeedbackResponse",
     "HealthResponse",
     "RequestIDMiddleware",
     "RetrievedChunkResponse",
@@ -49,6 +53,8 @@ _SCHEMA_SYMBOLS = {
     "CitationCheckResponse",
     "CitationVerificationResponse",
     "ErrorResponse",
+    "FeedbackPayload",
+    "FeedbackResponse",
     "HealthResponse",
     "RetrievedChunkResponse",
 }

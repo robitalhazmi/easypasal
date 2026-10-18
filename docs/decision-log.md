@@ -16,6 +16,14 @@ This document records the hypotheses, experimental setups, quantitative evaluati
 | **T6.1** | Replay-Based A/B Simulation | 2026-10-16 | Adopt `gepa_v0.2` (Promote Variant B over Variant A) | Counterfactual replay simulation on `dev` ($N=40$) and held-out `test` ($N=66$) under a unified LLM judge confirms 100% Faithfulness parity, directional gains in Grounding Fidelity (+3.5% on test, +9.4% on dev) and Citation F1 (+0.6% on test), and perfect Abstention Accuracy parity (81.82%, $p=1.000$) with zero regressions. Explicitly labeled as offline counterfactual replay simulation per Plan §6.4 & §13. |
 | **E7** | QLoRA Router Fine-tuning | 2026-10-16 | Approved (Adopt `Qwen2.5-0.5B-Instruct` QLoRA Router Adapter) | 4-bit NF4 QLoRA adapter achieves 1.0000 Theme Macro-F1 (+16.3% on test), 1.0000 Answerability F1 (+7.8%), 100% Injection Precision, and 100% Injection Recall (+33.3% on stealth attacks). Zero regression across all 9 gold taxonomy categories. Compresses inference latency by 2.6x (21.6 ms vs 56.6 ms), fast-pathing out-of-scope/adversarial queries before retrieval. Packaged in Colab notebook (`notebooks/e7_qlora_training.ipynb`) and adapter card (`experiments/e7_qlora/adapter_card.md`). |
 | **T6.4** | Guardrail Router Pipeline Integration | 2026-10-16 | Approved & Deployed into `RAGPipeline` | Deployed front-line question router into `RAGPipeline.ask()` (`src/easypasal/guardrails/question_router.py`). Short-circuits injections, superseded traps, and out-of-scope queries in <25ms, eliminating expensive dense retrieval and LLM generation. 100% test coverage on router, zero regressions across 295 test suite cases. |
+| **T7.1** | Structured Request Logging & PII Redaction | 2026-10-17 | Deployed Schema-Validated Request Logging & PII Redaction | Implemented `RequestLogRecord` schema validating all operational, retrieval, generation, token, and latency fields from Plan §9. Integrated automated regex-based redaction for Indonesian NIK (16-digit), NPWP, phone numbers, email, card, and bank account numbers while strictly preserving statutory legal citation anchors. Added `/feedback` endpoint and privacy notice. 22/22 unit & integration tests passing. |
+| **T7.2** | VPS Log Collector Microservice | 2026-10-17 | Approved & Deployed (FastAPI + SQLite WAL + Docker) | Dedicated low-memory (<55 MB RSS RAM under load, well under <= 90 MB VPS budget) microservice running on port 8080 with shared Bearer / X-Collector-Token authentication. SQLite WAL mode provides high concurrency without external DB dependencies. Single, atomic batch ingestion, user feedback linking, real-time telemetry query/stats summary, and unauthenticated /health probe. Multi-stage Dockerized non-root container with persistent /data volume. 18 dedicated tests, 335/335 full suite passing, 87% coverage. |
+| **T7.3** | Telemetry & Observability Dashboard | 2026-10-17 | Approved & Deployed (FastAPI HTML/JS + Chart.js + Infographic Generator) | Responsive single-page dashboard served directly by collector microservice at `/dashboard` (and root `/` redirect). Features 6 KPI metric cards, interactive Chart.js charts for latency percentiles (p50/p95/p99), variant split, retrieval score distribution with low-evidence alerts (<0.60), and theme frequency, plus live request log inspection with PII redaction and auto-refresh (5s–30s). Added automated infographic generator (`scripts/generate_dashboard_preview.py`) generating publication-grade screenshots in `docs/images/dashboard_monitoring.png`. 339/339 tests passing, 87% coverage. |
+| **T7.4** | Drift / Quality Monitoring (Evidently) | 2026-10-17 | Approved & Implemented (Evidently Data Drift Suite) | Statistical distribution drift detection comparing live query logs against the 322-item gold standard reference across query length, word count, regulatory legal theme, and abstention behavior. Generates interactive Plotly/HTML (`reports/drift_report.html`) and structured JSON telemetry (`reports/drift_summary.json`). Integrated into collector microservice endpoints (`GET /v1/reports/drift` and `GET /reports/drift`) with direct link in dashboard. 12 dedicated tests, 347/347 full suite passing, 86% coverage. |
+| **T7.5** | Threshold Alerts & Operational Drill | 2026-10-17 | Approved & Deployed (Automated Threshold Engine & Drill Harness) | Continuous operational threshold evaluation for abstention rate (>35%), p95 latency (>5000ms), and low-evidence queries (>30% with top-1 score <0.60). Persists flagged events in SQLite `alert_events` table and JSONL audit logs with WARNING/CRITICAL severities; supports webhook notifications and synthetic drill triggers (`--action drill` / `POST /v1/alerts/drill`). Live alert banner integrated in monitoring dashboard. 11 dedicated tests, 362/362 full suite passing, 88% coverage. |
+| **T7.6** | Hugging Face Space Demo Deployment | 2026-10-17 | Approved & Packaged (Gradio UI + Docker Space Bundle) | Responsive, bilingual (ID/EN) compliance assistant interface (`src/easypasal/ui/app.py`) featuring query input, legal disclaimer banner, variant comparison selector (`baseline_v0.1` vs `gepa_v0.2`), collapsible statutory citation inspector, abstention badge indicators, and user feedback dispatch (+1/-1 rating and comment). Packaged standalone Docker image (`docker/space/Dockerfile`) for free CPU Basic Tier (2 vCPUs, 16 GB RAM, port 7860) with prebuilt vector and BM25 indices (`data/index/`) baked into the image. Added automated staging and cold-start latency probe (`scripts/deploy_hf_space.py`). 6 dedicated tests, 368/368 full suite passing, 88% coverage. |
+
+
 
 ---
 
@@ -717,3 +725,213 @@ graph TD
 - **Unit & Integration Tests:** 10 dedicated test cases added in `tests/test_guardrails.py` covering prompt injection detection, superseded trap refusals, agrarian/criminal/programming out-of-scope blocking, in-scope theme inference, and pipeline bypass toggles.
 - **Coverage:** 100% test coverage on `question_router.py`. Overall repository coverage sits at **88%** (exceeding $\ge 85\%$ target).
 - **Quality Gates:** 295/295 tests passing (`make check`), 0 ruff lint errors, 0 formatting issues, 0 mypy static type errors across all modules.
+
+---
+
+### Decision: Task T7.1 — Structured Request Logging & PII Redaction
+- **Date:** 2026-10-17
+- **Status:** Approved & Deployed in API
+- **Objective:**
+  Implement structured request logging in the API adhering strictly to the telemetry fields defined in Plan §9, validated against a schema with automated redaction of sensitive personal identifiable information (PII).
+
+#### 1. Schema Validation (Plan §9 Compliance)
+Every incoming request processed by the API is validated against `RequestLogRecord` (`src/easypasal/monitoring/schemas.py`) before persistence:
+- **Request Telemetry:** `request_id`, UTC `timestamp`, `variant`, `language`, `question_length`, `question_redacted`.
+- **Retrieval Observability:** `retrieval_score_top1`, `retrieval_scores_topk`, `retrieved_doc_ids`.
+- **Abstention & Guardrails:** `abstained`, `routed`, `theme`.
+- **Latency Breakdown:** `retrieval_latency_ms`, `generation_latency_ms`, `total_latency_ms`.
+- **Token Telemetry:** `prompt_tokens`, `completion_tokens`, `total_tokens`.
+- **Grounding Verification:** `citation_count`, `grounded_citation_count`, `ungrounded_citation_count`.
+- **Privacy & Feedback:** Salted one-way SHA-256 `client_ip_hash`, `feedback_rating`, `feedback_comment`.
+
+#### 2. PII Redaction Engine
+`src/easypasal/monitoring/redaction.py` automatically detects and redacts personal identifiers prior to disk logging:
+- Indonesian National ID (NIK - 16 digits) $\rightarrow$ `[REDACTED_NIK]`
+- Indonesian Tax ID (NPWP) $\rightarrow$ `[REDACTED_NPWP]`
+- Indonesian & international phone numbers $\rightarrow$ `[REDACTED_PHONE]`
+- Email addresses $\rightarrow$ `[REDACTED_EMAIL]`
+- Credit / Debit card numbers $\rightarrow$ `[REDACTED_CARD]`
+- Bank account numbers $\rightarrow$ `[REDACTED_ACCOUNT]`
+- **Statutory Anchor Preservation:** Verified zero false-positive redaction on Indonesian regulatory citations (e.g. `POJK 22 Tahun 2023, Pasal 71 ayat (1)`, `UU Nomor 4 Tahun 2023 Pasal 243`).
+
+#### 3. API & Feedback Integration
+- Integrated `RequestLogger` (`src/easypasal/monitoring/logger.py`) into FastAPI request lifecycle (`src/easypasal/api/routes.py`).
+- Added `POST /feedback` endpoint for logging user ratings (+1 / -1) and comments linked to `request_id`.
+- Added privacy notice in `GET /` root metadata informing users of evaluation logging and automated redaction per Plan §9.
+- Added `MonitoringConfig` in `src/easypasal/config.py`.
+
+#### 4. Quality Verification
+- **Unit & Integration Tests:** 22 tests in `tests/test_monitoring.py` verifying PII redaction patterns, statutory preservation, schema validation, thread safety, corrupt line skipping, and API request/feedback logging.
+- **Full Verification Suite:** 316/316 tests passing, 88% overall repository code coverage, 0 lint errors, 0 type errors.
+
+---
+
+### Decision: Task T7.2 — Log Collector (FastAPI + SQLite) for VPS Deployment
+- **Date:** 2026-10-17
+- **Status:** Approved & Deployed
+- **Objective:**
+  Implement a lightweight, Dockerized log collector service for the VPS with shared auth token protection, persisting structured request logs and user feedback into a high-concurrency SQLite store within the strict VPS memory budget ($\le 90\text{ MB}$ RSS RAM out of the total 2 GB host allocation).
+
+#### 1. Architecture & Persistence Strategy
+- **Framework:** FastAPI microservice (`src/easypasal/collector/`) serving on port 8080.
+- **Database Engine:** Standard library `sqlite3` configured with Write-Ahead Logging (`PRAGMA journal_mode = WAL`), synchronous normal, and page cache limited to ~4 MB (`PRAGMA cache_size = -4000`).
+- **Relational Schema:**
+  - `request_logs`: Primary storage with indices on `timestamp`, `variant`, `abstained`, and `theme`. Stores all operational, retrieval, generation, latency, and telemetry fields.
+  - `feedback_logs`: Linked feedback table updating user ratings and comments on corresponding request records.
+- **Zero Heavy ORMs:** By relying solely on Python's built-in `sqlite3` without PostgreSQL or heavy ORM machinery, the collector eliminates substantial memory overhead.
+
+#### 2. Authentication & Timing-Attack Defense
+- Secured via Bearer token (`Authorization: Bearer <token>`) or `X-Collector-Token` header.
+- Token validation utilizes `hmac.compare_digest` in `src/easypasal/collector/auth.py` to prevent timing attacks.
+
+#### 3. Ingestion & Telemetry API Endpoints
+- `POST /v1/logs/requests`: Ingest single request log (returns 201 Created).
+- `POST /v1/logs/batch`: Atomic transaction batch ingestion up to `max_batch_size` entries (returns 201 Created).
+- `POST /v1/logs/feedback`: Ingest user feedback and update parent request row.
+- `GET /v1/logs/requests`: Paginated query with filtering by `variant`, `theme`, `abstained`, and timestamp range.
+- `GET /v1/logs/feedback`: Filtered query for user feedback records.
+- `GET /v1/stats/summary`: Real-time telemetry dashboard metrics (total requests, abstain rate, token sums, p50/p95/p99 latencies, feedback distribution).
+- `GET /health`: Unauthenticated health probe returning uptime, SQLite database size and page statistics, and process memory metrics (`current_rss_mb`, `peak_rss_mb`, `budget_mb = 90.0`).
+
+#### 4. Memory Budget & Concurrency Load Test
+- **Requirement (Plan §9 / Architecture §3):** Collector RSS memory must strictly remain $\le 90\text{ MB}$ under active load.
+- **Verification:** Under automated load testing (120 concurrent requests across 8 worker threads), the isolated collector process consumed **52.2 MB RSS RAM**, operating with a ~42% safety headroom below the 90 MB ceiling.
+- **Main App Forwarder:** `RequestLogger` optionally dispatches logs via background thread pool (`ThreadPoolExecutor(max_workers=2)`) to `collector_url` if configured, ensuring logging never blocks inference latencies.
+
+#### 5. Dockerization
+- Multi-stage Dockerfile (`docker/collector/Dockerfile`) based on `python:3.12-slim`.
+- Runs as non-root user `collector` (UID 10001).
+- Mounts persistent volume `/data` for SQLite WAL storage.
+- Standard healthcheck probe against `http://localhost:8080/health`.
+
+#### 6. Verification & Quality Gates
+- **Unit & Integration Tests:** 18 dedicated tests in `tests/test_collector.py` covering auth verification, single/batch ingestion, pagination, stats aggregation, feedback linking, health probes, and concurrent memory budget enforcement.
+- **Full Verification Suite:** 335/335 tests passing (`make check`), 87% overall repository test coverage, 0 ruff errors, 0 mypy static type errors.
+
+---
+
+### Decision: Task T7.3 — Telemetry & Observability Dashboard
+- **Date:** 2026-10-17
+- **Status:** Approved & Deployed
+- **Objective:**
+  Implement an interactive monitoring dashboard displaying latency percentiles (p50/p95/p99), request volume, abstain rate, retrieval score distribution, and user feedback, reachable on the VPS and with exportable visual artifacts for documentation.
+
+#### 1. Architecture & Zero-Overhead Serving Strategy
+- **Web Dashboard:** Single-page application served directly by the FastAPI collector microservice (`src/easypasal/collector/dashboard.py`) at `/dashboard`, with root `/` redirecting to `/dashboard`.
+- **Memory Footprint:** Running the dashboard natively within the collector adds $\approx 1.5\text{ MB}$ memory, avoiding heavy standalone frameworks like Streamlit (which idles at 150–300 MB) and strictly respecting the 2 GB VPS allocation.
+- **Client-Side Visualizations:** Leverages Chart.js via CDN for responsive, hardware-accelerated dark-mode charts:
+  - **Latency Percentiles:** Bar chart comparing p50 (median), mean, p95, and p99 response durations.
+  - **Variant Traffic Split:** Donut chart tracking A/B serving proportions (`baseline_v0.1` vs `gepa_v0.2`).
+  - **Retrieval Top-1 Score Distribution:** Histogram bucketed by relevance scores, with a visual alert threshold for low-evidence queries ($< 0.60$).
+  - **Theme Distribution:** Polar area chart visualizing query traffic across Indonesian financial legal themes.
+  - **Live Request Feed:** Filterable table displaying the 15 most recent requests with PII redaction, latency, theme, and abstention badges.
+  - **Auto-Refresh Controls:** Toggleable polling intervals (5s, 10s, 30s) and token persistence via `localStorage`.
+
+#### 2. Documentation & Readme Visual Artifacts
+- Implemented `scripts/generate_dashboard_preview.py` using `matplotlib` to render publication-ready dashboard infographics.
+- Saved generated screenshots to `docs/images/dashboard_monitoring.png` for README inclusion and runbooks.
+
+#### 3. Quality Verification
+- **Unit & Integration Tests:** 4 tests in `tests/test_dashboard.py` verifying HTML structure, canvas IDs, metric cards, root redirect, and preview generator script execution.
+- **Full Suite Pass:** 339/339 tests passing (`make check`), 87% overall test coverage, 0 ruff lint errors, 0 mypy static type errors.
+
+---
+
+### Decision: Task T7.4 — Drift and Quality Monitoring with Evidently
+- **Date:** 2026-10-17
+- **Status:** Approved & Implemented
+- **Objective:**
+  Implement statistical data and quality drift reporting engine comparing live production query logs against the curated gold standard dataset to detect covariate shifts, changes in user query complexity, theme redistribution, and abstention anomalies.
+
+#### 1. Statistical Methodology & Drift Features
+- **Reference Baseline:** Aggregated 322 gold standard evaluation items across `train.jsonl`, `dev.jsonl`, and `test.jsonl` (`src/easypasal/monitoring/drift.py:build_gold_reference_dataset`).
+- **Target / Production Distribution:** Extracted live query records from the SQLite collector database or raw JSONL logs (`build_current_dataset_from_db`, `build_current_dataset_from_file`). Gracefully samples the baseline with bootstrap jitter if live production volume has $<10$ items.
+- **Analyzed Dimensions:**
+  1. `question_length` (character length of input queries): Evaluated via two-sample Kolmogorov-Smirnov (K-S) test ($\alpha = 0.05$).
+  2. `word_count` (token/word density): Evaluated via two-sample Kolmogorov-Smirnov (K-S) test ($\alpha = 0.05$).
+  3. `theme` (categorical legal domain frequency, e.g. Perbankan, Fintech, Pasar Modal): Evaluated via Pearson Chi-Square ($\chi^2$) test ($\alpha = 0.05$).
+  4. `abstained` (binary safety / out-of-scope proportion): Evaluated via two-proportion Z-test ($\alpha = 0.05$).
+- **Overall Dataset Drift Decision:** Triggered when $\ge 50\%$ (`drift_share >= 0.50`) of monitored features exhibit statistically significant distributional drift.
+
+#### 2. Artifacts & Telemetry Endpoints
+- **Evidently 0.7.23 Architecture:** Runs `Report(metrics=[DataDriftPreset(drift_share=0.50)])` and extracts both rich interactive Plotly visual HTML and compact machine-readable JSON summaries:
+  - `reports/drift_report.html` (interactive standalone report with distribution plots and p-value curves).
+  - `reports/drift_summary.json` (compact payload with p-values, drift flags, reference vs current record counts, and timestamps).
+- **Collector Microservice Integration:**
+  - `GET /v1/reports/drift`: Authenticated endpoint returning JSON drift telemetry for alerting pipelines.
+  - `GET /reports/drift`: Public endpoint serving the standalone HTML report with dynamic on-demand generation when not precomputed.
+  - **Dashboard Header Link:** Accessible directly from the monitoring dashboard navbar via `"Evidently Drift Report"` link.
+- **CLI Tool:** Executable via `python -m easypasal.monitoring.drift` supporting custom `--gold-dir`, `--db-path`, and report output destinations.
+
+#### 3. Verification & Quality Gates
+- **Coverage & Lint:** 94% test coverage on `src/easypasal/monitoring/drift.py`, 347/347 repository test suite passing (`make check`), 86% overall repository coverage, 0 ruff lint errors, 0 mypy static type errors.
+
+---
+
+### Decision: Task T7.5 — Simple Threshold Alerts and Operational Drill
+- **Date:** 2026-10-17
+- **Status:** Approved & Deployed
+- **Objective:**
+  Implement continuous operational threshold monitoring for abstention rate, p95 latency, and low-evidence queries, persisting flagged events into SQLite and JSONL audit logs with automated drill execution.
+
+#### 1. Threshold Boundaries & Tiered Severities
+- **Minimum Evaluation Sample:** Enforces $N \ge 10$ request records (`min_sample_size = 10`) to eliminate spurious alerts during cold starts or low traffic periods (`status = "INSUFFICIENT_DATA"`).
+- **Abstention Rate (`abstain_rate`):**
+  - **Warning Threshold:** $> 35.0\%$ (`abstain_rate_max = 0.35`). Signals potential retrieval starvation, index corruption, or user prompt shifts.
+  - **Critical Threshold:** $\ge 50.0\%$. Indicates severe retrieval breakdown or sustained adversarial query floods.
+- **p95 Latency (`p95_latency_ms`):**
+  - **Warning Threshold:** $> 5{,}000\text{ ms}$ (`p95_latency_ms_max = 5000.0`). Prevents degradation of interactive client response times.
+  - **Critical Threshold:** $\ge 10{,}000\text{ ms}$ ($\ge 2\times$ threshold). Signals CPU thread starvation or model inference blockage.
+- **Low-Evidence Retrieval Rate (`low_evidence_rate`):**
+  - **Warning Threshold:** $> 30.0\%$ (`low_evidence_rate_max = 0.30`) of scored requests having top-1 retrieval score $< 0.60$.
+
+#### 2. Architecture & Persistence Engine
+- **Relational Storage:** Scaffolded `alert_events` table in SQLite `CollectorDB` (`src/easypasal/collector/db.py`) indexed by `timestamp`, `metric_name`, and `severity`.
+- **JSONL Audit Sink:** Flagged events are asynchronously mirrored to `logs/alerts.jsonl` for offline log ingestion and audit trails.
+- **Webhook Integration:** Standard library HTTP POST dispatcher (`dispatch_webhook`) delivering alert payloads to external incident channels (Discord, Slack, or webhook relays) with strict timeouts (5.0s) and exception handling.
+- **Automated Drill Testing:** Built-in drill simulator (`run_alert_drill`) creating synthetic metric spikes with `is_drill = True` to verify end-to-end event writing, database indexing, and dashboard alerts without requiring actual production failure states.
+- **Dashboard Alert Banner:** Added real-time operational status banner in `/dashboard` displaying green operational health or highlighted red alert notifications with one-click drill execution.
+
+#### 3. Collector Endpoints & CLI Interface
+- `POST /v1/alerts/check`: Authenticated evaluation check returning `AlertCheckResult`.
+- `POST /v1/alerts/drill`: Authenticated endpoint executing automated synthetic drills.
+- `GET /v1/alerts`: Paginated query interface with metric, severity, and drill filtering.
+- `GET /v1/alerts/active`: Recent active alert list within configurable lookback windows (`lookback_minutes = 60`).
+- **CLI Utility:** `python -m easypasal.monitoring.alerts --action [check|drill|list]`.
+
+#### 4. Verification & Quality Gates
+- **Unit & Integration Tests:** 11 dedicated tests in `tests/test_alerts.py` covering schema validation, SQLite persistence, threshold breaches (abstain rate, latency, low evidence), insufficient data handling, automated drills, webhook delivery, REST API endpoints, and CLI actions.
+- **Coverage & Suite Pass:** **95% test coverage** on `src/easypasal/monitoring/alerts.py`, **362/362 repository test suite passing** (`make check`), **88% overall repository coverage**, 0 ruff lint errors, 0 mypy static type errors.
+
+---
+
+### Decision: Task T7.6 — Hugging Face Space Demo Deployment (Plan §8.3 / Task T7.6)
+- **Date:** 2026-10-17
+- **Status:** Approved & Packaged
+- **Objective:**
+  Build and package an interactive web demonstration interface and standalone Hugging Face Space Docker container for public access on the free CPU Basic tier (2 vCPUs, 16 GB RAM), bundling prebuilt indices to ensure fast cold-start availability.
+
+#### 1. UI Architecture & Features (`src/easypasal/ui/app.py`)
+- **Framework:** Gradio 6.x (`gradio==6.30.0`) configured with modern CSS-injected theme layout conforming to Plan §8.3:
+  - **Legal Disclaimer Banner:** High-visibility notice explicitly informing users that EasyPasal is an AI research prototype and does not provide binding legal advice (`no legal advice`).
+  - **Bilingual Interface:** Instant language toggle between Indonesian (`id`) and English (`en`).
+  - **Pipeline Variant Selector:** Allows interactive evaluation of `baseline_v0.1` vs `gepa_v0.2` (DSPy GEPA-optimized prompt).
+  - **Representative Examples:** 5 pre-configured queries spanning Banking, Fintech P2P, Consumer Protection, Cyber Resilience, and out-of-scope non-regulatory questions.
+  - **Collapsible Statutory Citation Inspector:** Structured accordion rendering retrieved candidate statutory chunks with exact Document Number, Article (*Pasal*), Clause (*Ayat*), cosine relevance score, and verbatim excerpt.
+  - **Transparent Abstention Badging:** Prominent badges highlighting whether a response is backed by retrieved legal provisions or abstained due to lack of statutory grounding.
+  - **Telemetry & Feedback Collection:** Displays latency, model identifier, and variant metadata; captures thumbs up / thumbs down ratings and free-text comments dispatched asynchronously to `RequestLogger` and the Collector sink.
+
+#### 2. Hugging Face Space Containerization (`docker/space/Dockerfile`)
+- **Base Image:** `python:3.12-slim` multi-stage build.
+- **HF Space Compatibility:** Configured for non-root user `user` (UID 1000) on exposed port 7860.
+- **Prebuilt Indices Baked in Image:** Copies pre-indexed Qdrant vector database and BM25 postings (`data/index/`) and corpus manifest (`data/corpus_manifest.csv`) directly into the container image (~46 MB index size), eliminating index rebuilds on container startup.
+- **Metadata:** `docker/space/README.md` includes Hugging Face Space YAML frontmatter (`sdk: docker`, `app_port: 7860`, `emoji: ⚖️`, `license: apache-2.0`).
+
+#### 3. Automated Packaging & Cold-Start Probe (`scripts/deploy_hf_space.py`)
+- **Staging Bundle Builder:** Validates presence of indices and packages clean bundle into `dist/hf_space/` (supported via `make space-bundle`).
+- **Cold-Start Latency Probe:** HTTP wake-up probe measuring end-to-end time to first HTTP 200 OK from dormant state.
+- **Automated / Manual Push Support:** Supports direct deployment via `huggingface_hub.HfApi` when `HF_TOKEN` is supplied, or manual deployment via git remote `git push --force space main`.
+
+#### 4. Verification & Quality Gates
+- **Dedicated Test Suite:** 6 tests in `tests/test_ui.py` validating UI structure, citation markdown formatting, bundle preparation, cold-start latency probing, and CLI dry-run staging.
+- **Coverage & Suite Pass:** **100% test pass**, **368/368 repository test suite passing** (`make check`), **88% overall repository coverage**, 0 ruff lint errors, 0 mypy static type errors.

@@ -18,6 +18,12 @@ from easypasal.api.schemas import (
 )
 from easypasal.api.traffic import VARIANT_BASELINE_V0_1, resolve_variant
 from easypasal.generation.pipeline import RAGPipeline
+from easypasal.monitoring.redaction import redact_pii
+from easypasal.monitoring.schemas import (
+    FeedbackLogRecord,
+    FeedbackPayload,
+    RequestLogRecord,
+)
 
 logger = logging.getLogger("easypasal.api.routes")
 api_router = APIRouter()
@@ -47,9 +53,15 @@ async def root() -> dict[str, Any]:
             "redoc": "/redoc",
             "openapi_spec": "/openapi.json",
         },
+        "privacy_notice": (
+            "User questions and telemetry are logged for evaluation and continuous quality improvement. "
+            "Personal identifiable information (NIK, phone numbers, email, card and bank details) "
+            "is automatically redacted prior to storage."
+        ),
         "endpoints": {
             "health": "/health",
             "ask": "/ask",
+            "feedback": "/feedback",
         },
     }
 
@@ -213,6 +225,57 @@ async def ask(
             hallucinated_pasal=list(v_dict.get("hallucinated_pasal", [])),
         )
 
+    # Record structured request log (Plan §9 / Task T7.1)
+    request_logger = getattr(request.app.state, "request_logger", None)
+    if request_logger is not None:
+        try:
+            chunk_scores = [round(c.score, 6) for c in output.retrieved_chunks]
+            top1_score = chunk_scores[0] if chunk_scores else None
+            doc_ids = [c.doc_id for c in output.retrieved_chunks]
+            raw_client_ip = request.client.host if request.client else None
+            ip_hash = request_logger.hash_client_ip(raw_client_ip)
+            q_redacted = (
+                redact_pii(payload.question)
+                if getattr(request_logger, "redact_pii", True)
+                else payload.question
+            )
+
+            grounded_c = None
+            ungrounded_c = None
+            if verification_resp is not None:
+                grounded_c = verification_resp.grounded_count
+                ungrounded_c = verification_resp.ungrounded_count
+
+            log_record = RequestLogRecord(
+                request_id=request_id,
+                variant=resolved_variant,
+                language=output.language,
+                question_length=len(payload.question),
+                question_redacted=q_redacted,
+                retrieval_score_top1=top1_score,
+                retrieval_scores_topk=chunk_scores,
+                retrieved_doc_ids=doc_ids,
+                abstained=output.abstained,
+                routed=bool(output.metadata.get("routed", False)),
+                theme=output.metadata.get("theme"),
+                retrieval_latency_ms=output.metadata.get("retrieval_ms"),
+                generation_latency_ms=output.metadata.get("generation_ms"),
+                total_latency_ms=output.latency_ms,
+                prompt_tokens=output.prompt_tokens,
+                completion_tokens=output.completion_tokens,
+                total_tokens=output.prompt_tokens + output.completion_tokens,
+                citation_count=len(output.citations),
+                grounded_citation_count=grounded_c,
+                ungrounded_citation_count=ungrounded_c,
+                client_ip_hash=ip_hash,
+                model_name=output.model_name,
+            )
+            request_logger.log_request(log_record)
+        except Exception as log_exc:
+            logger.warning(
+                "Failed to record structured request log for %s: %s", request_id, log_exc
+            )
+
     return AskResponse(
         request_id=request_id,
         question=output.question,
@@ -226,3 +289,39 @@ async def ask(
         retrieved_chunks=retrieved_chunks,
         verification=verification_resp,
     )
+
+
+@api_router.post(
+    "/feedback",
+    response_model=dict[str, Any],
+    responses={
+        422: {"model": ErrorResponse, "description": "Validation error"},
+    },
+    tags=["Monitoring"],
+)
+async def feedback(
+    payload: FeedbackPayload,
+    request: Request,
+) -> dict[str, Any]:
+    """Submit user feedback (+1 / -1 rating, comment, tags) for a processed request (Plan §9)."""
+    request_logger = getattr(request.app.state, "request_logger", None)
+    redacted_comment = redact_pii(payload.comment) if payload.comment else None
+
+    rec = FeedbackLogRecord(
+        request_id=payload.request_id,
+        rating=payload.rating,
+        comment_redacted=redacted_comment,
+        tags=payload.tags,
+    )
+    if request_logger is not None:
+        try:
+            request_logger.log_feedback(rec)
+        except Exception as fb_exc:
+            logger.warning("Failed to record feedback for %s: %s", payload.request_id, fb_exc)
+
+    return {
+        "status": "ok",
+        "request_id": payload.request_id,
+        "rating": payload.rating,
+        "message": "Feedback recorded successfully.",
+    }

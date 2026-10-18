@@ -104,6 +104,31 @@ curl -s -X POST http://localhost:8000/ask \
 Interactive OpenAPI documentation is accessible at `http://localhost:8000/docs` (Swagger UI) and `http://localhost:8000/redoc`.
 
 
+### Running with Docker Compose (Full Local Stack / Fallback Demo)
+
+To run the complete system (FastAPI API on `:8000`, Gradio UI Demo on `:7860`, and VPS Log Collector & Monitoring Dashboard on `:8080`) with a single command:
+
+```bash
+# 1. (Optional) Download prebuilt statutory indexes from Hugging Face Space if cloning fresh
+make download-index
+
+# 2. Build and start all services with inter-service health validation
+make docker-up
+# Or directly: docker compose up -d
+
+# 3. Follow logs in real-time
+make docker-logs
+
+# 4. Stop and clean up containers
+make docker-down
+```
+
+**Services Exposed Locally:**
+- **Gradio Interactive UI Demo:** `http://localhost:7860`
+- **FastAPI REST API & Swagger UI:** `http://localhost:8000/docs` (endpoints: `/health`, `/ask`, `/feedback`)
+- **VPS Monitoring Dashboard:** `http://localhost:8080/dashboard` (endpoints: `/reports/drift`, `/v1/alerts`)
+
+
 ### Key Makefile Targets
 
 | Target | Description |
@@ -114,8 +139,17 @@ Interactive OpenAPI documentation is accessible at `http://localhost:8000/docs` 
 | `make check` | Run all lint and test checks |
 | `make ingest` | Fetch and parse corpus from manifest (Phase 1) |
 | `make index` | Build dense (Qdrant) and sparse (BM25) indexes (Phase 1) |
-| `make serve` | Run local FastAPI + Gradio interface (Phase 1) |
+| `make download-index` | Fetch prebuilt Qdrant and BM25 indexes from Hugging Face Space (Phase 7 / T7.7) |
+| `make serve` | Start the FastAPI REST service locally (Phase 1) |
+| `make ui` | Start the interactive Gradio demo UI locally (Phase 7 / T7.6) |
+| `make space-bundle` | Stage Hugging Face Space deployment bundle (Phase 7 / T7.6) |
+| `make docker-build` | Build multi-service Docker images (Phase 7 / T7.7) |
+| `make docker-up` | Start full multi-service stack via docker-compose (Phase 7 / T7.7) |
+| `make docker-down` | Stop and tear down docker-compose stack (Phase 7 / T7.7) |
+| `make docker-logs` | Follow real-time docker-compose logs (Phase 7 / T7.7) |
 | `make eval` | Run evaluation harness on gold set (Phase 3) |
+| `make compare` | Compare baseline and candidate runs with bootstrap CIs (Phase 3) |
+| `make smoke-eval` | Run fast CI smoke evaluation gate against stored baseline (Phase 3) |
 | `make bench` | Run local CPU latency benchmark |
 
 ---

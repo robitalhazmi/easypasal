@@ -4,9 +4,11 @@ from __future__ import annotations
 
 import argparse
 import logging
+import os
 from collections.abc import AsyncGenerator
 from contextlib import asynccontextmanager
 from pathlib import Path
+from typing import TYPE_CHECKING
 
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
@@ -14,6 +16,9 @@ from fastapi.middleware.cors import CORSMiddleware
 from easypasal.api.middleware import RequestIDMiddleware
 from easypasal.api.routes import api_router
 from easypasal.generation.pipeline import RAGPipeline
+
+if TYPE_CHECKING:
+    from easypasal.monitoring.logger import RequestLogger
 
 logger = logging.getLogger("easypasal.api.app")
 
@@ -26,6 +31,8 @@ def create_app(
     config_path: Path | str | None = None,
     variant: str | None = None,
     traffic_split: bool | None = None,
+    request_logger: RequestLogger | None = None,
+    provider: str | None = None,
 ) -> FastAPI:
     """Create and configure the FastAPI application instance.
 
@@ -37,6 +44,8 @@ def create_app(
         config_path: Optional path to YAML configuration file.
         variant: Optional default variant override ('baseline_v0.1' or 'gepa_v0.2').
         traffic_split: Optional boolean flag to enable or disable traffic splitting.
+        request_logger: Optional pre-configured RequestLogger instance.
+        provider: Optional LLM backend provider override ('auto', 'mock', 'llamacpp', etc.).
 
     Returns:
         Configured FastAPI application.
@@ -55,8 +64,14 @@ def create_app(
                     if cand_path.exists():
                         eff_config_path = cand_path
 
-                logger.info("Initializing default on-disk EasyPasal RAGPipeline on startup...")
-                app.state.pipeline = RAGPipeline.from_defaults(config_path=eff_config_path)
+                eff_provider: str = provider or os.getenv("EASYPASAL_LLM_PROVIDER") or "auto"
+                logger.info(
+                    "Initializing default on-disk EasyPasal RAGPipeline on startup (provider=%s)...",
+                    eff_provider,
+                )
+                app.state.pipeline = RAGPipeline.from_defaults(
+                    config_path=eff_config_path, provider=eff_provider
+                )
                 logger.info("EasyPasal RAGPipeline loaded and ready.")
             except Exception as exc:
                 logger.warning(
@@ -115,6 +130,30 @@ def create_app(
     else:
         app.state.traffic_split_config = None
 
+    # RequestLogger configuration (Plan §9 / Task T7.1)
+    if request_logger is not None:
+        app.state.request_logger = request_logger
+    else:
+        monitoring_cfg = getattr(pip_cfg, "monitoring", None) if pip_cfg else None
+        if monitoring_cfg is None:
+            from easypasal.config import MonitoringConfig
+
+            monitoring_cfg = MonitoringConfig()
+
+        from easypasal.monitoring.logger import RequestLogger
+
+        active_log_file = None if is_test else monitoring_cfg.log_file
+        active_fb_file = None if is_test else monitoring_cfg.feedback_file
+
+        app.state.request_logger = RequestLogger(
+            log_file=active_log_file if monitoring_cfg.enabled else None,
+            feedback_file=active_fb_file if monitoring_cfg.enabled else None,
+            redact_pii=monitoring_cfg.redact_pii,
+            salt=monitoring_cfg.salt,
+            collector_url=monitoring_cfg.collector_url,
+            collector_token=monitoring_cfg.collector_token,
+        )
+
     # Middleware registration (executed in reverse order of addition)
     app.add_middleware(RequestIDMiddleware)
     app.add_middleware(
@@ -150,8 +189,8 @@ def main() -> None:
     parser.add_argument(
         "--provider",
         choices=["auto", "mock", "ollama", "llamacpp"],
-        default="auto",
-        help="LLM provider for RAGPipeline (default: auto)",
+        default=os.getenv("EASYPASAL_LLM_PROVIDER", "auto"),
+        help="LLM provider for RAGPipeline (default: auto or EASYPASAL_LLM_PROVIDER)",
     )
     parser.add_argument(
         "--variant",
@@ -211,6 +250,7 @@ def main() -> None:
         config_path=args.config,
         variant=args.variant,
         traffic_split=True if args.traffic_split else None,
+        provider=args.provider,
     )
 
     uvicorn.run(

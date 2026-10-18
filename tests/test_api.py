@@ -297,6 +297,8 @@ def test_api_package_exports() -> None:
     assert issubclass(api_pkg.HealthResponse, HealthResponse)
     assert issubclass(api_pkg.RetrievedChunkResponse, RetrievedChunkResponse)
     assert issubclass(api_pkg.RequestIDMiddleware, BaseHTTPMiddleware)
+    assert hasattr(api_pkg, "FeedbackPayload")
+    assert hasattr(api_pkg, "FeedbackResponse")
 
     with pytest.raises(AttributeError, match="has no attribute 'NonExistent'"):
         _ = api_pkg.NonExistent

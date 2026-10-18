@@ -9,6 +9,7 @@ if TYPE_CHECKING:
         tokenize_indonesian_legal,
     )
     from easypasal.index.build import IndexStats, build_indices
+    from easypasal.index.download import download_prebuilt_index
     from easypasal.index.embeddings import (
         DEFAULT_EMBEDDING_MODEL,
         EmbeddingBackend,
@@ -33,6 +34,7 @@ __all__ = [
     "VectorSearchResult",
     "build_indices",
     "chunk_id_to_uuid",
+    "download_prebuilt_index",
     "get_embedding_backend",
     "get_model_slug",
     "tokenize_indonesian_legal",
@@ -63,6 +65,10 @@ _BUILD_SYMBOLS = {
     "build_indices",
 }
 
+_DOWNLOAD_SYMBOLS = {
+    "download_prebuilt_index",
+}
+
 
 def __getattr__(name: str) -> object:
     if name in _BM25_SYMBOLS:
@@ -81,4 +87,8 @@ def __getattr__(name: str) -> object:
         import easypasal.index.build as _build
 
         return getattr(_build, name)
+    if name in _DOWNLOAD_SYMBOLS:
+        import easypasal.index.download as _download
+
+        return getattr(_download, name)
     raise AttributeError(f"module {__name__!r} has no attribute {name!r}")

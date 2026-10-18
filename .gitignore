@@ -58,7 +58,8 @@ data/chunks/
 *.pdf
 
 # Indexes and Model Checkpoints
-data/index/
+data/index/*
+!data/index/.gitkeep
 qdrant_storage/
 *.qdrant
 models/*.gguf
@@ -75,6 +76,9 @@ mlflow.db
 *.log
 logs/
 data/sqlite/*.db
+reports/*.html
+reports/*.json
+!reports/.gitkeep
 
 # IDE & OS
 .DS_Store

@@ -1,28 +1,37 @@
-.PHONY: help setup lint format test check clean ingest index serve eval compare smoke-eval exp-e1 exp-e2 exp-e3 exp-e4 exp-e5 exp-e6 exp-e7 bench replay-ab
+.PHONY: help setup lint format test check clean ingest index download-index serve ui space-bundle docker-build docker-up docker-down docker-logs rehearse-rollback real-usage eval compare smoke-eval exp-e1 exp-e2 exp-e3 exp-e4 exp-e5 exp-e6 exp-e7 bench replay-ab
 
 help:
 	@echo "EasyPasal Development Commands:"
-	@echo "  make setup      - Install dependencies and pre-commit hooks via uv"
-	@echo "  make lint       - Run ruff linter, formatting checks, and mypy type checks"
-	@echo "  make format     - Auto-format code and fix lint issues where possible"
-	@echo "  make test       - Run unit and integration tests with pytest"
-	@echo "  make check      - Run all linting and test suites"
-	@echo "  make ingest     - Download and parse regulatory documents from corpus manifest (Phase 1)"
-	@echo "  make index      - Build Qdrant vector store and BM25 sparse index (Phase 1)"
-	@echo "  make serve      - Start the FastAPI service and Gradio UI locally (Phase 1)"
-	@echo "  make eval       - Run the evaluation harness on the gold evaluation set (Phase 3)"
-	@echo "  make compare    - Compare baseline and candidate runs with bootstrap CIs (Phase 3)"
-	@echo "  make smoke-eval - Run fast CI smoke evaluation gate against stored baseline (Phase 3)"
-	@echo "  make exp-e1     - Run Experiment E1: Chunking Strategy comparison on dev & test (Phase 4)"
-	@echo "  make exp-e2     - Run Experiment E2: Embedding Models comparison on dev & test (Phase 4)"
-	@echo "  make exp-e3     - Run Experiment E3: Retrieval Pipeline comparison on dev & test (Phase 4)"
-	@echo "  make exp-e4     - Run Experiment E4: Generator Models comparison on CPU (Phase 4)"
-	@echo "  make exp-e5     - Run Experiment E5: DSPy + GEPA prompt optimization (Phase 5)"
-	@echo "  make exp-e6     - Run Experiment E6: vLLM serving benchmark vs CPU baseline (Phase 5)"
-	@echo "  make exp-e7     - Run Experiment E7: QLoRA router dataset prep, mock train, & eval (Phase 6 / T6.3)"
-	@echo "  make bench      - Run serving throughput and latency benchmark (Phase 5)"
-	@echo "  make replay-ab  - Run offline counterfactual replay-based A/B simulation (Phase 6 / T6.1)"
-	@echo "  make clean      - Remove cache directories and temporary build artifacts"
+	@echo "  make setup        - Install dependencies and pre-commit hooks via uv"
+	@echo "  make lint         - Run ruff linter, formatting checks, and mypy type checks"
+	@echo "  make format       - Auto-format code and fix lint issues where possible"
+	@echo "  make test         - Run unit and integration tests with pytest"
+	@echo "  make check        - Run all linting and test suites"
+	@echo "  make ingest       - Download and parse regulatory documents from corpus manifest (Phase 1)"
+	@echo "  make index        - Build Qdrant vector store and BM25 sparse index (Phase 1)"
+	@echo "  make download-index - Fetch prebuilt Qdrant and BM25 indexes from Hugging Face Space"
+	@echo "  make serve        - Start the FastAPI service locally (Phase 1)"
+	@echo "  make ui           - Start the interactive Gradio demo UI locally (Phase 7 / T7.6)"
+	@echo "  make space-bundle - Stage Hugging Face Space deployment bundle (Phase 7 / T7.6)"
+	@echo "  make docker-build - Build full multi-service Docker images (Phase 7 / T7.7)"
+	@echo "  make docker-up    - Start full stack (API, UI, Collector) via docker-compose (Phase 7 / T7.7)"
+	@echo "  make docker-down  - Stop and tear down docker-compose stack (Phase 7 / T7.7)"
+	@echo "  make docker-logs  - Follow docker-compose logs in real-time (Phase 7 / T7.7)"
+	@echo "  make rehearse-rollback - Rehearse operational variant rollback drill and audit (Phase 7 / T7.8)"
+	@echo "  make real-usage   - Execute real usage queries session and populate telemetry (Phase 7 / T7.9)"
+	@echo "  make eval         - Run the evaluation harness on the gold evaluation set (Phase 3)"
+	@echo "  make compare      - Compare baseline and candidate runs with bootstrap CIs (Phase 3)"
+	@echo "  make smoke-eval   - Run fast CI smoke evaluation gate against stored baseline (Phase 3)"
+	@echo "  make exp-e1       - Run Experiment E1: Chunking Strategy comparison on dev & test (Phase 4)"
+	@echo "  make exp-e2       - Run Experiment E2: Embedding Models comparison on dev & test (Phase 4)"
+	@echo "  make exp-e3       - Run Experiment E3: Retrieval Pipeline comparison on dev & test (Phase 4)"
+	@echo "  make exp-e4       - Run Experiment E4: Generator Models comparison on CPU (Phase 4)"
+	@echo "  make exp-e5       - Run Experiment E5: DSPy + GEPA prompt optimization (Phase 5)"
+	@echo "  make exp-e6       - Run Experiment E6: vLLM serving benchmark vs CPU baseline (Phase 5)"
+	@echo "  make exp-e7       - Run Experiment E7: QLoRA router dataset prep, mock train, & eval (Phase 6 / T6.3)"
+	@echo "  make bench        - Run serving throughput and latency benchmark (Phase 5)"
+	@echo "  make replay-ab    - Run offline counterfactual replay-based A/B simulation (Phase 6 / T6.1)"
+	@echo "  make clean        - Remove cache directories and temporary build artifacts"
 
 setup:
 	@which uv >/dev/null 2>&1 || (echo "uv not found. Please install uv (e.g., 'curl -LsSf https://astral.sh/uv/install.sh | sh' or 'pip install uv')" && exit 1)
@@ -60,8 +69,29 @@ chunk:
 index:
 	uv run python -m easypasal.index.build --strategy structure_aware
 
+download-index:
+	uv run python scripts/download_prebuilt_index.py
+
 serve:
 	uv run python -m easypasal.api.app --host 0.0.0.0 --port 8000
+
+ui:
+	uv run python -m easypasal.ui.app --host 0.0.0.0 --port 7860
+
+space-bundle:
+	uv run python scripts/deploy_hf_space.py --dry-run
+
+docker-build:
+	docker compose build
+
+docker-up:
+	docker compose up -d
+
+docker-down:
+	docker compose down
+
+docker-logs:
+	docker compose logs -f
 
 label-helper:
 	uv run python -m eval.labeling_helper --sample
@@ -124,3 +154,9 @@ exp-e7:
 	uv run python -m experiments.e7_qlora.dataset
 	uv run python -m experiments.e7_qlora.train --mock
 	uv run python -m experiments.e7_qlora.evaluate
+
+rehearse-rollback:
+	uv run python scripts/rehearse_rollback.py
+
+real-usage:
+	uv run python scripts/run_real_usage_session.py
