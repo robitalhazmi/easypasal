@@ -100,7 +100,7 @@ def build_ui(
     custom_css = """
     .gradio-container {
         font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif !important;
-        max-width: 1100px !important;
+        max-width: 1320px !important;
         margin: 0 auto !important;
     }
     .disclaimer-banner {
@@ -119,6 +119,19 @@ def build_ui(
         border-radius: 6px;
         padding: 10px 14px;
         font-size: 0.85rem;
+    }
+    #query-panel,
+    #examples-panel,
+    #response-panel,
+    #feedback-panel {
+        background: #0f172a !important;
+        border: 1px solid #1e293b !important;
+        border-radius: 8px !important;
+        padding: 16px !important;
+        margin-bottom: 14px !important;
+    }
+    #response-panel {
+        min-height: 220px !important;
     }
     /* Example Queries - Full Visibility, Word-wrapped, Zero Truncation */
     .example-queries-container,
@@ -359,91 +372,100 @@ def build_ui(
         current_request_id = gr.State(value="")
         last_output_state = gr.State(value=None)
 
-        with gr.Row():
-            with gr.Column(scale=3):
-                question_input = gr.Textbox(
-                    label="Tulis Pertanyaan Regulasi / Enter Compliance Question:",
-                    placeholder="Contoh: Apa syarat modal disetor minimum untuk pendirian Bank Umum?",
-                    lines=3,
-                    autofocus=True,
-                )
-                with gr.Row():
-                    lang_toggle = gr.Radio(
-                        choices=[("Bahasa Indonesia", "id"), ("English", "en")],
-                        value="id",
-                        label="Bahasa Respon / Language",
-                    )
-                    variant_selector = gr.Dropdown(
-                        choices=["baseline_v0.1", "gepa_v0.2"],
-                        value="baseline_v0.1",
-                        label="Model Variant",
-                    )
-
-                with gr.Row():
-                    submit_btn = gr.Button(
-                        "🔍 Cari & Jawab / Ask EasyPasal", variant="primary", scale=2
-                    )
-                    clear_btn = gr.Button("Bersihkan / Clear", scale=1)
-
+        with gr.Row(elem_id="main-workspace-row"):
+            # Left Column: Input, settings, and example queries
             with gr.Column(
-                scale=2,
-                min_width=320,
-                elem_id="example-queries-col",
-                elem_classes=["example-queries-container"],
+                scale=5,
+                min_width=380,
+                elem_id="query-column",
+                elem_classes=["query-column-container"],
             ):
-                gr.Markdown("### ⚡ Pertanyaan Uji / Example Queries")
-                gr.Markdown(
-                    "<span style='font-size: 0.85rem; color: #94a3b8; margin-bottom: 4px; display: block;'>"
-                    "Pilih pertanyaan untuk langsung menguji kepatuhan:"
-                    "</span>"
-                )
-                with gr.Column(elem_id="example-queries-list"):
-                    for ex_q, ex_l, ex_v in DEFAULT_EXAMPLES:
-                        ex_btn = gr.Button(
-                            ex_q,
-                            size="sm",
-                            elem_classes=["example-query-btn"],
+                with gr.Group(elem_id="query-panel"):
+                    gr.Markdown("### 📝 Input Pertanyaan / Query")
+                    question_input = gr.Textbox(
+                        label="Tulis Pertanyaan Regulasi / Enter Compliance Question:",
+                        placeholder="Contoh: Apa syarat modal disetor minimum untuk pendirian Bank Umum?",
+                        lines=3,
+                        autofocus=True,
+                    )
+                    with gr.Row():
+                        lang_toggle = gr.Radio(
+                            choices=[("Bahasa Indonesia", "id"), ("English", "en")],
+                            value="id",
+                            label="Bahasa Respon / Language",
                         )
-                        ex_btn.click(
-                            fn=lambda query_val=ex_q, lang_val=ex_l, var_val=ex_v: (
-                                query_val,
-                                lang_val,
-                                var_val,
-                            ),
-                            inputs=[],
-                            outputs=[question_input, lang_toggle, variant_selector],
+                        variant_selector = gr.Dropdown(
+                            choices=["baseline_v0.1", "gepa_v0.2"],
+                            value="baseline_v0.1",
+                            label="Model Variant",
                         )
 
-        # Response Section
-        with gr.Group():
-            gr.Markdown("### 📋 Jawaban Kepatuhan / Grounded Answer")
-            answer_output = gr.Markdown(
-                value="*Silakan masukkan pertanyaan kepatuhan di atas untuk melihat jawaban berdasar pasal.*"
-            )
+                    with gr.Row():
+                        submit_btn = gr.Button(
+                            "🔍 Cari & Jawab / Ask EasyPasal", variant="primary", scale=2
+                        )
+                        clear_btn = gr.Button("Bersihkan / Clear", scale=1)
 
-            with gr.Row():
-                status_badge = gr.HTML(
-                    value="<span style='color: #64748b;'>Status: Menunggu pertanyaan</span>"
-                )
-                telemetry_info = gr.HTML(value="")
+                with gr.Group(elem_id="examples-panel"):
+                    gr.Markdown("### ⚡ Pertanyaan Uji / Example Queries")
+                    gr.Markdown(
+                        "<span style='font-size: 0.85rem; color: #94a3b8; margin-bottom: 6px; display: block;'>"
+                        "Pilih pertanyaan untuk langsung menguji kepatuhan:"
+                        "</span>"
+                    )
+                    with gr.Column(elem_id="example-queries-list"):
+                        for ex_q, ex_l, ex_v in DEFAULT_EXAMPLES:
+                            ex_btn = gr.Button(
+                                ex_q,
+                                size="sm",
+                                elem_classes=["example-query-btn"],
+                            )
+                            ex_btn.click(
+                                fn=lambda query_val=ex_q, lang_val=ex_l, var_val=ex_v: (
+                                    query_val,
+                                    lang_val,
+                                    var_val,
+                                ),
+                                inputs=[],
+                                outputs=[question_input, lang_toggle, variant_selector],
+                            )
 
-        # Collapsible Citations Inspector
-        with gr.Accordion("🔎 Rincian Sitasi & Potongan Naskah Regulasi", open=False):
-            citations_output = gr.Markdown(value="*Belum ada data sitasi.*")
+            # Right Column: Grounded Answer, Citations & Feedback
+            with gr.Column(
+                scale=6,
+                min_width=420,
+                elem_id="response-column",
+                elem_classes=["response-column-container"],
+            ):
+                with gr.Group(elem_id="response-panel"):
+                    gr.Markdown("### 📋 Jawaban Kepatuhan / Grounded Answer")
+                    with gr.Row():
+                        status_badge = gr.HTML(
+                            value="<span style='color: #64748b;'>Status: Menunggu pertanyaan</span>"
+                        )
+                        telemetry_info = gr.HTML(value="")
 
-        # Feedback Section
-        with gr.Group():
-            with gr.Row():
-                thumbs_up_btn = gr.Button("👍 Jawaban Tepat & Membantu", size="sm")
-                thumbs_down_btn = gr.Button("👎 Kurang Tepat / Salah Sitasi", size="sm")
+                    answer_output = gr.Markdown(
+                        value="*Silakan masukkan pertanyaan kepatuhan di sebelah kiri atau pilih salah satu pertanyaan uji untuk melihat jawaban berdasar pasal.*"
+                    )
 
-            feedback_comment = gr.Textbox(
-                label="Catatan atau masukan (opsional):",
-                placeholder="Misal: Nomor pasal berbeda dengan ketentuan terbaru...",
-                lines=1,
-            )
-            feedback_submit_btn = gr.Button("Kirim Feedback / Submit Feedback", size="sm")
-            feedback_status = gr.HTML(value="")
+                # Collapsible Citations Inspector
+                with gr.Accordion("🔎 Rincian Sitasi & Potongan Naskah Regulasi", open=True):
+                    citations_output = gr.Markdown(value="*Belum ada data sitasi.*")
+
+                # Feedback Section
+                with gr.Group(elem_id="feedback-panel"):
+                    with gr.Row():
+                        thumbs_up_btn = gr.Button("👍 Jawaban Tepat & Membantu", size="sm")
+                        thumbs_down_btn = gr.Button("👎 Kurang Tepat / Salah Sitasi", size="sm")
+
+                    feedback_comment = gr.Textbox(
+                        label="Catatan atau masukan (opsional):",
+                        placeholder="Misal: Nomor pasal berbeda dengan ketentuan terbaru...",
+                        lines=1,
+                    )
+                    feedback_submit_btn = gr.Button("Kirim Feedback / Submit Feedback", size="sm")
+                    feedback_status = gr.HTML(value="")
 
         # Interaction Handlers
         def on_ask(
