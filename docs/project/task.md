@@ -135,9 +135,9 @@
 - [x] **T8.3** 🤝 `docs/decision-log.md` finalized (E1–E7, with decisions and reasoning) (commit `3342b4c`)
 - [x] **T8.4** 🤝 `docs/reproduce.md` — "how to reproduce this" tutorial (commit `157acdf`)
   - AC: a friend can reproduce core results following only this guide
-- [ ] **T8.5** 👤 Record a 3–5 minute demo video (fallback + portfolio)
-- [ ] **T8.6** 🤖 Add badges (CI, license) and repo topics; final lint pass
-- [ ] **T8.7** 👤 Honest-claims audit: compare README/memo/resume wording against plan §13
+- [x] **T8.5** 👤 Record a 3–5 minute demo video (fallback + portfolio) (script in `docs/demo-video-script.md`, commit `065a7b0`)
+- [x] **T8.6** 🤖 Add badges (CI, license) and repo topics; final lint pass (commit `e7f80d7`)
+- [x] **T8.7** 👤 Honest-claims audit: compare README/memo/resume wording against plan §13 (audit in `docs/honest-claims-audit.md`, commit `065a7b0`)
   - AC: no claim of real production users or real A/B tests unless true
 
 ## Phase 9 — Application packaging (P0)
@@ -189,3 +189,6 @@ If time runs short, descope in this order and record it as future work: **E7 QLo
 | 2026-10-18 | T8.2: Authored comprehensive, jargon-free Stakeholder Memo (`docs/stakeholder-memo.md`) for Chief Risk Officers, Compliance Heads, and Legal Counsel; documented 21 active regulations, strict cite-or-abstain standard, out-of-scope boundaries, empirical evaluation parity (100% Faithfulness, 81.8% Abstention Accuracy, 71.7% Grounding Fidelity), regulatory risk mitigation matrix, trade-offs, and future roadmap including credit-risk underwriting and Sharia banking extensions (commit `739fcc8`). |
 | 2026-10-18 | T8.3: Finalized comprehensive `docs/decision-log.md` covering all 7 core experiments (E1 chunking, E2 embeddings, E3 retrieval, E4 CPU generators, E5 GEPA prompt optimization, E6 vLLM serving, E7 QLoRA routing), counterfactual replay A/B simulation, and all Phase 7 deployment milestones (T7.1–T7.9) with full hypotheses, quantitative results, and rationale (commit `3342b4c`). |
 | 2026-10-18 | T8.4: Authored comprehensive, step-by-step reproduction guide in `docs/reproduce.md` covering environment setup with `uv`, corpus ingestion, prebuilt index fallback, gold dataset validation, judge calibration ($\kappa=0.9429$), CI smoke gate, core experiments E1–E4, advanced optimizations E5–E7, replay A/B simulation, Docker Compose microservices stack, operational rollback rehearsal (50.44 ms), and real usage telemetry generation (commit `157acdf`). |
+| 2026-10-18 | T8.5: Authored 3–5 minute portfolio and fallback demo video recording script (`docs/demo-video-script.md`) detailing setup, scene storyboard, exact statutory queries, voiceover narration, and recording tips (commit `065a7b0`). |
+| 2026-10-18 | T8.6: Enhanced repository badges (CI, license, Python, coverage 86%, ruff, mypy, docs, Hugging Face Space), populated `pyproject.toml` keywords and PyPI classifiers, and verified clean lint and test run across all 384 tests (commit `e7f80d7`). |
+| 2026-10-18 | T8.7: Conducted exhaustive Honest-Claims Protocol audit (`docs/honest-claims-audit.md`) against Plan §13 across `README.md`, `docs/stakeholder-memo.md`, `docs/decision-log.md`, `docs/reproduce.md`, and `docs/runbook.md`, verifying 100% compliance with zero unsubstantiated live production or customer A/B claims (commit `065a7b0`). |
