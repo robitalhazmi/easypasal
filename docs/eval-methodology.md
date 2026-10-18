@@ -315,7 +315,7 @@ To measure the reliability and internal consistency of the gold evaluation set, 
 
 ### Empirical Self-Agreement Verification Results (T2.5)
 
-In accordance with the protocol above, a **20% stratified sample (20 items)** from `data/gold/gold_dataset.jsonl` was selected, blinded, and re-annotated into [`data/gold/relabel_annotations.jsonl`](file:///home/robit/Documents/Project/easypasal/data/gold/relabel_annotations.jsonl). Consistency metrics were computed using [`eval/compute_self_agreement.py`](file:///home/robit/Documents/Project/easypasal/eval/compute_self_agreement.py) (`make agreement`):
+In accordance with the protocol above, a **20% stratified sample (20 items)** from `data/gold/gold_dataset.jsonl` was selected, blinded, and re-annotated into [`data/gold/relabel_annotations.jsonl`](../data/gold/relabel_annotations.jsonl). Consistency metrics were computed using [`eval/compute_self_agreement.py`](../eval/compute_self_agreement.py) (`make agreement`):
 
 | Consistency Metric | Acceptance Threshold | Observed Empirical Result | Quality Gate Status |
 |---|:---:|:---:|:---:|
@@ -397,13 +397,13 @@ A stratified sample of **35 items** was drawn across all 9 evaluation categories
 - `superseded_trap`: 4 items (11.4%)
 - `unanswerable_out_of_scope`: 4 items (11.4%)
 
-An expert compliance annotator independently evaluated each inquiry, assigning continuous scores ($[0.0, 1.0]$) for faithfulness and correctness along with qualitative compliance rationale, recorded in [`eval/judge_calibration/calibration_annotations_35.jsonl`](file:///home/robit/Documents/Project/easypasal/eval/judge_calibration/calibration_annotations_35.jsonl).
+An expert compliance annotator independently evaluated each inquiry, assigning continuous scores ($[0.0, 1.0]$) for faithfulness and correctness along with qualitative compliance rationale, recorded in [`eval/judge_calibration/calibration_annotations_35.jsonl`](../eval/judge_calibration/calibration_annotations_35.jsonl).
 
 ---
 
 ### 11.2 Calibration Agreement Results
 
-Quantitative agreement metrics were computed using [`eval/compute_judge_calibration.py`](file:///home/robit/Documents/Project/easypasal/eval/compute_judge_calibration.py) (`make calibrate`):
+Quantitative agreement metrics were computed using [`eval/compute_judge_calibration.py`](../eval/compute_judge_calibration.py) (`make calibrate`):
 
 | Calibration Metric | Acceptance Threshold | Observed Value | Gate Status |
 |---|:---:|:---:|:---:|
@@ -482,7 +482,7 @@ For any metric $M$ observed over sample $X = [x_1, \dots, x_N]$, the non-paramet
 3. For confidence level $1 - \alpha = 0.95$, the interval is given by the empirical percentiles:
    $$\text{CI}_{95\%} = \left[ Q\left(\frac{\alpha}{2}\right), Q\left(1 - \frac{\alpha}{2}\right) \right] = \left[ Q(0.025), Q(0.975) \right]$$
 
-Implemented in [`eval/metrics/bootstrap.py`](file:///home/robit/Documents/Project/easypasal/eval/metrics/bootstrap.py) via vectorized NumPy arrays and pinned random seeds for exact determinism.
+Implemented in [`eval/metrics/bootstrap.py`](../eval/metrics/bootstrap.py) via vectorized NumPy arrays and pinned random seeds for exact determinism.
 
 ---
 
@@ -536,8 +536,8 @@ make compare
 
 To protect the EasyPasal legal RAG system from silent regressions during iterative development and PR reviews, we implement an automated **CI smoke evaluation gate**:
 1. **Zero-GPU & Sub-Second Execution**: Runs entirely on CPU in $< 3$ seconds, enabling execution on every pull request within GitHub Actions standard runners.
-2. **Fixed Stratified Inquiries ($N = 30$)**: A dedicated, committed evaluation split ([`data/gold/smoke.jsonl`](file:///home/robit/Documents/Project/easypasal/data/gold/smoke.jsonl)) containing 25 answerable and 5 unanswerable/adversarial queries representing all 9 regulatory categories.
-3. **Committed Baseline Anchor**: Candidate runs are evaluated against a stored reference run ([`data/eval_outputs/smoke_baseline.json`](file:///home/robit/Documents/Project/easypasal/data/eval_outputs/smoke_baseline.json)).
+2. **Fixed Stratified Inquiries ($N = 30$)**: A dedicated, committed evaluation split ([`data/gold/smoke.jsonl`](../data/gold/smoke.jsonl)) containing 25 answerable and 5 unanswerable/adversarial queries representing all 9 regulatory categories.
+3. **Committed Baseline Anchor**: Candidate runs are evaluated against a stored reference run ([`data/eval_outputs/smoke_baseline.json`](../data/eval_outputs/smoke_baseline.json)).
 4. **Hard Gating & CI Exit Codes**: Any regression exceeding the allowable tolerance fails the CI check with exit code `1`.
 
 ---
@@ -557,7 +557,7 @@ To protect the EasyPasal legal RAG system from silent regressions during iterati
 
 ### 13.3 Deliberately Broken Retrieval Test (Acceptance Criterion)
 
-To mathematically prove that the CI gate reliably catches broken retrieval pipelines before they can merge into `main`, [`tests/test_smoke_eval.py`](file:///home/robit/Documents/Project/easypasal/tests/test_smoke_eval.py) contains permanent test cases:
+To mathematically prove that the CI gate reliably catches broken retrieval pipelines before they can merge into `main`, [`tests/test_smoke_eval.py`](../tests/test_smoke_eval.py) contains permanent test cases:
 1. **Empty/Irrelevant Chunks**: Injects a broken retriever returning empty or ungrounded chunks. Verifies that Recall@5 drops to $0.0$, violates the regression threshold, raises `CIGateFailureError`, and causes `eval.smoke_eval` CLI to exit with code `1`.
 2. **Hallucinated Adversarial Answers**: Injects a retriever claiming relevance on unanswerable/adversarial queries. Verifies that the abstention gate immediately fails.
 3. **Latency Spikes**: Injects artificial delay to confirm that latency violations trigger gate failure.

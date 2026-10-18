@@ -348,7 +348,7 @@ uv run python scripts/rehearse_rollback.py \
 ```
 
 ### 6.4 Rehearsal Audit Certificate
-The automated drill generates a machine-verifiable audit certificate persisted to [`reports/rollback_rehearsal.json`](file:///home/robit/Documents/Project/easypasal/reports/rollback_rehearsal.json):
+The automated drill generates a machine-verifiable audit certificate persisted to [`reports/rollback_rehearsal.json`](../reports/rollback_rehearsal.json):
 
 ```json
 {

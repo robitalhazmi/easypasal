@@ -202,7 +202,7 @@ p95 Latency Ceiling Gate     | ~828 ms      | 1500.0000      | ✅ PASS     | We
 
 ## 7. Reproducing Core Experiments (E1 to E4)
 
-All core architecture decisions are documented in [`docs/decision-log.md`](file:///home/robit/Documents/Project/easypasal/docs/decision-log.md). You can reproduce the exact quantitative results across `dev` ($N=40$) and `test` ($N=66$) splits:
+All core architecture decisions are documented in [`docs/decision-log.md`](decision-log.md). You can reproduce the exact quantitative results across `dev` ($N=40$) and `test` ($N=66$) splits:
 
 ### 7.1 Experiment E1: Chunking Strategy Comparison
 Compares Fixed-Size (512 tokens), Structure-Aware (Pasal/Ayat), and Structure-Aware + Context Hierarchy:
@@ -244,7 +244,7 @@ E5 optimized the system prompt using DSPy and Genetic Pareto Prompt Optimization
    make exp-e5
    ```
 2. **Google Colab Free GPU Notebook:**
-   Open [`notebooks/e5_gepa_prompt_optimization.ipynb`](file:///home/robit/Documents/Project/easypasal/notebooks/e5_gepa_prompt_optimization.ipynb) in Colab. Run all cells to observe the Pareto frontier evolution across 10 generations.
+   Open [`notebooks/e5_gepa_prompt_optimization.ipynb`](../notebooks/e5_gepa_prompt_optimization.ipynb) in Colab. Run all cells to observe the Pareto frontier evolution across 10 generations.
    - **Result:** Grounding Fidelity increased from 0.6897 to 0.7170 (+4.0%) on the held-out test split with zero prompt overfitting.
 
 ### 8.2 Experiment E6: vLLM GPU Serving Benchmark
@@ -257,7 +257,7 @@ E6 benchmarked high-throughput serving of `Qwen/Qwen2.5-3B-Instruct` on an NVIDI
    make bench
    ```
 2. **Colab Tesla T4 GPU Benchmark:**
-   Open [`notebooks/e6_vllm_benchmark.ipynb`](file:///home/robit/Documents/Project/easypasal/notebooks/e6_vllm_benchmark.ipynb) on a free Colab GPU runtime and execute the benchmark.
+   Open [`notebooks/e6_vllm_benchmark.ipynb`](../notebooks/e6_vllm_benchmark.ipynb) on a free Colab GPU runtime and execute the benchmark.
    - **Observed Metrics on NVIDIA T4:**
      - $c=1$: 31.75 tok/s, TTFT 207.8 ms, p95 6.30s.
      - $c=32$: **187.79 tok/s**, p95 11.38s (**78.2x speedup** over CPU 1B, **391.2x speedup** over CPU 3B).
@@ -270,7 +270,7 @@ E7 trained a parameter-efficient adapter (PEFT QLoRA 4-bit, rank $r=16$) on `Qwe
    make exp-e7
    ```
 2. **Colab GPU Training Notebook:**
-   Open [`notebooks/e7_qlora_training.ipynb`](file:///home/robit/Documents/Project/easypasal/notebooks/e7_qlora_training.ipynb) to inspect the training loop, loss curves, and Hugging Face PEFT adapter card.
+   Open [`notebooks/e7_qlora_training.ipynb`](../notebooks/e7_qlora_training.ipynb) to inspect the training loop, loss curves, and Hugging Face PEFT adapter card.
    - **Observed Metrics:** **1.0000 Theme Macro-F1**, 100% prompt injection precision, 21.56 ms inference latency.
 
 ---
@@ -376,7 +376,7 @@ To render and inspect the monitoring dashboard without opening a browser:
 ```bash
 uv run python scripts/generate_dashboard_preview.py
 ```
-Outputs an updated high-resolution screenshot to [`docs/images/dashboard_monitoring.png`](file:///home/robit/Documents/Project/easypasal/docs/images/dashboard_monitoring.png).
+Outputs an updated high-resolution screenshot to [`docs/images/dashboard_monitoring.png`](images/dashboard_monitoring.png).
 
 ---
 
@@ -414,4 +414,4 @@ Outputs an updated high-resolution screenshot to [`docs/images/dashboard_monitor
 ---
 
 ### Need Help or Found an Issue?
-Please consult the [Operational Runbook](file:///home/robit/Documents/Project/easypasal/docs/runbook.md) or open an issue on the [GitHub Repository](https://github.com/robitalhazmi/easypasal/issues).
+Please consult the [Operational Runbook](runbook.md) or open an issue on the [GitHub Repository](https://github.com/robitalhazmi/easypasal/issues).
