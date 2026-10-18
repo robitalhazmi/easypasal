@@ -1,4 +1,4 @@
-.PHONY: help setup lint format test check clean ingest index serve ui space-bundle docker-build docker-up docker-down docker-logs eval compare smoke-eval exp-e1 exp-e2 exp-e3 exp-e4 exp-e5 exp-e6 exp-e7 bench replay-ab
+.PHONY: help setup lint format test check clean ingest index download-index serve ui space-bundle docker-build docker-up docker-down docker-logs eval compare smoke-eval exp-e1 exp-e2 exp-e3 exp-e4 exp-e5 exp-e6 exp-e7 bench replay-ab
 
 help:
 	@echo "EasyPasal Development Commands:"
@@ -9,6 +9,7 @@ help:
 	@echo "  make check        - Run all linting and test suites"
 	@echo "  make ingest       - Download and parse regulatory documents from corpus manifest (Phase 1)"
 	@echo "  make index        - Build Qdrant vector store and BM25 sparse index (Phase 1)"
+	@echo "  make download-index - Fetch prebuilt Qdrant and BM25 indexes from Hugging Face Space"
 	@echo "  make serve        - Start the FastAPI service locally (Phase 1)"
 	@echo "  make ui           - Start the interactive Gradio demo UI locally (Phase 7 / T7.6)"
 	@echo "  make space-bundle - Stage Hugging Face Space deployment bundle (Phase 7 / T7.6)"
@@ -65,6 +66,9 @@ chunk:
 
 index:
 	uv run python -m easypasal.index.build --strategy structure_aware
+
+download-index:
+	uv run python scripts/download_prebuilt_index.py
 
 serve:
 	uv run python -m easypasal.api.app --host 0.0.0.0 --port 8000

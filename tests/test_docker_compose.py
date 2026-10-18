@@ -140,3 +140,23 @@ def test_docker_compose_config_cli() -> None:
     assert "easypasal-app" in res.stdout
     assert "easypasal-collector" in res.stdout
     assert "easypasal-ui" in res.stdout
+
+
+def test_download_prebuilt_index_skip_when_present(tmp_path: Path) -> None:
+    """Verify download_prebuilt_index safely skips downloading when indexes exist."""
+    from unittest.mock import patch
+
+    from easypasal.index.download import download_prebuilt_index
+
+    # Create dummy mock index structure
+    q_dir = tmp_path / "qdrant"
+    q_dir.mkdir(parents=True, exist_ok=True)
+    (q_dir / "meta.json").write_text("{}", encoding="utf-8")
+    b_dir = tmp_path / "bm25"
+    b_dir.mkdir(parents=True, exist_ok=True)
+    (b_dir / "bm25_model.pkl").write_text("", encoding="utf-8")
+
+    with patch("huggingface_hub.snapshot_download") as mock_dl:
+        res = download_prebuilt_index(target_dir=tmp_path, force=False)
+        assert res == tmp_path
+        mock_dl.assert_not_called()

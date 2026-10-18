@@ -117,6 +117,26 @@ class RAGPipeline:
             provider if provider != "auto" else config.generator.cpu_default.provider
         )
 
+        # Check if prebuilt indexes exist; if not, attempt auto-download from Hugging Face Space
+        q_dir = Path(index_dir) / "qdrant"
+        b_dir = Path(index_dir) / "bm25"
+        if not (q_dir.exists() and any(q_dir.iterdir())) or not (
+            b_dir.exists() and any(b_dir.iterdir())
+        ):
+            try:
+                from easypasal.index.download import download_prebuilt_index
+
+                logger.info(
+                    "Index directories not fully populated at %s. Fetching prebuilt indexes from Hugging Face...",
+                    index_dir,
+                )
+                download_prebuilt_index(target_dir=index_dir)
+            except Exception as dl_exc:
+                logger.warning(
+                    "Auto-download of prebuilt index deferred/failed (%s). Continuing with existing files.",
+                    dl_exc,
+                )
+
         logger.info("Initializing HybridRetriever from %s...", index_dir)
         retriever = HybridRetriever.from_paths(
             index_dir=index_dir,
