@@ -334,121 +334,128 @@ def run_session(
 
     client_ips = ["192.168.1.10", "10.0.0.15", "172.16.0.4", "192.168.1.42", "127.0.0.1"]
 
-    for idx, item in enumerate(SAMPLE_QUERIES, 1):
-        q = item["question"]
-        variant = item["variant"]
-        feedback_info = item["feedback"]
-        client_ip = client_ips[idx % len(client_ips)]
+    try:
+        for idx, item in enumerate(SAMPLE_QUERIES, 1):
+            q = item["question"]
+            variant = item["variant"]
+            feedback_info = item["feedback"]
+            client_ip = client_ips[idx % len(client_ips)]
 
-        logger.info("[%02d/%d] [%s] %s...", idx, len(SAMPLE_QUERIES), variant, q[:45])
+            logger.info("[%02d/%d] [%s] %s...", idx, len(SAMPLE_QUERIES), variant, q[:45])
 
-        # Execute query through real RAG pipeline
-        output = pipeline.ask(question=q, variant=variant)
+            # Execute query through real RAG pipeline
+            output = pipeline.ask(question=q, variant=variant)
 
-        req_id = str(uuid.uuid4())
-        chunk_scores = [round(c.score, 6) for c in output.retrieved_chunks]
-        top1_score = chunk_scores[0] if chunk_scores else None
-        doc_ids = [c.doc_id for c in output.retrieved_chunks]
-        ip_hash = req_logger.hash_client_ip(client_ip)
+            req_id = str(uuid.uuid4())
+            chunk_scores = [round(c.score, 6) for c in output.retrieved_chunks]
+            top1_score = chunk_scores[0] if chunk_scores else None
+            doc_ids = [c.doc_id for c in output.retrieved_chunks]
+            ip_hash = req_logger.hash_client_ip(client_ip)
 
-        grounded_c = len(output.citations) if not output.abstained else 0
+            grounded_c = len(output.citations) if not output.abstained else 0
 
-        # Construct validated request record
-        rec = RequestLogRecord(
-            request_id=req_id,
-            timestamp=datetime.now(UTC),
-            variant=variant,
-            language=output.language,
-            question_length=len(q),
-            question_redacted=redact_pii(q),
-            retrieval_score_top1=top1_score,
-            retrieval_scores_topk=chunk_scores,
-            retrieved_doc_ids=doc_ids,
-            abstained=output.abstained,
-            routed=bool(output.metadata.get("routed", False)),
-            theme=output.metadata.get("theme") or item["domain"],
-            retrieval_latency_ms=output.metadata.get("retrieval_ms"),
-            generation_latency_ms=output.metadata.get("generation_ms"),
-            total_latency_ms=output.latency_ms,
-            prompt_tokens=output.prompt_tokens,
-            completion_tokens=output.completion_tokens,
-            total_tokens=output.prompt_tokens + output.completion_tokens,
-            citation_count=len(output.citations),
-            grounded_citation_count=grounded_c,
-            ungrounded_citation_count=0,
-            feedback_rating=feedback_info["rating"] if feedback_info else None,
-            feedback_comment=feedback_info["comment"] if feedback_info else None,
-            client_ip_hash=ip_hash,
-            model_name=output.model_name,
-        )
-
-        # 1. Persist to SQLite CollectorDB
-        db.insert_request(rec)
-
-        # 2. Persist to structured JSONL file
-        req_logger.log_request(rec)
-        logged_records.append(rec)
-
-        # 3. If feedback attached, log feedback record
-        if feedback_info:
-            fb_record = FeedbackLogRecord(
+            # Construct validated request record
+            rec = RequestLogRecord(
                 request_id=req_id,
                 timestamp=datetime.now(UTC),
-                rating=feedback_info["rating"],
-                comment_redacted=feedback_info["comment"],
-                tags=["real_user_evaluation"],
+                variant=variant,
+                language=output.language,
+                question_length=len(q),
+                question_redacted=redact_pii(q),
+                retrieval_score_top1=top1_score,
+                retrieval_scores_topk=chunk_scores,
+                retrieved_doc_ids=doc_ids,
+                abstained=output.abstained,
+                routed=bool(output.metadata.get("routed", False)),
+                theme=output.metadata.get("theme") or item["domain"],
+                retrieval_latency_ms=output.metadata.get("retrieval_ms"),
+                generation_latency_ms=output.metadata.get("generation_ms"),
+                total_latency_ms=output.latency_ms,
+                prompt_tokens=output.prompt_tokens,
+                completion_tokens=output.completion_tokens,
+                total_tokens=output.prompt_tokens + output.completion_tokens,
+                citation_count=len(output.citations),
+                grounded_citation_count=grounded_c,
+                ungrounded_citation_count=0,
+                feedback_rating=feedback_info["rating"] if feedback_info else None,
+                feedback_comment=feedback_info["comment"] if feedback_info else None,
+                client_ip_hash=ip_hash,
+                model_name=output.model_name,
             )
-            db.insert_feedback(fb_record)
-            req_logger.log_feedback(fb_record)
-            feedback_records.append(fb_record)
 
-    total_session_ms = round((time.perf_counter() - session_start) * 1000, 2)
-    summary = db.get_stats_summary()
+            # 1. Persist to SQLite CollectorDB
+            db.insert_request(rec)
 
-    # Calculate domain statistics
-    themes_count: dict[str, int] = {}
-    variants_count: dict[str, int] = {}
-    for r in logged_records:
-        th = r.theme or "Unknown"
-        themes_count[th] = themes_count.get(th, 0) + 1
-        variants_count[r.variant] = variants_count.get(r.variant, 0) + 1
+            # 2. Persist to structured JSONL file
+            req_logger.log_request(rec)
+            logged_records.append(rec)
 
-    session_report = {
-        "timestamp": datetime.now(UTC).isoformat(),
-        "total_queries_asked": len(logged_records),
-        "total_feedback_logged": len(feedback_records),
-        "session_duration_ms": total_session_ms,
-        "variants_split": variants_count,
-        "themes_breakdown": themes_count,
-        "telemetry_stats": {
-            "p50_latency_ms": summary.get("p50_latency_ms"),
-            "mean_latency_ms": summary.get("mean_latency_ms"),
-            "p95_latency_ms": summary.get("p95_latency_ms"),
-            "abstain_rate": summary.get("abstain_rate"),
-            "feedback_positive": summary.get("feedback_positive"),
-            "feedback_negative": summary.get("feedback_negative"),
-        },
-    }
+            # 3. If feedback attached, log feedback record
+            if feedback_info:
+                fb_record = FeedbackLogRecord(
+                    request_id=req_id,
+                    timestamp=datetime.now(UTC),
+                    rating=feedback_info["rating"],
+                    comment_redacted=feedback_info["comment"],
+                    tags=["real_user_evaluation"],
+                )
+                db.insert_feedback(fb_record)
+                req_logger.log_feedback(fb_record)
+                feedback_records.append(fb_record)
 
-    # Persist session report
-    report_path = Path("reports/real_usage_session.json")
-    report_path.parent.mkdir(parents=True, exist_ok=True)
-    with open(report_path, "w", encoding="utf-8") as f:
-        json.dump(session_report, f, indent=2)
+        total_session_ms = round((time.perf_counter() - session_start) * 1000, 2)
+        summary = db.get_stats_summary()
 
-    logger.info("=" * 70)
-    logger.info("REAL USAGE LOGGING SESSION COMPLETED in %.2f ms", total_session_ms)
-    logger.info(
-        "Logged %d requests (%d feedback) to %s & %s",
-        len(logged_records),
-        len(feedback_records),
-        db_path,
-        log_file,
-    )
-    logger.info("Session report saved to: %s", report_path)
-    logger.info("=" * 70)
+        # Calculate domain statistics
+        themes_count: dict[str, int] = {}
+        variants_count: dict[str, int] = {}
+        for r in logged_records:
+            th = r.theme or "Unknown"
+            themes_count[th] = themes_count.get(th, 0) + 1
+            variants_count[r.variant] = variants_count.get(r.variant, 0) + 1
 
-    return session_report
+        session_report = {
+            "timestamp": datetime.now(UTC).isoformat(),
+            "total_queries_asked": len(logged_records),
+            "total_feedback_logged": len(feedback_records),
+            "session_duration_ms": total_session_ms,
+            "variants_split": variants_count,
+            "themes_breakdown": themes_count,
+            "telemetry_stats": {
+                "p50_latency_ms": summary.get("p50_latency_ms"),
+                "mean_latency_ms": summary.get("mean_latency_ms"),
+                "p95_latency_ms": summary.get("p95_latency_ms"),
+                "abstain_rate": summary.get("abstain_rate"),
+                "feedback_positive": summary.get("feedback_positive"),
+                "feedback_negative": summary.get("feedback_negative"),
+            },
+        }
+
+        # Persist session report
+        report_path = Path("reports/real_usage_session.json")
+        report_path.parent.mkdir(parents=True, exist_ok=True)
+        with open(report_path, "w", encoding="utf-8") as f:
+            json.dump(session_report, f, indent=2)
+
+        logger.info("=" * 70)
+        logger.info("REAL USAGE LOGGING SESSION COMPLETED in %.2f ms", total_session_ms)
+        logger.info(
+            "Logged %d requests (%d feedback) to %s & %s",
+            len(logged_records),
+            len(feedback_records),
+            db_path,
+            log_file,
+        )
+        logger.info("Session report saved to: %s", report_path)
+        logger.info("=" * 70)
+
+        return session_report
+    finally:
+        pipeline.close()
+        req_logger.close()
+        import gc
+
+        gc.collect()
 
 
 def main() -> None:

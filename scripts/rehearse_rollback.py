@@ -64,153 +64,158 @@ def rehearse_in_process(
         is_test=False,
     )
 
-    client = TestClient(app)
+    try:
+        with TestClient(app) as client:
+            # -------------------------------------------------------------
+            # Phase 1: Pre-Rollback Health & Verification
+            # -------------------------------------------------------------
+            logger.info("[Phase 1/5] Running pre-rollback health and verification probe...")
+            res_health_pre = client.get("/health")
+            if res_health_pre.status_code != 200:
+                raise RuntimeError(f"Pre-rollback health check failed: {res_health_pre.text}")
+            health_data_pre = res_health_pre.json()
 
-    # -------------------------------------------------------------
-    # Phase 1: Pre-Rollback Health & Verification
-    # -------------------------------------------------------------
-    logger.info("[Phase 1/5] Running pre-rollback health and verification probe...")
-    res_health_pre = client.get("/health")
-    if res_health_pre.status_code != 200:
-        raise RuntimeError(f"Pre-rollback health check failed: {res_health_pre.text}")
-    health_data_pre = res_health_pre.json()
+            res_ask_pre = client.post("/ask", json={"question": sample_question, "language": "id"})
+            if res_ask_pre.status_code != 200:
+                raise RuntimeError(f"Pre-rollback /ask query failed: {res_ask_pre.text}")
+            ask_data_pre = res_ask_pre.json()
+            header_var_pre = res_ask_pre.headers.get("X-EasyPasal-Variant")
 
-    res_ask_pre = client.post("/ask", json={"question": sample_question, "language": "id"})
-    if res_ask_pre.status_code != 200:
-        raise RuntimeError(f"Pre-rollback /ask query failed: {res_ask_pre.text}")
-    ask_data_pre = res_ask_pre.json()
-    header_var_pre = res_ask_pre.headers.get("X-EasyPasal-Variant")
+            phase1 = {
+                "status": "PASS",
+                "health_status": health_data_pre.get("status"),
+                "active_variant": health_data_pre.get("active_variant"),
+                "response_variant": ask_data_pre.get("variant"),
+                "header_variant": header_var_pre,
+                "answer_length": len(ask_data_pre.get("answer", "")),
+                "citations_count": len(ask_data_pre.get("citations", [])),
+            }
 
-    phase1 = {
-        "status": "PASS",
-        "health_status": health_data_pre.get("status"),
-        "active_variant": health_data_pre.get("active_variant"),
-        "response_variant": ask_data_pre.get("variant"),
-        "header_variant": header_var_pre,
-        "answer_length": len(ask_data_pre.get("answer", "")),
-        "citations_count": len(ask_data_pre.get("citations", [])),
-    }
+            # -------------------------------------------------------------
+            # Phase 2: Incident Trigger Simulation
+            # -------------------------------------------------------------
+            logger.info("[Phase 2/5] Simulating operational incident alert...")
+            incident_id = f"INC-SIM-{datetime.now(UTC).strftime('%Y%m%d-%H%M%S')}"
+            phase2 = {
+                "incident_id": incident_id,
+                "type": "SIMULATED_REGRESSION_ALERT",
+                "description": f"Evidently detected prompt grounding drift and p95 latency degraded in {from_variant}.",
+                "trigger_metric": "abstain_rate_spike",
+                "severity": "CRITICAL",
+                "remediation": f"Initiate immediate rollback to {to_variant}.",
+            }
 
-    # -------------------------------------------------------------
-    # Phase 2: Incident Trigger Simulation
-    # -------------------------------------------------------------
-    logger.info("[Phase 2/5] Simulating operational incident alert...")
-    incident_id = f"INC-SIM-{datetime.now(UTC).strftime('%Y%m%d-%H%M%S')}"
-    phase2 = {
-        "incident_id": incident_id,
-        "type": "SIMULATED_REGRESSION_ALERT",
-        "description": f"Evidently detected prompt grounding drift and p95 latency degraded in {from_variant}.",
-        "trigger_metric": "abstain_rate_spike",
-        "severity": "CRITICAL",
-        "remediation": f"Initiate immediate rollback to {to_variant}.",
-    }
+            # -------------------------------------------------------------
+            # Phase 3: Rollback Execution
+            # -------------------------------------------------------------
+            logger.info("[Phase 3/5] Executing atomic variant rollback to %r...", to_variant)
+            t_rollback_start = time.perf_counter()
 
-    # -------------------------------------------------------------
-    # Phase 3: Rollback Execution
-    # -------------------------------------------------------------
-    logger.info("[Phase 3/5] Executing atomic variant rollback to %r...", to_variant)
-    t_rollback_start = time.perf_counter()
+            # Reconfigure app state to target rollback variant
+            app.state.active_variant = to_variant
+            to_cfg_path = Path(f"configs/{to_variant}.yaml")
+            if to_cfg_path.exists():
+                target_cfg = EasyPasalConfig.from_yaml(to_cfg_path)
+                if hasattr(app.state, "pipeline") and app.state.pipeline:
+                    app.state.pipeline.config = target_cfg
+                    if hasattr(target_cfg, "guardrails"):
+                        app.state.pipeline.router = QuestionRouter(config=target_cfg.guardrails)
+                if hasattr(target_cfg, "traffic_split"):
+                    app.state.traffic_split_config = target_cfg.traffic_split.model_copy()
 
-    # Reconfigure app state to target rollback variant
-    app.state.active_variant = to_variant
-    to_cfg_path = Path(f"configs/{to_variant}.yaml")
-    if to_cfg_path.exists():
-        target_cfg = EasyPasalConfig.from_yaml(to_cfg_path)
-        if hasattr(app.state, "pipeline") and app.state.pipeline:
-            app.state.pipeline.config = target_cfg
-            if hasattr(target_cfg, "guardrails"):
-                app.state.pipeline.router = QuestionRouter(config=target_cfg.guardrails)
-        if hasattr(target_cfg, "traffic_split"):
-            app.state.traffic_split_config = target_cfg.traffic_split.model_copy()
+            # Ensure deterministic traffic splitting falls back to 100% target variant
+            if getattr(app.state, "traffic_split_config", None):
+                app.state.traffic_split_config.enabled = False
+                app.state.traffic_split_config.default_variant = to_variant
 
-    # Ensure deterministic traffic splitting falls back to 100% target variant
-    if getattr(app.state, "traffic_split_config", None):
-        app.state.traffic_split_config.enabled = False
-        app.state.traffic_split_config.default_variant = to_variant
+            rollback_duration_ms = round((time.perf_counter() - t_rollback_start) * 1000, 2)
+            phase3 = {
+                "status": "PASS",
+                "target_variant": to_variant,
+                "rollback_duration_ms": rollback_duration_ms,
+                "method": "hot-swap",
+            }
 
-    rollback_duration_ms = round((time.perf_counter() - t_rollback_start) * 1000, 2)
-    phase3 = {
-        "status": "PASS",
-        "target_variant": to_variant,
-        "rollback_duration_ms": rollback_duration_ms,
-        "method": "hot-swap",
-    }
+            # -------------------------------------------------------------
+            # Phase 4: Post-Rollback Health & Verification
+            # -------------------------------------------------------------
+            logger.info("[Phase 4/5] Running post-rollback health and verification probe...")
+            res_health_post = client.get("/health")
+            if res_health_post.status_code != 200:
+                raise RuntimeError(f"Post-rollback health check failed: {res_health_post.text}")
+            health_data_post = res_health_post.json()
 
-    # -------------------------------------------------------------
-    # Phase 4: Post-Rollback Health & Verification
-    # -------------------------------------------------------------
-    logger.info("[Phase 4/5] Running post-rollback health and verification probe...")
-    res_health_post = client.get("/health")
-    if res_health_post.status_code != 200:
-        raise RuntimeError(f"Post-rollback health check failed: {res_health_post.text}")
-    health_data_post = res_health_post.json()
+            res_ask_post = client.post("/ask", json={"question": sample_question, "language": "id"})
+            if res_ask_post.status_code != 200:
+                raise RuntimeError(f"Post-rollback /ask query failed: {res_ask_post.text}")
+            ask_data_post = res_ask_post.json()
+            header_var_post = res_ask_post.headers.get("X-EasyPasal-Variant")
 
-    res_ask_post = client.post("/ask", json={"question": sample_question, "language": "id"})
-    if res_ask_post.status_code != 200:
-        raise RuntimeError(f"Post-rollback /ask query failed: {res_ask_post.text}")
-    ask_data_post = res_ask_post.json()
-    header_var_post = res_ask_post.headers.get("X-EasyPasal-Variant")
+            # Assertions for successful rollback
+            if health_data_post.get("active_variant") != to_variant:
+                raise AssertionError(
+                    f"Expected active_variant={to_variant}, got {health_data_post.get('active_variant')}"
+                )
+            if ask_data_post.get("variant") != to_variant:
+                raise AssertionError(
+                    f"Expected response variant={to_variant}, got {ask_data_post.get('variant')}"
+                )
+            if header_var_post != to_variant:
+                raise AssertionError(
+                    f"Expected header X-EasyPasal-Variant={to_variant}, got {header_var_post}"
+                )
 
-    # Assertions for successful rollback
-    if health_data_post.get("active_variant") != to_variant:
-        raise AssertionError(
-            f"Expected active_variant={to_variant}, got {health_data_post.get('active_variant')}"
-        )
-    if ask_data_post.get("variant") != to_variant:
-        raise AssertionError(
-            f"Expected response variant={to_variant}, got {ask_data_post.get('variant')}"
-        )
-    if header_var_post != to_variant:
-        raise AssertionError(
-            f"Expected header X-EasyPasal-Variant={to_variant}, got {header_var_post}"
-        )
+            phase4 = {
+                "status": "PASS",
+                "health_status": health_data_post.get("status"),
+                "active_variant": health_data_post.get("active_variant"),
+                "response_variant": ask_data_post.get("variant"),
+                "header_variant": header_var_post,
+                "answer_length": len(ask_data_post.get("answer", "")),
+                "citations_count": len(ask_data_post.get("citations", [])),
+            }
 
-    phase4 = {
-        "status": "PASS",
-        "health_status": health_data_post.get("status"),
-        "active_variant": health_data_post.get("active_variant"),
-        "response_variant": ask_data_post.get("variant"),
-        "header_variant": header_var_post,
-        "answer_length": len(ask_data_post.get("answer", "")),
-        "citations_count": len(ask_data_post.get("citations", [])),
-    }
+            # -------------------------------------------------------------
+            # Phase 5: Index Disaster Recovery & Verification
+            # -------------------------------------------------------------
+            logger.info("[Phase 5/5] Verifying index disaster recovery and manifest integrity...")
+            idx_p = Path(index_dir)
+            qdrant_p = idx_p / "qdrant"
+            bm25_p = idx_p / "bm25"
+            manifest_p = Path("data/corpus_manifest.csv")
 
-    # -------------------------------------------------------------
-    # Phase 5: Index Disaster Recovery & Verification
-    # -------------------------------------------------------------
-    logger.info("[Phase 5/5] Verifying index disaster recovery and manifest integrity...")
-    idx_p = Path(index_dir)
-    qdrant_p = idx_p / "qdrant"
-    bm25_p = idx_p / "bm25"
-    manifest_p = Path("data/corpus_manifest.csv")
+            qdrant_ok = qdrant_p.exists() and any(qdrant_p.iterdir())
+            bm25_ok = bm25_p.exists() and any(bm25_p.iterdir())
+            manifest_ok = manifest_p.exists() and manifest_p.stat().st_size > 0
 
-    qdrant_ok = qdrant_p.exists() and any(qdrant_p.iterdir())
-    bm25_ok = bm25_p.exists() and any(bm25_p.iterdir())
-    manifest_ok = manifest_p.exists() and manifest_p.stat().st_size > 0
+            if not (qdrant_ok and bm25_ok and manifest_ok):
+                raise AssertionError(
+                    f"Index recovery validation failed: qdrant={qdrant_ok}, bm25={bm25_ok}, manifest={manifest_ok}"
+                )
 
-    if not (qdrant_ok and bm25_ok and manifest_ok):
-        raise AssertionError(
-            f"Index recovery validation failed: qdrant={qdrant_ok}, bm25={bm25_ok}, manifest={manifest_ok}"
-        )
+            phase5 = {
+                "status": "PASS",
+                "index_dir": str(index_dir),
+                "index_ready": True,
+                "qdrant_present": qdrant_ok,
+                "bm25_present": bm25_ok,
+                "remote_snapshot_repo": DEFAULT_SPACE_REPO,
+                "rebuild_command": "make index",
+                "download_command": "make download-index",
+            }
 
-    phase5 = {
-        "status": "PASS",
-        "index_dir": str(index_dir),
-        "index_ready": True,
-        "qdrant_present": qdrant_ok,
-        "bm25_present": bm25_ok,
-        "remote_snapshot_repo": DEFAULT_SPACE_REPO,
-        "rebuild_command": "make index",
-        "download_command": "make download-index",
-    }
+            return {
+                "phase1_pre_rollback": phase1,
+                "phase2_incident_trigger": phase2,
+                "phase3_rollback_execution": phase3,
+                "phase4_post_rollback": phase4,
+                "phase5_index_recovery": phase5,
+            }
+    finally:
+        pipeline.close()
+        import gc
 
-    return {
-        "phase1_pre_rollback": phase1,
-        "phase2_incident_trigger": phase2,
-        "phase3_rollback_execution": phase3,
-        "phase4_post_rollback": phase4,
-        "phase5_index_recovery": phase5,
-    }
+        gc.collect()
 
 
 def run_rehearsal(

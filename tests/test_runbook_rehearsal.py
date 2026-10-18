@@ -78,13 +78,26 @@ def test_cli_rehearsal_main(tmp_path: Path) -> None:
         str(out_file),
     ]
 
-    with patch.object(sys, "argv", test_args):
-        main()
+    mock_report = {
+        "status": "SUCCESS",
+        "total_rehearsal_duration_ms": 42.0,
+        "from_variant": "gepa_v0.2",
+        "to_variant": "baseline_v0.1",
+    }
 
-    assert out_file.exists()
-    with open(out_file, encoding="utf-8") as f:
-        data = json.load(f)
-    assert data["status"] == "SUCCESS"
+    with patch("scripts.rehearse_rollback.run_rehearsal", return_value=mock_report) as mock_run:
+        with patch.object(sys, "argv", test_args):
+            main()
+
+        mock_run.assert_called_once_with(
+            mode="in-process",
+            api_url="http://localhost:8000",
+            from_variant="gepa_v0.2",
+            to_variant="baseline_v0.1",
+            provider="mock",
+            output_path=str(out_file),
+            index_dir="data/index",
+        )
 
 
 def test_rehearsal_index_failure(tmp_path: Path) -> None:
