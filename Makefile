@@ -1,4 +1,4 @@
-.PHONY: help setup lint format test check clean ingest index download-index serve ui space-bundle docker-build docker-up docker-down docker-logs rehearse-rollback eval compare smoke-eval exp-e1 exp-e2 exp-e3 exp-e4 exp-e5 exp-e6 exp-e7 bench replay-ab
+.PHONY: help setup lint format test check clean ingest index download-index serve ui space-bundle docker-build docker-up docker-down docker-logs rehearse-rollback real-usage eval compare smoke-eval exp-e1 exp-e2 exp-e3 exp-e4 exp-e5 exp-e6 exp-e7 bench replay-ab
 
 help:
 	@echo "EasyPasal Development Commands:"
@@ -18,6 +18,7 @@ help:
 	@echo "  make docker-down  - Stop and tear down docker-compose stack (Phase 7 / T7.7)"
 	@echo "  make docker-logs  - Follow docker-compose logs in real-time (Phase 7 / T7.7)"
 	@echo "  make rehearse-rollback - Rehearse operational variant rollback drill and audit (Phase 7 / T7.8)"
+	@echo "  make real-usage   - Execute real usage queries session and populate telemetry (Phase 7 / T7.9)"
 	@echo "  make eval         - Run the evaluation harness on the gold evaluation set (Phase 3)"
 	@echo "  make compare      - Compare baseline and candidate runs with bootstrap CIs (Phase 3)"
 	@echo "  make smoke-eval   - Run fast CI smoke evaluation gate against stored baseline (Phase 3)"
@@ -156,3 +157,6 @@ exp-e7:
 
 rehearse-rollback:
 	uv run python scripts/rehearse_rollback.py
+
+real-usage:
+	uv run python scripts/run_real_usage_session.py
