@@ -8,6 +8,7 @@ import pymupdf
 import pytest
 
 from easypasal.ingest.parser import (
+    ParsedPage,
     dehyphenate_text,
     is_footer_block,
     is_header_block,
@@ -194,3 +195,100 @@ def test_package_exports() -> None:
     assert hasattr(ingest, "dehyphenate_text")
     assert hasattr(ingest, "clean_page_text")
     assert hasattr(ingest, "unwrap_legal_text")
+
+
+def test_parsed_page_to_dict() -> None:
+    """Verify ParsedPage serializes correctly to dictionary."""
+    page = ParsedPage(
+        page_number=1,
+        raw_text="raw",
+        clean_text="clean",
+        char_count=5,
+        block_count=1,
+    )
+    d = page.to_dict()
+    assert d["page_number"] == 1
+    assert d["clean_text"] == "clean"
+    assert d["char_count"] == 5
+
+
+def test_empty_header_and_footer() -> None:
+    """Verify empty string blocks in header/footer regions return True."""
+    assert is_header_block("", y1=10.0, page_height=1000.0, page_idx=1) is True
+    assert is_footer_block("", y0=900.0, page_height=1000.0) is True
+
+
+def test_parse_corpus_with_manifest_and_limit(tmp_path: Path) -> None:
+    """Verify parse_corpus attaches manifest metadata and respects document limits."""
+    raw_dir = tmp_path / "raw"
+    parsed_dir = tmp_path / "parsed"
+    manifest_csv = tmp_path / "manifest.csv"
+    raw_dir.mkdir()
+
+    pdf_1 = raw_dir / "POJK_1_2024.pdf"
+    pdf_2 = raw_dir / "POJK_2_2024.pdf"
+    create_synthetic_pdf(pdf_1)
+    create_synthetic_pdf(pdf_2)
+
+    manifest_csv.write_text(
+        "title,doc_number,year,issuer,url,retrieval_date,status,language,sha256\n"
+        '"Doc 1",POJK 1/2024,2024,OJK,https://example.com/1.pdf,2026-10-10,berlaku,id,hash1\n',
+        encoding="utf-8",
+    )
+
+    docs = parse_corpus(
+        raw_dir=raw_dir,
+        output_dir=parsed_dir,
+        manifest_path=manifest_csv,
+        limit=1,
+    )
+    assert len(docs) == 1
+    assert docs[0].metadata.get("title") == "Doc 1"
+
+
+def test_spot_check_missing_file(tmp_path: Path) -> None:
+    """Verify spot_check_documents gracefully marks missing files."""
+    raw_dir = tmp_path / "raw"
+    parsed_dir = tmp_path / "parsed"
+    raw_dir.mkdir()
+    res = spot_check_documents(["nonexistent.pdf"], raw_dir=raw_dir, output_dir=parsed_dir)
+    assert res["nonexistent.pdf"]["status"] == "missing"
+
+
+def test_main_cli(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
+    """Verify parser CLI handles batch and spot-check options."""
+    from unittest.mock import patch
+
+    from easypasal.ingest.parser import main
+
+    monkeypatch.setattr(
+        "sys.argv",
+        [
+            "parser.py",
+            "--input-dir",
+            str(tmp_path),
+            "--output-dir",
+            str(tmp_path / "out"),
+            "--limit",
+            "2",
+        ],
+    )
+    with patch("easypasal.ingest.parser.parse_corpus", return_value=[]):
+        main()
+
+    monkeypatch.setattr(
+        "sys.argv",
+        [
+            "parser.py",
+            "--input-dir",
+            str(tmp_path),
+            "--output-dir",
+            str(tmp_path / "out"),
+            "--spot-check",
+        ],
+    )
+    with patch(
+        "easypasal.ingest.parser.spot_check_documents",
+        return_value={"test.pdf": {"status": "ok"}},
+    ):
+        main()
