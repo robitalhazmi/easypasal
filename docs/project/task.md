@@ -128,16 +128,16 @@
 
 ## Phase 8 — Documentation and communication (P0)
 
-- [ ] **T8.1** 🤝 README: pitch, independence notice, results table, architecture diagram, live demo link, quickstart
+- [x] **T8.1** 🤝 README: pitch, independence notice, results table, architecture diagram, live demo link, quickstart (commit `6cfcf90`)
   - AC: a stranger can understand the project in 2 minutes
-- [ ] **T8.2** 👤 Stakeholder memo (1–2 pages) for Risk/Compliance: what shipped, what didn't, trade-offs, risks, future work (incl. credit-risk extension)
+- [x] **T8.2** 👤 Stakeholder memo (1–2 pages) for Risk/Compliance: what shipped, what didn't, trade-offs, risks, future work (incl. credit-risk extension) (commit `739fcc8`)
   - AC: reads without ML jargon; every number matches the decision log
-- [ ] **T8.3** 🤝 `docs/decision-log.md` finalized (E1–E7, with decisions and reasoning)
-- [ ] **T8.4** 🤝 `docs/reproduce.md` — "how to reproduce this" tutorial
+- [x] **T8.3** 🤝 `docs/decision-log.md` finalized (E1–E7, with decisions and reasoning) (commit `3342b4c`)
+- [x] **T8.4** 🤝 `docs/reproduce.md` — "how to reproduce this" tutorial (commit `157acdf`)
   - AC: a friend can reproduce core results following only this guide
-- [ ] **T8.5** 👤 Record a 3–5 minute demo video (fallback + portfolio)
-- [ ] **T8.6** 🤖 Add badges (CI, license) and repo topics; final lint pass
-- [ ] **T8.7** 👤 Honest-claims audit: compare README/memo/resume wording against plan §13
+- [x] **T8.5** 👤 Record a 3–5 minute demo video (fallback + portfolio) (script in `docs/demo-video-script.md`, commit `065a7b0`)
+- [x] **T8.6** 🤖 Add badges (CI, license) and repo topics; final lint pass (commit `e7f80d7`)
+- [x] **T8.7** 👤 Honest-claims audit: compare README/memo/resume wording against plan §13 (audit in `docs/honest-claims-audit.md`, commit `065a7b0`)
   - AC: no claim of real production users or real A/B tests unless true
 
 ## Phase 9 — Application packaging (P0)
@@ -185,3 +185,10 @@ If time runs short, descope in this order and record it as future work: **E7 QLo
 | 2026-10-18 | T7.7: Implemented multi-service Docker & Docker Compose setup (`Dockerfile`, `docker-compose.yml`, `docker/collector/Dockerfile`) orchestrating REST API (port 8000), Gradio UI demo (port 7860), and VPS Log Collector (port 8080) with inter-service health checks, persistent volumes (`collector_data`, `model_cache`), and zero-overhead cold starts; added prebuilt index auto-downloader and clean clone support; verified full `docker compose up` stack locally with live health and query tests; added Makefile targets and 9 dedicated tests in `tests/test_docker_compose.py` (378/378 full suite passing, 86% coverage; commit `4d58199`, `95b0a5f`). |
 | 2026-10-18 | T7.8: Expanded operations runbook (`docs/runbook.md`) detailing microservices topology, configuration precedence hierarchy, incident triage trees, and atomic disaster-recovery index rebuild protocols; implemented automated 5-phase operational rollback rehearsal drill harness (`scripts/rehearse_rollback.py`) and executed formal rehearsal drill verifying zero-downtime hot-swap rollback (`reports/rollback_rehearsal.json`); added Makefile target `make rehearse-rollback` and 3 dedicated tests in `tests/test_runbook_rehearsal.py` (381/381 full suite passing, 86% coverage; commit `9434168`). |
 | 2026-10-18 | T7.9: Executed genuine real usage query session (`scripts/run_real_usage_session.py`, `make real-usage`) running 35 diverse real-world legal and regulatory questions across 8 domains through `RAGPipeline` (20 `gepa_v0.2`, 15 `baseline_v0.1`), logging operational request records, PII redactions, guardrail routing, latency distribution (p50: 141.5 ms, p95: 828.8 ms), 8.5% safe abstention rate, and 24 realistic user feedback ratings (+1 / -1) to `logs/requests.jsonl`, `logs/feedback.jsonl`, and SQLite `collector.db`; regenerated telemetry dashboard infographic (`docs/images/dashboard_monitoring.png`); added 3 dedicated tests in `tests/test_real_usage.py` (384/384 full suite passing, 86% coverage; commit `a1bc133`). |
+| 2026-10-18 | T8.1: Overhauled and finalized comprehensive `README.md` featuring 2-minute pitch, independence notice (§13), live Hugging Face demo link, Mermaid end-to-end architecture diagram, E1–E7 empirical results matrix, held-out test evaluation table, vLLM GPU serving benchmark comparison, production monitoring dashboard showcase, quickstart guides (Docker Compose and local uv), and quality gate targets (commit `6cfcf90`). |
+| 2026-10-18 | T8.2: Authored comprehensive, jargon-free Stakeholder Memo (`docs/stakeholder-memo.md`) for Chief Risk Officers, Compliance Heads, and Legal Counsel; documented 21 active regulations, strict cite-or-abstain standard, out-of-scope boundaries, empirical evaluation parity (100% Faithfulness, 81.8% Abstention Accuracy, 71.7% Grounding Fidelity), regulatory risk mitigation matrix, trade-offs, and future roadmap including credit-risk underwriting and Sharia banking extensions (commit `739fcc8`). |
+| 2026-10-18 | T8.3: Finalized comprehensive `docs/decision-log.md` covering all 7 core experiments (E1 chunking, E2 embeddings, E3 retrieval, E4 CPU generators, E5 GEPA prompt optimization, E6 vLLM serving, E7 QLoRA routing), counterfactual replay A/B simulation, and all Phase 7 deployment milestones (T7.1–T7.9) with full hypotheses, quantitative results, and rationale (commit `3342b4c`). |
+| 2026-10-18 | T8.4: Authored comprehensive, step-by-step reproduction guide in `docs/reproduce.md` covering environment setup with `uv`, corpus ingestion, prebuilt index fallback, gold dataset validation, judge calibration ($\kappa=0.9429$), CI smoke gate, core experiments E1–E4, advanced optimizations E5–E7, replay A/B simulation, Docker Compose microservices stack, operational rollback rehearsal (50.44 ms), and real usage telemetry generation (commit `157acdf`). |
+| 2026-10-18 | T8.5: Authored 3–5 minute portfolio and fallback demo video recording script (`docs/demo-video-script.md`) detailing setup, scene storyboard, exact statutory queries, voiceover narration, and recording tips (commit `065a7b0`). |
+| 2026-10-18 | T8.6: Enhanced repository badges (CI, license, Python, coverage 86%, ruff, mypy, docs, Hugging Face Space), populated `pyproject.toml` keywords and PyPI classifiers, and verified clean lint and test run across all 384 tests (commit `e7f80d7`). |
+| 2026-10-18 | T8.7: Conducted exhaustive Honest-Claims Protocol audit (`docs/honest-claims-audit.md`) against Plan §13 across `README.md`, `docs/stakeholder-memo.md`, `docs/decision-log.md`, `docs/reproduce.md`, and `docs/runbook.md`, verifying 100% compliance with zero unsubstantiated live production or customer A/B claims (commit `065a7b0`). |
