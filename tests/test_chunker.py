@@ -16,6 +16,7 @@ from easypasal.ingest.chunker import (
     chunk_document,
     estimate_tokens,
     is_catchword,
+    main,
     split_oversized,
 )
 from easypasal.ingest.parser import ParsedDocument
@@ -401,3 +402,74 @@ def test_chunk_document_structure_aware_no_header(sample_statute_doc: ParsedDocu
     assert len(chunks) > 0
     assert all(c.chunk_type == "structure_aware" for c in chunks)
     assert not chunks[0].text.startswith("[")
+
+
+def test_chunker_empty_document() -> None:
+    """Verify empty document clean_text returns empty chunk list."""
+    empty_doc = ParsedDocument(
+        doc_id="empty",
+        filename="empty.pdf",
+        total_pages=1,
+        clean_text="",
+        metadata={"year": "invalid_year"},
+    )
+    s_chunker = StructureAwareChunker()
+    assert s_chunker.chunk(empty_doc) == []
+
+    f_chunker = FixedSizeChunker()
+    assert f_chunker.chunk(empty_doc) == []
+
+
+def test_chunker_duplicate_id_handling() -> None:
+    """Verify duplicate chunk IDs receive sequential count suffixes."""
+    text = (
+        "\nPasal 1\n(1) Aturan pertama.\n"
+        "\nPasal 1\n(1) Aturan kedua yang memiliki penomoran identik.\n"
+    )
+    doc = ParsedDocument(
+        doc_id="dup_doc",
+        filename="dup.pdf",
+        total_pages=1,
+        clean_text=text,
+        metadata={"year": 2024},
+    )
+    chunker = StructureAwareChunker()
+    chunks = chunker.chunk(doc)
+    assert len(chunks) == 2
+    assert chunks[0].chunk_id == "dup_doc_pasal_1_ayat_1"
+    assert chunks[1].chunk_id == "dup_doc_pasal_1_ayat_1_2"
+
+
+def test_chunk_corpus_empty_and_error(tmp_path: Path) -> None:
+    """Verify chunk_corpus handles empty directories and malformed JSON files."""
+    empty_dir = tmp_path / "empty"
+    empty_dir.mkdir()
+    out_dir = tmp_path / "out"
+    assert chunk_corpus(empty_dir, out_dir) == []
+
+    # Corrupt JSON file
+    bad_dir = tmp_path / "bad"
+    bad_dir.mkdir()
+    (bad_dir / "bad.json").write_text("invalid json syntax", encoding="utf-8")
+    assert chunk_corpus(bad_dir, out_dir) == []
+
+
+def test_main_cli_runner(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
+    """Verify CLI runner handles arguments for all strategies."""
+    from unittest.mock import patch
+
+    monkeypatch.setattr(
+        "sys.argv",
+        [
+            "chunker.py",
+            "--strategy",
+            "all",
+            "--input-dir",
+            str(tmp_path),
+            "--output-dir",
+            str(tmp_path / "chunks"),
+        ],
+    )
+    with patch("easypasal.ingest.chunker.chunk_corpus") as mock_chunk:
+        main()
+        assert mock_chunk.call_count == 3
