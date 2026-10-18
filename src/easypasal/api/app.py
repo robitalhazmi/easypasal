@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import argparse
 import logging
+import os
 from collections.abc import AsyncGenerator
 from contextlib import asynccontextmanager
 from pathlib import Path
@@ -31,6 +32,7 @@ def create_app(
     variant: str | None = None,
     traffic_split: bool | None = None,
     request_logger: RequestLogger | None = None,
+    provider: str | None = None,
 ) -> FastAPI:
     """Create and configure the FastAPI application instance.
 
@@ -43,6 +45,7 @@ def create_app(
         variant: Optional default variant override ('baseline_v0.1' or 'gepa_v0.2').
         traffic_split: Optional boolean flag to enable or disable traffic splitting.
         request_logger: Optional pre-configured RequestLogger instance.
+        provider: Optional LLM backend provider override ('auto', 'mock', 'llamacpp', etc.).
 
     Returns:
         Configured FastAPI application.
@@ -61,8 +64,14 @@ def create_app(
                     if cand_path.exists():
                         eff_config_path = cand_path
 
-                logger.info("Initializing default on-disk EasyPasal RAGPipeline on startup...")
-                app.state.pipeline = RAGPipeline.from_defaults(config_path=eff_config_path)
+                eff_provider: str = provider or os.getenv("EASYPASAL_LLM_PROVIDER") or "auto"
+                logger.info(
+                    "Initializing default on-disk EasyPasal RAGPipeline on startup (provider=%s)...",
+                    eff_provider,
+                )
+                app.state.pipeline = RAGPipeline.from_defaults(
+                    config_path=eff_config_path, provider=eff_provider
+                )
                 logger.info("EasyPasal RAGPipeline loaded and ready.")
             except Exception as exc:
                 logger.warning(
@@ -180,8 +189,8 @@ def main() -> None:
     parser.add_argument(
         "--provider",
         choices=["auto", "mock", "ollama", "llamacpp"],
-        default="auto",
-        help="LLM provider for RAGPipeline (default: auto)",
+        default=os.getenv("EASYPASAL_LLM_PROVIDER", "auto"),
+        help="LLM provider for RAGPipeline (default: auto or EASYPASAL_LLM_PROVIDER)",
     )
     parser.add_argument(
         "--variant",
@@ -241,6 +250,7 @@ def main() -> None:
         config_path=args.config,
         variant=args.variant,
         traffic_split=True if args.traffic_split else None,
+        provider=args.provider,
     )
 
     uvicorn.run(

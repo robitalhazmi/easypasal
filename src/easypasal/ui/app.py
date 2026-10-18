@@ -709,8 +709,8 @@ def main() -> None:
     parser.add_argument(
         "--provider",
         choices=["auto", "mock", "ollama", "llamacpp"],
-        default="auto",
-        help="LLM provider for RAGPipeline (default: auto)",
+        default=os.getenv("EASYPASAL_LLM_PROVIDER", "auto"),
+        help="LLM provider for RAGPipeline (default: auto or EASYPASAL_LLM_PROVIDER)",
     )
     parser.add_argument(
         "--share",

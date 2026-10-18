@@ -7,6 +7,7 @@ supporting YAML parsing, serialization, and runtime pipeline assembly.
 from __future__ import annotations
 
 import logging
+import os
 from pathlib import Path
 from typing import Any, Literal
 
@@ -169,8 +170,17 @@ class MonitoringConfig(BaseModel):
     feedback_file: str | None = "logs/feedback.jsonl"
     redact_pii: bool = True
     salt: str = "easypasal-monitoring-salt-v1"
-    collector_url: str | None = None
-    collector_token: str | None = None
+    collector_url: str | None = Field(
+        default_factory=lambda: (
+            os.getenv("EASYPASAL_COLLECTOR_URL") or os.getenv("LOG_COLLECTOR_URL")
+        )
+    )
+    collector_token: str | None = Field(
+        default_factory=lambda: (
+            os.getenv("EASYPASAL_COLLECTOR_TOKEN")
+            or os.getenv("LOG_COLLECTOR_TOKEN", "easypasal-vps-secret-token-v1")
+        )
+    )
 
 
 class EasyPasalConfig(BaseModel):
