@@ -344,3 +344,98 @@ def test_build_indices_custom_collection_name(tmp_path: Path) -> None:
         ),
     )
     assert stats2.collection_name == "easypasal_structure_aware_multilingual_e5_large"
+
+
+def test_index_module_lazy_exports() -> None:
+    """Test __getattr__ lazy loading of exported symbols and invalid attribute handling."""
+    import pytest
+
+    import easypasal.index as idx
+
+    # Test all symbols in __all__
+    for sym in idx.__all__:
+        attr = getattr(idx, sym)
+        assert attr is not None
+
+    with pytest.raises(AttributeError, match="has no attribute 'non_existent_symbol'"):
+        _ = idx.non_existent_symbol
+
+
+def test_download_prebuilt_index_exists(tmp_path: Path) -> None:
+    """Test download_prebuilt_index skips download when indices already exist locally."""
+    from easypasal.index.download import download_prebuilt_index
+
+    target = tmp_path / "index"
+    qdrant_dir = target / "qdrant"
+    bm25_dir = target / "bm25"
+    qdrant_dir.mkdir(parents=True)
+    bm25_dir.mkdir(parents=True)
+
+    (qdrant_dir / "test.txt").write_text("data")
+    (bm25_dir / "test.txt").write_text("data")
+
+    res = download_prebuilt_index(target_dir=target, force=False)
+    assert res == target.resolve()
+
+
+def test_download_prebuilt_index_fetches(tmp_path: Path, monkeypatch: Any) -> None:
+    """Test download_prebuilt_index calls snapshot_download when files are missing."""
+    import sys
+    from unittest.mock import MagicMock
+
+    from easypasal.index.download import download_prebuilt_index
+
+    mock_hf = MagicMock()
+    mock_hf.snapshot_download.return_value = "/mock/cached/path"
+    monkeypatch.setitem(sys.modules, "huggingface_hub", mock_hf)
+
+    target = tmp_path / "fresh_index"
+    res = download_prebuilt_index(target_dir=target, force=True)
+    assert res == target.resolve()
+    mock_hf.snapshot_download.assert_called_once()
+
+
+def test_build_main_cli(tmp_path: Path, monkeypatch: Any) -> None:
+    """Test build.py main CLI execution."""
+    import sys
+
+    from easypasal.index.build import main
+
+    chunks_file = tmp_path / "chunks" / "structure_aware.jsonl"
+    chunks_file.parent.mkdir(parents=True)
+    mock_chunk = {
+        "chunk_id": "test_1",
+        "text": "uji coba teks hukum perbankan",
+        "citation_label": "UU Test",
+        "doc_id": "UU_Test",
+        "doc_number": "UU Test",
+        "status": "berlaku",
+    }
+    chunks_file.write_text(json.dumps(mock_chunk) + "\n")
+
+    out_idx = tmp_path / "out_idx"
+
+    monkeypatch.setattr(
+        sys,
+        "argv",
+        [
+            "build.py",
+            "--strategy",
+            "structure_aware",
+            "--input-dir",
+            str(chunks_file.parent),
+            "--output-dir",
+            str(out_idx),
+        ],
+    )
+
+    # Mock FastEmbedBackend to avoid downloading real model in unit test
+    monkeypatch.setattr(
+        "easypasal.index.build.get_embedding_backend",
+        lambda *_args, **_kwargs: MockEmbeddingBackend(dimension=4),
+    )
+
+    main()
+
+    assert (out_idx / "qdrant").exists()
+    assert (out_idx / "bm25" / "structure_aware_model.pkl").exists()
