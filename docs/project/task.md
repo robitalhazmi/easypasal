@@ -133,7 +133,7 @@
 - [x] **T8.2** 👤 Stakeholder memo (1–2 pages) for Risk/Compliance: what shipped, what didn't, trade-offs, risks, future work (incl. credit-risk extension) (commit `739fcc8`)
   - AC: reads without ML jargon; every number matches the decision log
 - [x] **T8.3** 🤝 `docs/decision-log.md` finalized (E1–E7, with decisions and reasoning) (commit `3342b4c`)
-- [ ] **T8.4** 🤝 `docs/reproduce.md` — "how to reproduce this" tutorial
+- [x] **T8.4** 🤝 `docs/reproduce.md` — "how to reproduce this" tutorial (commit `157acdf`)
   - AC: a friend can reproduce core results following only this guide
 - [ ] **T8.5** 👤 Record a 3–5 minute demo video (fallback + portfolio)
 - [ ] **T8.6** 🤖 Add badges (CI, license) and repo topics; final lint pass
@@ -188,3 +188,4 @@ If time runs short, descope in this order and record it as future work: **E7 QLo
 | 2026-10-18 | T8.1: Overhauled and finalized comprehensive `README.md` featuring 2-minute pitch, independence notice (§13), live Hugging Face demo link, Mermaid end-to-end architecture diagram, E1–E7 empirical results matrix, held-out test evaluation table, vLLM GPU serving benchmark comparison, production monitoring dashboard showcase, quickstart guides (Docker Compose and local uv), and quality gate targets (commit `6cfcf90`). |
 | 2026-10-18 | T8.2: Authored comprehensive, jargon-free Stakeholder Memo (`docs/stakeholder-memo.md`) for Chief Risk Officers, Compliance Heads, and Legal Counsel; documented 21 active regulations, strict cite-or-abstain standard, out-of-scope boundaries, empirical evaluation parity (100% Faithfulness, 81.8% Abstention Accuracy, 71.7% Grounding Fidelity), regulatory risk mitigation matrix, trade-offs, and future roadmap including credit-risk underwriting and Sharia banking extensions (commit `739fcc8`). |
 | 2026-10-18 | T8.3: Finalized comprehensive `docs/decision-log.md` covering all 7 core experiments (E1 chunking, E2 embeddings, E3 retrieval, E4 CPU generators, E5 GEPA prompt optimization, E6 vLLM serving, E7 QLoRA routing), counterfactual replay A/B simulation, and all Phase 7 deployment milestones (T7.1–T7.9) with full hypotheses, quantitative results, and rationale (commit `3342b4c`). |
+| 2026-10-18 | T8.4: Authored comprehensive, step-by-step reproduction guide in `docs/reproduce.md` covering environment setup with `uv`, corpus ingestion, prebuilt index fallback, gold dataset validation, judge calibration ($\kappa=0.9429$), CI smoke gate, core experiments E1–E4, advanced optimizations E5–E7, replay A/B simulation, Docker Compose microservices stack, operational rollback rehearsal (50.44 ms), and real usage telemetry generation (commit `157acdf`). |
