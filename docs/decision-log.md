@@ -364,8 +364,8 @@ All local generators run quantized via 4-bit GGUF (`Q4_K_M`) using `llama.cpp` o
 - **Date:** 2026-10-16
 - **Status:** Approved & Merged (`GEPA_SYSTEM_PROMPT_ID` / `GEPA_SYSTEM_PROMPT_EN` in `src/easypasal/generation/prompts.py`)
 - **Git Branch:** `feat/phase5-prompt-inference`
-- **Reproducibility Notebook:** [`notebooks/e5_gepa_prompt_optimization.ipynb`](notebooks/e5_gepa_prompt_optimization.ipynb)
-- **Results Artifact:** [`results/e5_gepa_results.json`](results/e5_gepa_results.json)
+- **Reproducibility Notebook:** [`notebooks/e5_gepa_prompt_optimization.ipynb`](../notebooks/e5_gepa_prompt_optimization.ipynb)
+- **Results Artifact:** [`results/e5_gepa_results.json`](../results/e5_gepa_results.json)
 
 #### 1. Context & Hypotheses
 While Phase 4 established the baseline pipeline (`structure_aware` chunks, `multilingual-e5-large` embeddings, pure `dense` retrieval, and `Llama-3.2-1B-Instruct-Q4_K_M` CPU generator), diagnostic traces revealed recurring failure modes:
@@ -419,7 +419,7 @@ While Phase 4 established the baseline pipeline (`structure_aware` chunks, `mult
 - **Verdict:** **ROBUST GENERALIZATION CONFIRMED**. The GEPA-evolved prompt improves Grounding Fidelity (+4.0%) and Composite quality (+2.8%) on held-out test data without regressing on any objective dimension.
 
 #### 5. Winning Prompt Directives Committed to Codebase
-The optimized prompt was added to [`src/easypasal/generation/prompts.py`](src/easypasal/generation/prompts.py) as `GEPA_SYSTEM_PROMPT_ID` and `GEPA_SYSTEM_PROMPT_EN`:
+The optimized prompt was added to [`src/easypasal/generation/prompts.py`](../src/easypasal/generation/prompts.py) as `GEPA_SYSTEM_PROMPT_ID` and `GEPA_SYSTEM_PROMPT_EN`:
 - **Explicit Clause Syntax:** Standard format requirement `[<Nama Regulasi Resmi/Singkat>, Pasal <Nomor> ayat (<Angka>)]`.
 - **Anti-Hallucination Directive:** Strict prohibition against fabricating article numbers when not literally present in passages.
 - **Sharp Abstention Barrier:** Standardized single-sentence formula mandatory for non-financial queries (KUHP, labor, inheritance) or absent legal basis.
@@ -431,9 +431,9 @@ The optimized prompt was added to [`src/easypasal/generation/prompts.py`](src/ea
 - **Date:** 2026-10-16
 - **Status:** Approved (Adopt `vLLM` with `Qwen2.5-3B-Instruct` for Multi-User GPU Serving; Retain `llama.cpp` with `Llama-3.2-1B` for Single-Client CPU Serving)
 - **Git Branch:** `feat/phase5-prompt-inference`
-- **Reproducibility Notebook:** [`notebooks/e6_vllm_benchmark.ipynb`](notebooks/e6_vllm_benchmark.ipynb)
-- **Results Artifacts:** [`results/e6_vllm_benchmark.json`](results/e6_vllm_benchmark.json) and [`data/eval_outputs/e6_benchmark_summary.json`](data/eval_outputs/e6_benchmark_summary.json)
-- **Visualization Artifacts:** [`docs/assets/e6_benchmark_comparison.png`](docs/assets/e6_benchmark_comparison.png)
+- **Reproducibility Notebook:** [`notebooks/e6_vllm_benchmark.ipynb`](../notebooks/e6_vllm_benchmark.ipynb)
+- **Results Artifacts:** [`results/e6_vllm_benchmark.json`](../results/e6_vllm_benchmark.json) and [`data/eval_outputs/e6_benchmark_summary.json`](../data/eval_outputs/e6_benchmark_summary.json)
+- **Visualization Artifacts:** [`docs/assets/e6_benchmark_comparison.png`](assets/e6_benchmark_comparison.png)
 
 #### 1. Context & Hypotheses
 Experiment E4 established that `Qwen2.5-3B-Instruct` is our highest-quality reasoning engine, achieving a +105% relative gain in Citation F1 ($p = 0.0008$) and superior cross-statute synthesis over 1B/1.5B models. However, on CPU hardware without hardware acceleration, `Qwen2.5-3B` incurred a prohibitive average latency of 161.7s and a p95 of 252.7s (>4.2 minutes per query). Furthermore, under concurrent multi-user load, CPU architectures suffer severe thread contention and sequential prompt processing.
@@ -492,10 +492,10 @@ Experiment E4 established that `Qwen2.5-3B-Instruct` is our highest-quality reas
 - **Date:** 2026-10-16
 - **Status:** Approved (Adopt `gepa_v0.2` as Standard Production Variant, superseding `baseline_v0.1`)
 - **Git Branch:** `feat/phase6-replay-ab`
-- **Replay Runner:** [`eval/replay_ab_simulation.py`](eval/replay_ab_simulation.py) (`make replay-ab`)
+- **Replay Runner:** [`eval/replay_ab_simulation.py`](../eval/replay_ab_simulation.py) (`make replay-ab`)
 - **Results Artifacts:**
-  - Development Set: [`results/t6_1_replay_ab_simulation_dev.json`](results/t6_1_replay_ab_simulation_dev.json)
-  - Held-out Test Set: [`results/t6_1_replay_ab_simulation_test.json`](results/t6_1_replay_ab_simulation_test.json)
+  - Development Set: [`results/t6_1_replay_ab_simulation_dev.json`](../results/t6_1_replay_ab_simulation_dev.json)
+  - Held-out Test Set: [`results/t6_1_replay_ab_simulation_test.json`](../results/t6_1_replay_ab_simulation_test.json)
 
 > [!IMPORTANT]
 > **Honest-Claims Protocol (§13 / Plan §6.4 Notice):**
@@ -626,7 +626,7 @@ In accordance with Task T6.4, the fine-tuned adapter will **only** be integrated
 5. **Regression Guard:** If the adapter fails any criterion or induces false rejections on valid queries, it will be transparently documented as an experimental negative result (as required by Plan §7 and the Honest-Claims Audit §13), and the system will retain the verified rule-based guardrail.
 
 #### 5. Quantitative Results & Evaluation (T6.3 Benchmark)
-*Artifact: [`results/e7_qlora_evaluation.json`](results/e7_qlora_evaluation.json)*
+*Artifact: [`results/e7_qlora_evaluation.json`](../results/e7_qlora_evaluation.json)*
 
 ##### Held-Out Test Set Benchmark (`data/e7_router/test.jsonl`, $N = 66$)
 | Metric | Baseline Zero-Shot (`Qwen2.5-0.5B`) | Fine-Tuned QLoRA Adapter | Delta | Status |
