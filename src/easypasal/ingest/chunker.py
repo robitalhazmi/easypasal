@@ -171,11 +171,11 @@ class StructureAwareChunker:
             re.IGNORECASE,
         )
         self.heading_re = re.compile(
-            r"\n(?=(?:BAB\s+[IVXLCDM]+|Bagian\s+[A-Za-z]+|Paragraf\s+\d+|Pasal\s+(?:[0-9]+[A-Za-z]*|[IVXLCDM]+))\s*:?$)",
+            r"\n(?=(?:BAB\s+[IVXLCDM]+|Bagian\s+[A-Za-z]+|Paragraf\s+\d+|[\"'\u201c\u201d]?\s*Pasal\s+(?:[0-9]+[A-Za-z]*|[IVXLCDM]+))\s*:?[\"'\u201c\u201d]?$)",
             re.MULTILINE,
         )
         self.penj_heading_re = re.compile(
-            r"\n(?=(?:[IVXLCDM]+\.\s+[A-Z\s]+|Pasal\s+(?:[0-9]+[A-Za-z]*|[IVXLCDM]+))\s*:?$)",
+            r"\n(?=(?:[IVXLCDM]+\.\s+[A-Z\s]+|[\"'\u201c\u201d]?\s*Pasal\s+(?:[0-9]+[A-Za-z]*|[IVXLCDM]+))\s*:?[\"'\u201c\u201d]?$)",
             re.MULTILINE,
         )
 
@@ -442,11 +442,20 @@ class StructureAwareChunker:
                 continue
 
             m_pasal = re.match(
-                r"^Pasal\s+([0-9]+[A-Za-z]*|[IVXLCDM]+)\s*:?$", first_line, re.IGNORECASE
+                r"^[\"'\u201c\u201d]?\s*Pasal\s+([0-9]+[A-Za-z]*|[IVXLCDM]+)\s*:?[\"'\u201c\u201d]?$",
+                first_line,
+                re.IGNORECASE,
             )
             if m_pasal:
                 pasal_num = m_pasal.group(1)
                 pasal_body = "\n".join(lines[1:]).strip()
+                # If this is an amendment article, strip any trailing introductory clause for the next amendment point
+                pasal_body = re.sub(
+                    r"\n+\d+\.\s*(?:Ketentuan|Menambah|Di antara|Mengubah|Menghapus)\b.*$",
+                    "",
+                    pasal_body,
+                    flags=re.DOTALL,
+                ).strip()
                 pasal_chunks = self._chunk_pasal(
                     doc_id=doc_id,
                     doc_number=doc_number,
@@ -712,7 +721,9 @@ class StructureAwareChunker:
                 continue
 
             m_pasal = re.match(
-                r"^Pasal\s+([0-9]+[A-Za-z]*|[IVXLCDM]+)\s*:?$", first_line, re.IGNORECASE
+                r"^[\"'\u201c\u201d]?\s*Pasal\s+([0-9]+[A-Za-z]*|[IVXLCDM]+)\s*:?[\"'\u201c\u201d]?$",
+                first_line,
+                re.IGNORECASE,
             )
             if m_pasal:
                 pasal_num = m_pasal.group(1)

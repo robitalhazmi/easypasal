@@ -40,7 +40,7 @@ HEADING_RE = re.compile(
     r"^(BAB\s+[IVXLCDM]+|"
     r"Bagian\s+[A-Za-z]+|"
     r"Paragraf\s+\d+|"
-    r"Pasal\s+\d+|"
+    r"[\"'\u201c\u201d]?\s*Pasal\s+(?:[0-9]+[A-Za-z]*|[IVXLCDM]+)|"
     r"\(\d+\)|"
     r"[a-z]\.|"
     r"\d+\.|"
@@ -52,7 +52,10 @@ HEADING_RE = re.compile(
 )
 
 STANDALONE_HEADING_RE = re.compile(
-    r"^(BAB\s+[IVXLCDM]+|" r"Bagian\s+[A-Za-z]+|" r"Paragraf\s+\d+|" r"Pasal\s+\d+)$",
+    r"^(BAB\s+[IVXLCDM]+|"
+    r"Bagian\s+[A-Za-z]+|"
+    r"Paragraf\s+\d+|"
+    r"[\"'\u201c\u201d]?\s*Pasal\s+(?:[0-9]+[A-Za-z]*|[IVXLCDM]+)[\"'\u201c\u201d]?)$",
     re.IGNORECASE,
 )
 
@@ -132,8 +135,11 @@ def is_header_block(text: str, y1: float, page_height: float, page_idx: int) -> 
     if y1 > page_height * 0.25:
         return False
 
+    # Normalize whitespace for multi-line institutional header blocks
+    normalized_cleaned = re.sub(r"\s+", " ", cleaned)
+
     # Gazette running header: "2022, No.5/OJK \n-2-"
-    if re.match(r"^\d{4},\s*No\.\s*\d+", cleaned, re.IGNORECASE):
+    if re.match(r"^\d{4},\s*No\.\s*\d+", normalized_cleaned, re.IGNORECASE):
         return True
 
     # Institutional running headers
@@ -141,7 +147,7 @@ def is_header_block(text: str, y1: float, page_height: float, page_idx: int) -> 
         re.match(
             r"^(salinan|presiden republik indonesia|otoritas jasa keuangan|"
             r"menteri keuangan republik indonesia)$",
-            cleaned,
+            normalized_cleaned,
             re.IGNORECASE,
         )
     )

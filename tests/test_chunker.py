@@ -473,3 +473,41 @@ def test_main_cli_runner(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> Non
     with patch("easypasal.ingest.chunker.chunk_corpus") as mock_chunk:
         main()
         assert mock_chunk.call_count == 3
+
+
+def test_amendment_quoted_pasal_chunking() -> None:
+    """Verify that amendment laws with quoted Pasal and amendment transitions chunk accurately."""
+    amendment_text = (
+        "Pasal I\n"
+        "Mengubah beberapa ketentuan sebagai berikut:\n"
+        "16. Ketentuan Pasal 22 diubah sehingga menjadi berbunyi sebagai berikut:\n"
+        '"Pasal 22\n'
+        "(1) Bank Umum hanya dapat didirikan oleh WNI.\n"
+        '(2) Ketentuan pendirian diatur oleh Bank Indonesia."\n'
+        "17. Ketentuan Pasal 26 diubah sebagai berikut:\n"
+        '"Pasal 26\n'
+        '(1) Bank dapat melakukan emisi saham."\n'
+        "Pasal II\n"
+        "Undang-Undang ini mulai berlaku pada tanggal diundangkan.\n"
+    )
+    doc = ParsedDocument(
+        doc_id="UU_Amend_1998",
+        filename="UU_Amend_1998.pdf",
+        total_pages=2,
+        clean_text=amendment_text,
+        metadata={"doc_number": "UU Amend 1998", "year": 1998},
+    )
+    chunker = StructureAwareChunker()
+    chunks = chunker.chunk(doc)
+
+    p22_chunks = [c for c in chunks if c.pasal == "22"]
+    assert len(p22_chunks) == 2
+    assert p22_chunks[0].chunk_id == "UU_Amend_1998_pasal_22_ayat_1"
+    assert p22_chunks[0].citation_label == "UU Amend 1998, Pasal 22 ayat (1)"
+    assert p22_chunks[0].raw_content == "(1) Bank Umum hanya dapat didirikan oleh WNI."
+    assert p22_chunks[0].bab is None  # Legitimate null metadata
+
+    p26_chunks = [c for c in chunks if c.pasal == "26"]
+    assert len(p26_chunks) == 1
+    assert p26_chunks[0].chunk_id == "UU_Amend_1998_pasal_26_ayat_1"
+    assert "emisi saham" in p26_chunks[0].raw_content

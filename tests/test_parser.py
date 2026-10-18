@@ -78,6 +78,16 @@ def test_header_footer_detection() -> None:
         is True
     )
     assert is_header_block("SALINAN", y1=70.0, page_height=page_height, page_idx=1) is True
+    assert (
+        is_header_block(
+            "PRESIDEN\nREPUBLIK INDONESIA", y1=80.0, page_height=page_height, page_idx=1
+        )
+        is True
+    )
+    assert (
+        is_header_block("OTORITAS\nJASA KEUANGAN", y1=80.0, page_height=page_height, page_idx=1)
+        is True
+    )
 
     # First page headers should not be stripped
     assert is_header_block("PERATURAN OJK", y1=150.0, page_height=page_height, page_idx=0) is False
