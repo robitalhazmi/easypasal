@@ -7,7 +7,7 @@ This script is structured for recording a concise, high-impact **3 to 5-minute v
 > - **Browser Tabs Prepared:**
 >   1. Tab 1: Live Hugging Face Space Demo (`http://localhost:7860` or `https://huggingface.co/spaces/robitalhazmi/easypasal`)
 >   2. Tab 2: Monitoring & Telemetry Dashboard (`http://localhost:8080/dashboard`)
->   3. Tab 3: GitHub Repository (`README.md` and `docs/decision-log.md`)
+>   3. Tab 3: GitHub Repository ([`README.md`](../README.md) and [`docs/decision-log.md`](decision-log.md))
 > - **Terminal Window:** Clean terminal with Docker Compose running (`make docker-up`).
 
 ---
@@ -42,19 +42,25 @@ This script is structured for recording a concise, high-impact **3 to 5-minute v
 ### Scene 2: Interactive Grounded Statutory Queries (0:45 – 1:45)
 **Screen:** Switch to the Gradio UI demo tab (`http://localhost:7860`).
 
-**Action 1:** Type Query 1 in Indonesian:
+**Action 1:** Type Query 1 in Indonesian (choose either Option A or Option B):
+
+*Option A (Consumer Protection — Recommended):*
+```text
+Berapa lama jangka waktu penyelesaian pengaduan konsumen oleh PUJK menurut POJK 22 Tahun 2023?
+```
+*Option B (Commercial Banking Capital):*
 ```text
 Berapa modal disetor minimum untuk mendirikan bank umum menurut POJK terbaru?
 ```
 Click **Submit**.
 
 **Voiceover Narration:**
-> "Let's test a common banking compliance query: *'What is the minimum paid-up capital to establish a commercial bank under recent POJK?'*
+> "Let's test a common compliance query: *'What is the statutory deadline for a financial institution to resolve consumer complaints under POJK 22 of 2023?'*
 >
 > Notice the response:
-> 1. EasyPasal retrieves the authoritative regulation: **POJK No. 12/POJK.03/2021**.
-> 2. It accurately answers **Rp 10 triliun** (10 trillion Rupiah).
-> 3. Beneath the answer, it displays an interactive citation card linking directly to **Pasal 8 Ayat (1)** with the exact verbatim legal snippet.
+> 1. EasyPasal retrieves the authoritative regulation: **POJK No. 22 Tahun 2023**.
+> 2. It accurately answers that institutions must resolve complaints within **10 working days** (10 hari kerja).
+> 3. Beneath the answer, it renders an interactive citation card linking directly to **Pasal 75 Ayat (1)** with the exact verbatim statutory text.
 >
 > Every factual assertion is bounded by retrieved statutory context — not parametric memory."
 
@@ -126,7 +132,7 @@ Click **Submit**.
 **Screen:** Return to the top of `README.md`.
 
 **Voiceover Narration:**
-> "In accordance with our Honest-Claims Protocol, all results, Docker Compose configurations, and experiment logs are completely reproducible via `docs/reproduce.md`.
+> "In accordance with our Honest-Claims Protocol, all results, Docker Compose configurations, and experiment logs are completely reproducible via [`docs/reproduce.md`](reproduce.md).
 >
 > The entire codebase is open-source under Apache-2.0. You can try the live demo or inspect the code on GitHub. Thank you!"
 
