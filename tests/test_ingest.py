@@ -4,15 +4,21 @@ from __future__ import annotations
 
 import csv
 import hashlib
+import sys
+import time
 from pathlib import Path
+from unittest.mock import patch
 
 import httpx
+import pytest
 
 from easypasal.ingest.download import (
     compute_sha256,
     download_corpus,
     download_single_file,
+    ensure_session_cookies,
     load_manifest,
+    main,
     sanitize_filename,
     save_manifest,
 )
@@ -60,6 +66,38 @@ def test_manifest_load_and_save(tmp_path: Path) -> None:
     assert reloaded[0].sha256 == "dummy_sha256_hash_12345"
 
 
+def test_load_manifest_nonexistent() -> None:
+    """Verify load_manifest raises FileNotFoundError for missing path."""
+    with pytest.raises(FileNotFoundError, match="Corpus manifest not found"):
+        load_manifest(Path("nonexistent/manifest.csv"))
+
+
+def test_ensure_session_cookies_ojk() -> None:
+    """Verify session cookie warm-up for ojk.go.id domains."""
+    warmup_called = False
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        nonlocal warmup_called
+        if "ojk.go.id" in str(request.url):
+            warmup_called = True
+            return httpx.Response(status_code=200, headers={"Set-Cookie": "ojk_session=123"})
+        return httpx.Response(status_code=404)
+
+    transport = httpx.MockTransport(handler)
+    with httpx.Client(transport=transport) as client:
+        ensure_session_cookies(client, "https://www.ojk.go.id/id/regulasi/doc.pdf")
+        assert warmup_called is True
+
+    # Test error handling during cookie warm-up
+    def error_handler(_request: httpx.Request) -> httpx.Response:
+        raise httpx.ConnectError("Connection failed")
+
+    err_transport = httpx.MockTransport(error_handler)
+    with httpx.Client(transport=err_transport) as client:
+        # Should catch and log without raising exception
+        ensure_session_cookies(client, "https://www.ojk.go.id/id/regulasi/doc.pdf")
+
+
 def test_download_single_file_success(tmp_path: Path) -> None:
     """Test successful single file download via mock transport."""
     dest = tmp_path / "test_doc.pdf"
@@ -101,6 +139,27 @@ def test_download_single_file_404_failure(tmp_path: Path) -> None:
             dest_path=dest,
             client=client,
             max_retries=1,
+        )
+
+    assert success is False
+    assert not dest.exists()
+
+
+def test_download_single_file_retries(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
+    """Verify download retry logic on network errors."""
+    monkeypatch.setattr(time, "sleep", lambda _s: None)
+    dest = tmp_path / "network_fail.pdf"
+
+    def handler(_request: httpx.Request) -> httpx.Response:
+        raise httpx.ConnectError("Network unreachable")
+
+    transport = httpx.MockTransport(handler)
+    with httpx.Client(transport=transport) as client:
+        success = download_single_file(
+            url="https://example.com/fail.pdf",
+            dest_path=dest,
+            client=client,
+            max_retries=2,
         )
 
     assert success is False
@@ -192,6 +251,228 @@ def test_download_corpus_orchestration(tmp_path: Path) -> None:
     updated_records = load_manifest(manifest_csv)
     hash_b = hashlib.sha256(content_b).hexdigest()
     assert updated_records[1].sha256 == hash_b
+
+
+def test_download_corpus_hash_mismatch(tmp_path: Path) -> None:
+    """Verify detection of SHA-256 hash mismatch when update_hashes=False."""
+    manifest_csv = tmp_path / "manifest.csv"
+    raw_dir = tmp_path / "raw"
+    pdf_content = b"%PDF-1.4 Mock content mismatch"
+
+    with open(manifest_csv, "w", encoding="utf-8", newline="") as f:
+        writer = csv.DictWriter(
+            f,
+            fieldnames=[
+                "title",
+                "doc_number",
+                "year",
+                "issuer",
+                "url",
+                "retrieval_date",
+                "status",
+                "language",
+                "sha256",
+            ],
+        )
+        writer.writeheader()
+        writer.writerow(
+            {
+                "title": "Mismatch Doc",
+                "doc_number": "POJK 99/2024",
+                "year": "2024",
+                "issuer": "OJK",
+                "url": "https://example.com/mismatch.pdf",
+                "retrieval_date": "2026-10-10",
+                "status": "berlaku",
+                "language": "id",
+                "sha256": "expected_but_different_sha256_hash",
+            }
+        )
+
+    def handler(_request: httpx.Request) -> httpx.Response:
+        return httpx.Response(status_code=200, content=pdf_content)
+
+    transport = httpx.MockTransport(handler)
+    with httpx.Client(transport=transport) as mock_client:
+        summary = download_corpus(
+            manifest_path=manifest_csv,
+            output_dir=raw_dir,
+            update_hashes=False,
+            client=mock_client,
+        )
+
+    assert summary["total"] == 1
+    assert summary["downloaded"] == 1
+    assert len(summary["errors"]) == 1
+    assert "Hash mismatch" in summary["errors"][0]
+
+
+def test_download_corpus_existing_tbd_and_default_client(tmp_path: Path) -> None:
+    """Verify existing file with TBD hash is updated and default client is closed."""
+    manifest_csv = tmp_path / "manifest.csv"
+    raw_dir = tmp_path / "raw"
+    raw_dir.mkdir(parents=True)
+
+    pdf_content = b"%PDF-1.4 Existing cached file content"
+    target_file = raw_dir / "POJK_50_2024.pdf"
+    target_file.write_bytes(pdf_content)
+    expected_hash = hashlib.sha256(pdf_content).hexdigest()
+
+    with open(manifest_csv, "w", encoding="utf-8", newline="") as f:
+        writer = csv.DictWriter(
+            f,
+            fieldnames=[
+                "title",
+                "doc_number",
+                "year",
+                "issuer",
+                "url",
+                "retrieval_date",
+                "status",
+                "language",
+                "sha256",
+            ],
+        )
+        writer.writeheader()
+        writer.writerow(
+            {
+                "title": "Cached Doc",
+                "doc_number": "POJK 50/2024",
+                "year": "2024",
+                "issuer": "OJK",
+                "url": "https://example.com/cached.pdf",
+                "retrieval_date": "2026-10-10",
+                "status": "berlaku",
+                "language": "id",
+                "sha256": "TBD",
+            }
+        )
+
+    # client=None to test default httpx.Client creation and closing
+    summary = download_corpus(
+        manifest_path=manifest_csv,
+        output_dir=raw_dir,
+        update_hashes=True,
+        client=None,
+    )
+
+    assert summary["total"] == 1
+    assert summary["cached"] == 1
+    records = load_manifest(manifest_csv)
+    assert records[0].sha256 == expected_hash
+
+
+def test_download_corpus_failed_download_tracked(tmp_path: Path) -> None:
+    """Verify summary tracks failed downloads properly."""
+    manifest_csv = tmp_path / "manifest.csv"
+    raw_dir = tmp_path / "raw"
+
+    with open(manifest_csv, "w", encoding="utf-8", newline="") as f:
+        writer = csv.DictWriter(
+            f,
+            fieldnames=[
+                "title",
+                "doc_number",
+                "year",
+                "issuer",
+                "url",
+                "retrieval_date",
+                "status",
+                "language",
+                "sha256",
+            ],
+        )
+        writer.writeheader()
+        writer.writerow(
+            {
+                "title": "Fail Doc",
+                "doc_number": "POJK 77/2024",
+                "year": "2024",
+                "issuer": "OJK",
+                "url": "https://example.com/fail.pdf",
+                "retrieval_date": "2026-10-10",
+                "status": "berlaku",
+                "language": "id",
+                "sha256": "TBD",
+            }
+        )
+
+    def handler(_request: httpx.Request) -> httpx.Response:
+        return httpx.Response(status_code=404)
+
+    transport = httpx.MockTransport(handler)
+    with httpx.Client(transport=transport) as mock_client:
+        summary = download_corpus(
+            manifest_path=manifest_csv,
+            output_dir=raw_dir,
+            update_hashes=False,
+            client=mock_client,
+        )
+
+    assert summary["total"] == 1
+    assert summary["failed"] == 1
+    assert len(summary["errors"]) == 1
+
+
+def test_main_cli_success(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
+    """Verify CLI main entrypoint succeeds when no failures occur."""
+    dummy_summary = {
+        "total": 1,
+        "downloaded": 1,
+        "cached": 0,
+        "failed": 0,
+        "verified_hashes": 1,
+        "errors": [],
+    }
+    manifest_file = tmp_path / "manifest.csv"
+    output_dir = tmp_path / "raw"
+
+    monkeypatch.setattr(
+        sys,
+        "argv",
+        [
+            "download.py",
+            "--manifest",
+            str(manifest_file),
+            "--output-dir",
+            str(output_dir),
+            "--update-hashes",
+            "--timeout",
+            "10.0",
+        ],
+    )
+    with patch("easypasal.ingest.download.download_corpus", return_value=dummy_summary):
+        main()
+
+
+def test_main_cli_failure_exit(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
+    """Verify CLI main entrypoint exits with code 1 when failures occur."""
+    dummy_summary = {
+        "total": 1,
+        "downloaded": 0,
+        "cached": 0,
+        "failed": 1,
+        "verified_hashes": 0,
+        "errors": ["Failed to download doc"],
+    }
+    manifest_file = tmp_path / "manifest.csv"
+    output_dir = tmp_path / "raw"
+
+    monkeypatch.setattr(
+        sys,
+        "argv",
+        [
+            "download.py",
+            "--manifest",
+            str(manifest_file),
+            "--output-dir",
+            str(output_dir),
+        ],
+    )
+    with patch("easypasal.ingest.download.download_corpus", return_value=dummy_summary):
+        with pytest.raises(SystemExit) as exc_info:
+            main()
+        assert exc_info.value.code == 1
 
 
 def test_download_single_file_non_pdf_rejection(tmp_path: Path) -> None:
