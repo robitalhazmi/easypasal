@@ -3,7 +3,10 @@
 [![CI](https://github.com/robitalhazmi/easypasal/actions/workflows/ci.yml/badge.svg)](https://github.com/robitalhazmi/easypasal/actions/workflows/ci.yml)
 [![Coverage](https://img.shields.io/badge/coverage-86%25-brightgreen.svg)](https://github.com/robitalhazmi/easypasal)
 [![Python 3.11+](https://img.shields.io/badge/python-3.11+-blue.svg)](https://www.python.org/downloads/)
+[![Code style: ruff](https://img.shields.io/badge/code%20style-ruff-000000.svg)](https://github.com/astral-sh/ruff)
+[![Checked with mypy](https://img.shields.io/badge/mypy-checked-blue.svg)](http://mypy-lang.org/)
 [![License: Apache-2.0](https://img.shields.io/badge/License-Apache_2.0-blue.svg)](LICENSE)
+[![Docs: Reproduce](https://img.shields.io/badge/docs-reproduce.md-success.svg)](docs/reproduce.md)
 [![Hugging Face Spaces](https://img.shields.io/badge/%F0%9F%A4%97%20Hugging%20Face-Live%20Demo-yellow)](https://huggingface.co/spaces/robitalhazmi/easypasal)
 
 > **Citation-grounded statutory question-answering for Indonesian financial regulations (OJK & Bank Indonesia) with strict cite-or-abstain guardrails.**

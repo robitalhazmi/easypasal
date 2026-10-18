@@ -5,6 +5,33 @@ description = "Evaluated, cited answers on Indonesian financial regulation."
 readme = "README.md"
 requires-python = ">=3.11"
 license = { text = "Apache-2.0" }
+keywords = [
+    "rag",
+    "retrieval-augmented-generation",
+    "indonesian-law",
+    "ojk",
+    "bank-indonesia",
+    "financial-regulation",
+    "compliance",
+    "qdrant",
+    "fastembed",
+    "vllm",
+    "gepa",
+    "dspy",
+    "qlora",
+    "llm-evaluation",
+    "evidently",
+]
+classifiers = [
+    "Development Status :: 4 - Beta",
+    "Intended Audience :: Financial and Insurance Industry",
+    "Intended Audience :: Legal Industry",
+    "Intended Audience :: Science/Research",
+    "License :: OSI Approved :: Apache Software License",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+    "Topic :: Scientific/Engineering :: Artificial Intelligence",
+]
 authors = [
     { name = "EasyPasal Authors" }
 ]
