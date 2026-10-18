@@ -83,18 +83,17 @@ def test_example_queries_configuration(
         assert len(item) == 3
         question, lang, variant = item
         assert isinstance(question, str) and len(question) > 10
+        assert "..." not in question
         assert lang in ("id", "en")
         assert variant in ("baseline_v0.1", "gepa_v0.2")
 
     demo = build_ui(pipeline=mock_pipeline, request_logger=mock_request_logger)
-    # Verify dataset configuration inside demo blocks
-    datasets = [comp for comp in demo.blocks.values() if isinstance(comp, gr.Dataset)]
-    assert len(datasets) >= 1
-    dataset = datasets[0]
-    assert dataset.samples_per_page >= len(DEFAULT_EXAMPLES)
-    assert len(dataset.samples) == len(DEFAULT_EXAMPLES)
-    # Check visible column is only the question column to prevent masking
-    assert len(dataset.samples[0]) == 1
+    # Verify that all 6 default examples exist as clickable buttons with untruncated labels
+    buttons = [comp for comp in demo.blocks.values() if isinstance(comp, gr.Button)]
+    button_labels = [getattr(b, "value", "") for b in buttons]
+    for ex_q, _, _ in DEFAULT_EXAMPLES:
+        assert ex_q in button_labels
+        assert "..." not in ex_q
 
 
 def test_format_citations_markdown() -> None:

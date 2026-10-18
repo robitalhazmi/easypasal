@@ -120,13 +120,64 @@ def build_ui(
         padding: 10px 14px;
         font-size: 0.85rem;
     }
-    /* Example Queries - Full Visibility & No Masking */
+    /* Example Queries - Full Visibility, Word-wrapped, Zero Truncation */
+    .example-queries-container,
+    #example-queries-list {
+        overflow: visible !important;
+        max-height: none !important;
+        height: auto !important;
+        width: 100% !important;
+        display: flex !important;
+        flex-direction: column !important;
+        gap: 8px !important;
+    }
+    .example-query-btn {
+        display: block !important;
+        width: 100% !important;
+        white-space: normal !important;
+        word-break: break-word !important;
+        overflow-wrap: break-word !important;
+        text-overflow: clip !important;
+        overflow: visible !important;
+        text-align: left !important;
+        font-size: 0.86rem !important;
+        line-height: 1.45 !important;
+        font-weight: 400 !important;
+        padding: 10px 14px !important;
+        margin-bottom: 6px !important;
+        background-color: #0f172a !important;
+        border: 1px solid #334155 !important;
+        border-radius: 8px !important;
+        color: #cbd5e1 !important;
+        box-shadow: none !important;
+        cursor: pointer !important;
+        transition: all 0.15s ease-in-out !important;
+        height: auto !important;
+        min-height: unset !important;
+        max-height: none !important;
+        box-sizing: border-box !important;
+    }
+    .example-query-btn:hover {
+        background-color: #1e293b !important;
+        border-color: #38bdf8 !important;
+        color: #38bdf8 !important;
+        transform: translateY(-1px);
+    }
+    .example-query-btn * {
+        white-space: normal !important;
+        word-break: break-word !important;
+        overflow-wrap: break-word !important;
+        text-overflow: clip !important;
+        overflow: visible !important;
+        text-align: left !important;
+        line-height: 1.45 !important;
+    }
+
     #example-queries,
     #example-queries .dataset,
     #example-queries .table-wrap,
     #example-queries .gallery,
     #example-queries table,
-    .example-queries-container,
     .example-queries-container .dataset,
     .example-queries-container .table-wrap,
     .example-queries-container .gallery,
@@ -341,14 +392,27 @@ def build_ui(
                 elem_classes=["example-queries-container"],
             ):
                 gr.Markdown("### ⚡ Pertanyaan Uji / Example Queries")
-                gr.Examples(
-                    examples=DEFAULT_EXAMPLES,
-                    inputs=[question_input, lang_toggle, variant_selector],
-                    label="Pilih pertanyaan untuk menguji sistem:",
-                    visible_columns=[0],
-                    examples_per_page=len(DEFAULT_EXAMPLES),
-                    elem_id="example-queries",
+                gr.Markdown(
+                    "<span style='font-size: 0.85rem; color: #94a3b8; margin-bottom: 4px; display: block;'>"
+                    "Pilih pertanyaan untuk langsung menguji kepatuhan:"
+                    "</span>"
                 )
+                with gr.Column(elem_id="example-queries-list"):
+                    for ex_q, ex_l, ex_v in DEFAULT_EXAMPLES:
+                        ex_btn = gr.Button(
+                            ex_q,
+                            size="sm",
+                            elem_classes=["example-query-btn"],
+                        )
+                        ex_btn.click(
+                            fn=lambda query_val=ex_q, lang_val=ex_l, var_val=ex_v: (
+                                query_val,
+                                lang_val,
+                                var_val,
+                            ),
+                            inputs=[],
+                            outputs=[question_input, lang_toggle, variant_selector],
+                        )
 
         # Response Section
         with gr.Group():
