@@ -142,7 +142,7 @@
 
 ## Phase 9 — Application packaging (P0)
 
-- [ ] **T9.1** 👤 Final check of every link (repo, demo, docs, video) from a logged-out browser
+- [x] **T9.1** 👤 Final check of every link (repo, demo, docs, video) from a logged-out browser (commit `3f091d7`)
 
 ---
 
@@ -192,3 +192,4 @@ If time runs short, descope in this order and record it as future work: **E7 QLo
 | 2026-10-18 | T8.5: Authored 3–5 minute portfolio and fallback demo video recording script (`docs/demo-video-script.md`) detailing setup, scene storyboard, exact statutory queries, voiceover narration, and recording tips (commit `065a7b0`). |
 | 2026-10-18 | T8.6: Enhanced repository badges (CI, license, Python, coverage 86%, ruff, mypy, docs, Hugging Face Space), populated `pyproject.toml` keywords and PyPI classifiers, and verified clean lint and test run across all 384 tests (commit `e7f80d7`). |
 | 2026-10-18 | T8.7: Conducted exhaustive Honest-Claims Protocol audit (`docs/honest-claims-audit.md`) against Plan §13 across `README.md`, `docs/stakeholder-memo.md`, `docs/decision-log.md`, `docs/reproduce.md`, and `docs/runbook.md`, verifying 100% compliance with zero unsubstantiated live production or customer A/B claims (commit `065a7b0`). |
+| 2026-10-18 | T9.1: Automated link integrity check across all markdown documentation files (README and `docs/**/*.md`); resolved 11 relative navigation links in `docs/decision-log.md`; confirmed 100% link resolution and verified PR #8 merge to `main` (commit `3f091d7`). |
