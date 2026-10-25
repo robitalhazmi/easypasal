@@ -86,6 +86,13 @@ def test_trim_incomplete_sentence() -> None:
     assert trim_incomplete_sentence("") == ""
     assert trim_incomplete_sentence("   ") == "   "
 
+    # 6. Orphaned trailing list bullet or severed list item
+    orphaned_bullet = "Pusat Data wajib di Indonesia.\n\n3."
+    assert trim_incomplete_sentence(orphaned_bullet) == "Pusat Data wajib di Indonesia."
+
+    severed_bullet = "Pusat Data wajib di Indonesia.\n\n3. Bank wajib men"
+    assert trim_incomplete_sentence(severed_bullet) == "Pusat Data wajib di Indonesia."
+
 
 def test_format_passages_and_prompt_assembly() -> None:
     """Verify context formatting and prompt assembly for Indonesian and English."""

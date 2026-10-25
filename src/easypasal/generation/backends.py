@@ -55,11 +55,15 @@ def trim_incomplete_sentence(text: str) -> str:
     """Trim trailing incomplete sentences or cut-off fragments if generation stopped prematurely.
 
     Ensures the response always concludes at a complete grammatical boundary (period, exclamation,
-    question mark, or closing citation bracket), preventing dangling words or severed clauses.
+    question mark, or closing citation bracket), preventing dangling words, severed clauses,
+    or orphaned trailing list numbers.
     """
     stripped = text.rstrip()
     if not stripped:
         return text
+
+    # Strip any trailing orphan list marker (e.g. "\n\n3." or "\n3." or "\n- ")
+    stripped = re.sub(r"(?:\n\s*|\A\s*)(?:\d+[\.\)]|[-*•])\s*$", "", stripped).rstrip()
 
     terminal_chars = (
         ".",
@@ -78,16 +82,20 @@ def trim_incomplete_sentence(text: str) -> str:
         ".)",
     )
 
-    if stripped.endswith(terminal_chars) or stripped.rstrip("*_\"'\t\r \n)").endswith(
+    is_terminal = stripped.endswith(terminal_chars) or stripped.rstrip("*_\"'\t\r \n)").endswith(
         (".", "!", "?", "]")
-    ):
+    )
+    if is_terminal and not re.search(r"\b\d+\.$", stripped):
         return stripped
 
-    matches = list(re.finditer(r"[\.!\?\]][\'\"\)\*\_]*(?=\s|$)", stripped))
+    # Match genuine sentence endings (excluding list numbers like "3." or decimals like "3.5")
+    pattern = r"(?:(?<!\b\d)[\.!\?]|\])[\'\"\)\*\_]*(?=\s|$)"
+    matches = list(re.finditer(pattern, stripped))
     if matches:
         last_match = matches[-1]
         cut_index = last_match.end()
         trimmed = stripped[:cut_index].rstrip()
+        trimmed = re.sub(r"(?:\n\s*|\A\s*)(?:\d+[\.\)]|[-*•])\s*$", "", trimmed).rstrip()
         if len(trimmed) >= 10:
             return trimmed
 
