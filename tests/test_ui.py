@@ -132,6 +132,32 @@ def test_format_citations_markdown() -> None:
     empty_md = format_citations_markdown(empty_output)
     assert "Tidak ada pasal rujukan" in empty_md
 
+    # 3. Output with abstained=True (Indonesian) - Approach A: citations suppressed
+    abstained_output_id = GenerationOutput(
+        question="q_abstain",
+        answer="Maaf, informasi tidak tercantum.",
+        language="id",
+        abstained=True,
+        citations=[],
+        retrieved_chunks=[chunk],
+    )
+    abstain_md_id = format_citations_markdown(abstained_output_id)
+    assert "Tidak ada pasal yang disitir" in abstain_md_id
+    assert "[POJK-10-2022]" not in abstain_md_id
+
+    # 4. Output with abstained=True (English) - Approach A: citations suppressed
+    abstained_output_en = GenerationOutput(
+        question="q_abstain_en",
+        answer="Sorry, no regulatory provision found.",
+        language="en",
+        abstained=True,
+        citations=[],
+        retrieved_chunks=[chunk],
+    )
+    abstain_md_en = format_citations_markdown(abstained_output_en)
+    assert "No articles were cited" in abstain_md_en
+    assert "[POJK-10-2022]" not in abstain_md_en
+
 
 def test_prepare_space_bundle(tmp_path: Path) -> None:
     """Verify that prepare_space_bundle stages all required assets for Docker deployment."""

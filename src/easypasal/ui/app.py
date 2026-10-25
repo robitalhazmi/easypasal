@@ -86,8 +86,24 @@ DEFAULT_EXAMPLES = [
 
 def format_citations_markdown(output: Any) -> str:
     """Format retrieved statutory passages into structured markdown for review."""
+    abstained = getattr(output, "abstained", False)
+    language = getattr(output, "language", "id")
+
+    if abstained:
+        if language == "en":
+            return (
+                "*This query does not have a governing statutory basis within the available "
+                "regulatory corpus. No articles were cited.*"
+            )
+        return (
+            "*Pertanyaan ini tidak memiliki dasar hukum yang berlaku dalam korpus regulasi yang tersedia. "
+            "Tidak ada pasal yang disitir.*"
+        )
+
     retrieved_chunks = getattr(output, "retrieved_chunks", [])
     if not retrieved_chunks:
+        if language == "en":
+            return "*No reference statutory provisions retrieved for this query.*"
         return "*Tidak ada pasal rujukan yang ditarik untuk pertanyaan ini.*"
 
     md_lines: list[str] = [
