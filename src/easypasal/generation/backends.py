@@ -487,18 +487,19 @@ class TransformersBackend:
 
         do_sample = temperature > 0.01
         rep_penalty_env = os.getenv("EASYPASAL_REPETITION_PENALTY")
-        rep_penalty = float(rep_penalty_env) if rep_penalty_env else 1.15
+        rep_penalty = float(rep_penalty_env) if rep_penalty_env else 1.08
 
         no_repeat_ngram_env = os.getenv("EASYPASAL_NO_REPEAT_NGRAM_SIZE")
-        no_repeat_ngram_size = int(no_repeat_ngram_env) if no_repeat_ngram_env else 4
+        no_repeat_ngram_size = int(no_repeat_ngram_env) if no_repeat_ngram_env else 0
 
         gen_kwargs: dict[str, Any] = {
             "max_new_tokens": max_tokens,
             "pad_token_id": self._tokenizer.pad_token_id,
             "eos_token_id": self._tokenizer.eos_token_id,
             "repetition_penalty": rep_penalty,
-            "no_repeat_ngram_size": no_repeat_ngram_size,
         }
+        if no_repeat_ngram_size > 0:
+            gen_kwargs["no_repeat_ngram_size"] = no_repeat_ngram_size
         if do_sample:
             gen_kwargs["temperature"] = temperature
             gen_kwargs["do_sample"] = True

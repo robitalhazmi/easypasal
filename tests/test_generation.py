@@ -309,9 +309,18 @@ def test_transformers_backend_lazy_and_mock(monkeypatch: pytest.MonkeyPatch) -> 
     assert "Jawaban dari regulasi OJK [POJK 12]." in result.text
     assert result.model_name == "test-model"
 
-    gen_call_kwargs = mock_model.generate.call_args[1]
-    assert gen_call_kwargs.get("repetition_penalty") == 1.15
-    assert gen_call_kwargs.get("no_repeat_ngram_size") == 4
+    # Verify default gen_kwargs (no_repeat_ngram_size disabled by default, gentle repetition_penalty)
+    _, gen_kwargs = mock_model.generate.call_args
+    assert "no_repeat_ngram_size" not in gen_kwargs
+    assert gen_kwargs["repetition_penalty"] == 1.08
+
+    # Verify environment override
+    monkeypatch.setenv("EASYPASAL_NO_REPEAT_NGRAM_SIZE", "3")
+    monkeypatch.setenv("EASYPASAL_REPETITION_PENALTY", "1.12")
+    backend.generate("Pertanyaan kepatuhan?", temperature=0.0)
+    _, gen_kwargs_env = mock_model.generate.call_args
+    assert gen_kwargs_env["no_repeat_ngram_size"] == 3
+    assert gen_kwargs_env["repetition_penalty"] == 1.12
 
     backend.close()
     assert backend._model is None

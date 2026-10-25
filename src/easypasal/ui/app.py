@@ -603,11 +603,23 @@ def build_ui(
                 except Exception as log_exc:
                     logger.warning("Failed to log request in UI: %s", log_exc)
 
-            # Determine status badge
+            # Determine status badge based on abstention and post-hoc citation verification
+            v_data = (
+                output.metadata.get("citation_verification")
+                if isinstance(output.metadata, dict)
+                else None
+            )
+            is_valid_cit = v_data.get("is_valid", True) if v_data else True
+
             if output.abstained or len(output.citations) == 0:
                 badge_html = (
                     "<span style='background:#fee2e2; color:#b91c1c; padding:3px 10px; "
                     "border-radius:4px; font-weight:600;'>⚠️ Tidak Ada Dasar Hukum / Abstained</span>"
+                )
+            elif not is_valid_cit:
+                badge_html = (
+                    "<span style='background:#fef3c7; color:#b45309; padding:3px 10px; "
+                    "border-radius:4px; font-weight:600;'>⚠️ Sitasi Belum Terverifikasi / Perlu Tinjauan</span>"
                 )
             else:
                 badge_html = (

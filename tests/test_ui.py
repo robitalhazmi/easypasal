@@ -146,6 +146,52 @@ def test_on_ask_defaults_and_overrides(
     assert kwargs_override.get("status_filter") == "all"
 
 
+def test_on_ask_status_badge(mock_pipeline: MagicMock, mock_request_logger: RequestLogger) -> None:
+    """Verify that on_ask sets appropriate status badge according to verification metadata."""
+    demo = build_ui(pipeline=mock_pipeline, request_logger=mock_request_logger)
+    on_ask = next(
+        fn.fn
+        for fn in demo.fns.values()
+        if fn.fn is not None and getattr(fn.fn, "__name__", "") == "on_ask"
+    )
+    assert callable(on_ask)
+
+    # 1. Grounded & verified citations -> Green badge
+    mock_pipeline.ask.return_value = GenerationOutput(
+        question="q",
+        answer="a",
+        language="id",
+        citations=["[POJK 11/2022, Pasal 35]"],
+        abstained=False,
+        metadata={"citation_verification": {"is_valid": True}},
+    )
+    _, badge_1, _, _, _, _ = on_ask("q", "id", "gepa_v0.2")
+    assert "Dijawab Berdasar Regulasi" in badge_1
+
+    # 2. Hallucinated / unverified citations -> Amber badge
+    mock_pipeline.ask.return_value = GenerationOutput(
+        question="q",
+        answer="a",
+        language="id",
+        citations=["[POJK 7/2011, Pasal 4]"],
+        abstained=False,
+        metadata={"citation_verification": {"is_valid": False}},
+    )
+    _, badge_2, _, _, _, _ = on_ask("q", "id", "gepa_v0.2")
+    assert "Sitasi Belum Terverifikasi" in badge_2
+
+    # 3. Abstained -> Red badge
+    mock_pipeline.ask.return_value = GenerationOutput(
+        question="q",
+        answer="tidak ada dasar hukum",
+        language="id",
+        citations=[],
+        abstained=True,
+    )
+    _, badge_3, _, _, _, _ = on_ask("q", "id", "gepa_v0.2")
+    assert "Tidak Ada Dasar Hukum" in badge_3
+
+
 def test_format_citations_markdown() -> None:
     """Verify that format_citations_markdown produces properly formatted legal citations."""
     # 1. Output with chunks
