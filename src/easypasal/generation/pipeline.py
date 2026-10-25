@@ -344,10 +344,12 @@ class RAGPipeline:
             max_tokens=eff_max_tokens,
         )
 
-        # 5. Extract Citations and Check Abstention
-        citations = extract_citations(gen_res.text)
-        abstained = check_abstention(gen_res.text, language=lang)
-        answer_text = gen_res.text
+        # 5. Clean Incomplete Sentence Fragments, Extract Citations, and Check Abstention
+        from easypasal.generation.backends import trim_incomplete_sentence
+
+        answer_text = trim_incomplete_sentence(gen_res.text)
+        citations = extract_citations(answer_text)
+        abstained = check_abstention(answer_text, language=lang)
 
         # 6. Post-Hoc Citation Verification (T1.7)
         verification_dict = None
@@ -355,7 +357,7 @@ class RAGPipeline:
             from easypasal.guardrails.citation_verifier import verify_citations as verify_fn
 
             v_res = verify_fn(
-                answer=gen_res.text,
+                answer=answer_text,
                 retrieved_chunks=chunks,
                 citations=citations,
             )

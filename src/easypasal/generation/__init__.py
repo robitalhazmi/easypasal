@@ -12,6 +12,7 @@ if TYPE_CHECKING:
         OpenAICompatibleBackend,
         get_generator_backend,
         get_process_peak_memory_mb,
+        trim_incomplete_sentence,
     )
     from easypasal.generation.citations import (
         check_abstention,
@@ -50,6 +51,7 @@ __all__ = [
     "format_passages",
     "get_generator_backend",
     "get_process_peak_memory_mb",
+    "trim_incomplete_sentence",
     "verify_citation_coverage",
 ]
 
@@ -62,6 +64,7 @@ _BACKEND_SYMBOLS = {
     "OpenAICompatibleBackend",
     "get_generator_backend",
     "get_process_peak_memory_mb",
+    "trim_incomplete_sentence",
 }
 
 _CITATION_SYMBOLS = {

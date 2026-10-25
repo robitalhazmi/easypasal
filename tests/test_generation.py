@@ -56,6 +56,37 @@ def test_detect_language() -> None:
     assert detect_language("") == "id"
 
 
+def test_trim_incomplete_sentence() -> None:
+    """Verify sentence boundary trimmer removes trailing incomplete fragments while keeping full sentences."""
+    from easypasal.generation.backends import trim_incomplete_sentence
+
+    # 1. Trailing severed word/bullet
+    cutoff_text = (
+        "PUSK wajib memiliki mekanisme pengaduan.\n"
+        "PUJK wajib menyelesaikan pengaduan paling lambat 10 hari.\n"
+        "Mengajukan sengketa kepada le"
+    )
+    res = trim_incomplete_sentence(cutoff_text)
+    assert not res.endswith("kepada le")
+    assert res.endswith("paling lambat 10 hari.")
+
+    # 2. Complete text with terminal period
+    clean_text = "Berdasarkan [POJK 22/2023, Pasal 82], PUJK wajib menyelesaikan pengaduan."
+    assert trim_incomplete_sentence(clean_text) == clean_text
+
+    # 3. Citation bracket terminal
+    citation_text = "Ketentuan tercantum dalam [POJK 22/2023, Pasal 82]"
+    assert trim_incomplete_sentence(citation_text) == citation_text
+
+    # 4. Markdown formatted text
+    md_text = "**Ketentuan pertama berlaku.**\n**Ketentuan kedua yang dipoto"
+    assert trim_incomplete_sentence(md_text) == "**Ketentuan pertama berlaku.**"
+
+    # 5. Empty or whitespace
+    assert trim_incomplete_sentence("") == ""
+    assert trim_incomplete_sentence("   ") == "   "
+
+
 def test_format_passages_and_prompt_assembly() -> None:
     """Verify context formatting and prompt assembly for Indonesian and English."""
     c1 = _make_dummy_chunk(
@@ -247,6 +278,10 @@ def test_transformers_backend_lazy_and_mock(monkeypatch: pytest.MonkeyPatch) -> 
     result = backend.generate("Pertanyaan kepatuhan?", temperature=0.0)
     assert "Jawaban dari regulasi OJK [POJK 12]." in result.text
     assert result.model_name == "test-model"
+
+    gen_call_kwargs = mock_model.generate.call_args[1]
+    assert gen_call_kwargs.get("repetition_penalty") == 1.15
+    assert gen_call_kwargs.get("no_repeat_ngram_size") == 4
 
     backend.close()
     assert backend._model is None
@@ -520,6 +555,7 @@ def test_generation_package_exports() -> None:
     assert hasattr(gen, "LlamaCppBackend")
     assert hasattr(gen, "OpenAICompatibleBackend")
     assert hasattr(gen, "get_generator_backend")
+    assert hasattr(gen, "trim_incomplete_sentence")
     assert hasattr(gen, "extract_citations")
     assert hasattr(gen, "check_abstention")
     assert hasattr(gen, "build_rag_prompt")

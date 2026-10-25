@@ -51,6 +51,49 @@ def get_process_peak_memory_mb() -> float:
     return round(rusage / 1024, 2)
 
 
+def trim_incomplete_sentence(text: str) -> str:
+    """Trim trailing incomplete sentences or cut-off fragments if generation stopped prematurely.
+
+    Ensures the response always concludes at a complete grammatical boundary (period, exclamation,
+    question mark, or closing citation bracket), preventing dangling words or severed clauses.
+    """
+    stripped = text.rstrip()
+    if not stripped:
+        return text
+
+    terminal_chars = (
+        ".",
+        "!",
+        "?",
+        '"]',
+        "']",
+        '."',
+        '!"',
+        '?"',
+        "]",
+        ")",
+        ".*",
+        "._",
+        ".**",
+        ".)",
+    )
+
+    if stripped.endswith(terminal_chars) or stripped.rstrip("*_\"'\t\r \n)").endswith(
+        (".", "!", "?", "]")
+    ):
+        return stripped
+
+    matches = list(re.finditer(r"[\.!\?\]][\'\"\)\*\_]*(?=\s|$)", stripped))
+    if matches:
+        last_match = matches[-1]
+        cut_index = last_match.end()
+        trimmed = stripped[:cut_index].rstrip()
+        if len(trimmed) >= 10:
+            return trimmed
+
+    return stripped
+
+
 class GeneratorBackend(Protocol):
     """Protocol defining the interface for LLM text generators."""
 
@@ -200,6 +243,9 @@ class OllamaBackend:
         stop: list[str] | None = None,
     ) -> LLMGenerationResult:
         start_time = time.perf_counter()
+        rep_penalty_env = os.getenv("EASYPASAL_REPETITION_PENALTY")
+        rep_penalty = float(rep_penalty_env) if rep_penalty_env else 1.15
+
         payload = {
             "model": self._model_name,
             "prompt": prompt,
@@ -208,6 +254,7 @@ class OllamaBackend:
                 "temperature": temperature,
                 "num_predict": max_tokens,
                 "stop": stop or [],
+                "repeat_penalty": rep_penalty,
             },
         }
 
@@ -215,7 +262,8 @@ class OllamaBackend:
             resp = self.client.post("/api/generate", json=payload)
             resp.raise_for_status()
             data = resp.json()
-            text = data.get("response", "").strip()
+            raw_text = data.get("response", "").strip()
+            text = trim_incomplete_sentence(raw_text)
             prompt_tokens = data.get("prompt_eval_count", 0)
             completion_tokens = data.get("eval_count", 0)
         except Exception as e:
@@ -270,6 +318,8 @@ class OpenAICompatibleBackend:
             "temperature": temperature,
             "max_tokens": max_tokens,
             "stop": stop,
+            "frequency_penalty": 0.2,
+            "presence_penalty": 0.2,
         }
 
         resp = self.client.post("/chat/completions", json=payload)
@@ -277,7 +327,8 @@ class OpenAICompatibleBackend:
         data = resp.json()
 
         choices = data.get("choices", [])
-        text = choices[0]["message"]["content"].strip() if choices else ""
+        raw_text = choices[0]["message"]["content"].strip() if choices else ""
+        text = trim_incomplete_sentence(raw_text)
         usage = data.get("usage", {})
 
         elapsed = time.perf_counter() - start_time
@@ -435,10 +486,18 @@ class TransformersBackend:
         prompt_tokens = inputs["input_ids"].shape[1]
 
         do_sample = temperature > 0.01
+        rep_penalty_env = os.getenv("EASYPASAL_REPETITION_PENALTY")
+        rep_penalty = float(rep_penalty_env) if rep_penalty_env else 1.15
+
+        no_repeat_ngram_env = os.getenv("EASYPASAL_NO_REPEAT_NGRAM_SIZE")
+        no_repeat_ngram_size = int(no_repeat_ngram_env) if no_repeat_ngram_env else 4
+
         gen_kwargs: dict[str, Any] = {
             "max_new_tokens": max_tokens,
             "pad_token_id": self._tokenizer.pad_token_id,
             "eos_token_id": self._tokenizer.eos_token_id,
+            "repetition_penalty": rep_penalty,
+            "no_repeat_ngram_size": no_repeat_ngram_size,
         }
         if do_sample:
             gen_kwargs["temperature"] = temperature
@@ -461,6 +520,8 @@ class TransformersBackend:
             for s in stop:
                 if s in text:
                     text = text.split(s)[0].strip()
+
+        text = trim_incomplete_sentence(text)
 
         elapsed = time.perf_counter() - start_time
         latency_ms = round(elapsed * 1000, 2)
@@ -540,7 +601,8 @@ class HuggingFaceInferenceBackend:
                 stop=stop,
             )
             choice = resp.choices[0]
-            text = (choice.message.content or "").strip()
+            raw_text = (choice.message.content or "").strip()
+            text = trim_incomplete_sentence(raw_text)
             prompt_tokens = getattr(
                 getattr(resp, "usage", None), "prompt_tokens", len(prompt.split())
             )
@@ -652,6 +714,9 @@ class LlamaCppBackend:
         prompt_tokens = 0
         completion_tokens = 0
 
+        rep_penalty_env = os.getenv("EASYPASAL_REPETITION_PENALTY")
+        rep_penalty = float(rep_penalty_env) if rep_penalty_env else 1.15
+
         if sys_match:
             sys_text = sys_match.group(1).strip()
             messages: list[Any] = [
@@ -663,6 +728,7 @@ class LlamaCppBackend:
                 temperature=temperature,
                 max_tokens=max_tokens,
                 stop=effective_stop,
+                repeat_penalty=rep_penalty,
             )
             if isinstance(chat_res, dict):
                 choice = chat_res["choices"][0]
@@ -680,6 +746,7 @@ class LlamaCppBackend:
                 max_tokens=max_tokens,
                 stop=effective_stop,
                 stream=False,
+                repeat_penalty=rep_penalty,
             )
             if isinstance(comp_res, dict):
                 choice = comp_res["choices"][0]
@@ -690,6 +757,8 @@ class LlamaCppBackend:
                     completion_tokens = int(usage.get("completion_tokens", 0))
             else:
                 text = ""
+
+        text = trim_incomplete_sentence(text)
 
         elapsed = time.perf_counter() - start_time
         latency_ms = round(elapsed * 1000, 2)
