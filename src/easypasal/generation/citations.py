@@ -24,43 +24,35 @@ _BRACKET_CITATION_REGEX = re.compile(
 
 _ABSTAIN_PHRASES_ID = [
     "tidak ditemukan dalam regulasi",
-    "tidak ditemukan dalam",
     "tidak ditemukan dasar hukum",
     "tidak terdapat dasar hukum",
     "tidak terdapat informasi",
     "tidak terdapat dalam regulasi",
-    "tidak terdapat dalam",
-    "tidak ada informasi",
+    "tidak ada informasi mengenai",
     "tidak ada dasar hukum",
     "tidak menyebutkan informasi",
     "tidak diatur dalam regulasi",
-    "tidak diatur dalam",
     "di luar cakupan regulasi",
-    "di luar cakupan",
-    "tidak memuat ketentuan",
+    "tidak memuat ketentuan mengenai",
     "tidak memuat informasi",
     "belum dikemukakan dalam dokumen",
-    "belum dikemukakan",
     "tidak dikemukakan dalam dokumen",
-    "tidak dikemukakan",
     "tidak disebutkan dalam dokumen",
     "tidak disebutkan dalam regulasi",
-    "tidak disebutkan",
     "belum diatur dalam dokumen",
     "belum diatur dalam regulasi",
-    "belum diatur",
     "tidak tercantum dalam dokumen",
     "tidak tercantum dalam regulasi",
-    "tidak tercantum",
     "dokumen yang ada tidak memuat",
     "regulasi yang ada tidak memuat",
     "tidak dijelaskan dalam dokumen",
     "tidak dijelaskan dalam regulasi",
     "tidak ada ketentuan mengenai",
-    "tidak ditemukan",
-    "belum ada ketentuan",
-    "tidak memuat rincian",
-    "belum memuat",
+    "belum ada ketentuan mengenai",
+    "tidak diatur dalam korpus",
+    "tidak ditemukan dalam korpus",
+    "tidak diatur dalam peraturan",
+    "tidak ditemukan dalam peraturan",
 ]
 
 _ABSTAIN_PHRASES_EN = [
@@ -71,7 +63,7 @@ _ABSTAIN_PHRASES_EN = [
     "no information found",
     "outside the scope of",
     "does not contain information",
-    "not regulated in",
+    "not regulated in the regulations",
     "not stated in the provided documents",
     "not stated in the documents",
     "not mentioned in the documents",
@@ -120,6 +112,21 @@ def check_abstention(text: str, language: str = "id") -> bool:
     is not found within the available corpus passages.
     """
     clean_lower = text.strip().lower()
+
+    # If the response cites official regulations, it is overwhelmingly likely a substantive answer,
+    # not an abstention refusal. Only flag as abstention if it contains an explicit canonical refusal phrase.
+    citations = extract_citations(text)
+    if citations:
+        canonical_refusals = [
+            "tidak ditemukan dasar hukum",
+            "tidak terdapat dasar hukum",
+            "tidak ada dasar hukum",
+            "tidak ditemukan dalam regulasi",
+            "no legal basis was found",
+            "not found in the available regulations",
+            "not found in the provided regulations",
+        ]
+        return any(phrase in clean_lower for phrase in canonical_refusals)
 
     if language == "en":
         return any(phrase in clean_lower for phrase in _ABSTAIN_PHRASES_EN)

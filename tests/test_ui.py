@@ -96,6 +96,56 @@ def test_example_queries_configuration(
         assert "..." not in ex_q
 
 
+def test_on_ask_defaults_and_overrides(
+    mock_pipeline: MagicMock, mock_request_logger: RequestLogger, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """Verify that on_ask passes strict_grounding=False and status_filter='berlaku' by default, and honors env overrides."""
+    # 1. Default configuration: strict_grounding=False, status_filter="berlaku"
+    monkeypatch.delenv("EASYPASAL_STRICT_GROUNDING", raising=False)
+    monkeypatch.delenv("EASYPASAL_STATUS_FILTER", raising=False)
+    demo_default = build_ui(pipeline=mock_pipeline, request_logger=mock_request_logger)
+    on_ask_default = next(
+        fn.fn
+        for fn in demo_default.fns.values()
+        if fn.fn is not None and getattr(fn.fn, "__name__", "") == "on_ask"
+    )
+    assert callable(on_ask_default)
+
+    on_ask_default(
+        "Di mana Bank Umum wajib menempatkan Pusat Data?",
+        "id",
+        "gepa_v0.2",
+    )
+
+    mock_pipeline.ask.assert_called_once()
+    _, kwargs = mock_pipeline.ask.call_args
+    assert kwargs.get("strict_grounding") is False
+    assert kwargs.get("status_filter") == "berlaku"
+
+    # 2. Environment override: EASYPASAL_STRICT_GROUNDING=true, EASYPASAL_STATUS_FILTER=all
+    mock_pipeline.reset_mock()
+    monkeypatch.setenv("EASYPASAL_STRICT_GROUNDING", "true")
+    monkeypatch.setenv("EASYPASAL_STATUS_FILTER", "all")
+    demo_override = build_ui(pipeline=mock_pipeline, request_logger=mock_request_logger)
+    on_ask_override = next(
+        fn.fn
+        for fn in demo_override.fns.values()
+        if fn.fn is not None and getattr(fn.fn, "__name__", "") == "on_ask"
+    )
+    assert callable(on_ask_override)
+
+    on_ask_override(
+        "Di mana Bank Umum wajib menempatkan Pusat Data?",
+        "id",
+        "gepa_v0.2",
+    )
+
+    mock_pipeline.ask.assert_called_once()
+    _, kwargs_override = mock_pipeline.ask.call_args
+    assert kwargs_override.get("strict_grounding") is True
+    assert kwargs_override.get("status_filter") == "all"
+
+
 def test_format_citations_markdown() -> None:
     """Verify that format_citations_markdown produces properly formatted legal citations."""
     # 1. Output with chunks

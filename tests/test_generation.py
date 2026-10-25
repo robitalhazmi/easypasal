@@ -191,6 +191,22 @@ def test_check_abstention() -> None:
     )
     assert (
         check_abstention(
+            "Berdasarkan [POJK 11/POJK.03/2022, Pasal 35 ayat (1)], Bank Umum wajib menempatkan Pusat Data "
+            "dan Pusat Pemulihan Bencana di wilayah Indonesia. Rincian perizinan tidak tercantum dalam pasal ini.",
+            language="id",
+        )
+        is False
+    )
+    assert (
+        check_abstention(
+            "Bank wajib mengelola risiko siber sesuai [POJK 11/2022, Pasal 35]. Hal ini belum diatur secara spesifik "
+            "pada regulasi terdahulu.",
+            language="id",
+        )
+        is False
+    )
+    assert (
+        check_abstention(
             "Commercial banks must maintain a minimum core capital of IDR 3 trillion according to [POJK 12/2020].",
             language="en",
         )
