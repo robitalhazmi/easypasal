@@ -1,10 +1,12 @@
 # EasyPasal
 
 [![CI](https://github.com/robitalhazmi/easypasal/actions/workflows/ci.yml/badge.svg)](https://github.com/robitalhazmi/easypasal/actions/workflows/ci.yml)
-[![Coverage](https://img.shields.io/badge/coverage-86%25-brightgreen.svg)](https://github.com/robitalhazmi/easypasal)
+[![Coverage](https://img.shields.io/badge/coverage-90%25-brightgreen.svg)](https://github.com/robitalhazmi/easypasal)
 [![Python 3.11+](https://img.shields.io/badge/python-3.11+-blue.svg)](https://www.python.org/downloads/)
 [![Code style: ruff](https://img.shields.io/badge/code%20style-ruff-000000.svg)](https://github.com/astral-sh/ruff)
 [![Checked with mypy](https://img.shields.io/badge/mypy-checked-blue.svg)](http://mypy-lang.org/)
+[![Conventional Commits](https://img.shields.io/badge/Conventional%20Commits-1.0.0-yellow.svg)](https://conventionalcommits.org)
+[![Contributing Guide](https://img.shields.io/badge/contributions-welcome-brightgreen.svg)](CONTRIBUTING.md)
 [![License: Apache-2.0](https://img.shields.io/badge/License-Apache_2.0-blue.svg)](LICENSE)
 [![Docs: Reproduce](https://img.shields.io/badge/docs-reproduce.md-success.svg)](docs/reproduce.md)
 [![Hugging Face Spaces](https://img.shields.io/badge/%F0%9F%A4%97%20Hugging%20Face-Live%20Demo-yellow)](https://huggingface.co/spaces/robitalhazmi/easypasal)
@@ -232,7 +234,7 @@ EasyPasal enforces rigorous CI and quality gates:
 
 ```bash
 make check              # Run full verification: ruff lint, format check, and test suite
-make test               # Run pytest suite with coverage (384/384 tests passing, 86% coverage)
+make test               # Run pytest suite with coverage (406/406 tests passing, 90% coverage)
 make rehearse-rollback  # Execute automated 5-phase zero-downtime rollback rehearsal drill
 make real-usage         # Run 35-query operational telemetry generation session
 make eval               # Execute offline statutory evaluation harness
@@ -252,12 +254,78 @@ In strict adherence to the project's **Honest-Claims Protocol**, all capabilitie
 
 ---
 
+## 🤝 Contributing & Community Standards
+
+We welcome contributions that improve code quality, documentation, test coverage, and statutory evaluation methodology! All contributors agree to abide by our [Code of Conduct](CODE_OF_CONDUCT.md).
+
+For full contributor documentation and detailed instructions, refer to the [Contributing Guide](CONTRIBUTING.md).
+
+### 🛠️ Development Workflow
+
+EasyPasal uses [`uv`](https://docs.astral.sh/uv/) for deterministic dependency management. To set up your local development environment:
+
+```bash
+# 1. Clone the repository
+git clone https://github.com/robitalhazmi/easypasal.git
+cd easypasal
+
+# 2. Set up virtual environment and install pre-commit hooks
+make setup
+
+# 3. Verify complete installation and quality gates
+make check
+```
+
+Common developer commands:
+- `make setup` — Install all dependencies and configure Git pre-commit hooks
+- `make format` — Automatically format codebase using `ruff`
+- `make lint` — Run `ruff` linter, formatting checks, and strict `mypy` type validation
+- `make test` — Run `pytest` test suite with coverage report (406/406 passing, 90% coverage)
+- `make check` — Run both `make lint` and `make test` (mandatory gate before opening PR)
+
+### 🌿 Git & Commit Conventions
+
+We strictly follow the [Conventional Commits](https://www.conventionalcommits.org/) specification:
+
+- `feat(scope): ...` — New features or pipeline components
+- `fix(scope): ...` — Bug fixes and patch releases
+- `docs(scope): ...` — Documentation updates or additions
+- `test(scope): ...` — Adding, updating, or fixing tests
+- `chore(scope): ...` — Tooling, dependency, or configuration updates
+- `ci: ...` — GitHub Actions or workflow updates
+
+Examples:
+- `feat(router): add 4-bit qlora front-line guardrail`
+- `fix(generation): cast trainable lora weights to fp32 for amp unscaling`
+- `docs(readme): document conventional commits and 90% test coverage`
+
+### 🚀 Submitting a Pull Request
+
+1. **Branch from `main`:** Create a focused, descriptive feature branch:
+   ```bash
+   git checkout -b feat/ingest-enhancement
+   # or
+   git checkout -b fix/bm25-tokenizer
+   ```
+2. **Implement & Test:** Implement your changes with accompanying unit or integration tests under `tests/`.
+3. **Run Quality Gates:** Execute `make check` locally to ensure all linters, formatting, type checking, and 406 tests pass cleanly.
+4. **Adhere to Core Principles:**
+   - **Grounded or Silent:** Never compromise the strict cite-or-abstain standard.
+   - **Honest Claims:** Never commit synthetic benchmarks or unverified metrics.
+   - **Zero Secrets / Binary Assets:** Never commit `.env` files, API keys, or raw regulatory PDFs.
+5. **Open a PR:** Open a Pull Request targeting `main`. Ensure all automated CI checks pass.
+
+---
+
 ## 📂 Repository Layout
 
 ```
 easypasal/
 ├── README.md                          # Project pitch, architecture, results, quickstart
-├── LICENSE                            # Apache-2.0
+├── CONTRIBUTING.md                    # Contribution guidelines, git workflow, PR protocol
+├── CODE_OF_CONDUCT.md                 # Contributor Covenant Code of Conduct
+├── SECURITY.md                        # Vulnerability reporting policy
+├── LICENSE                            # Apache-2.0 license
 ├── pyproject.toml / uv.lock           # Dependency specification & lockfile
 ├── Makefile                           # Developer workflow targets
 ├── Dockerfile                         # Unified multi-stage container image
@@ -267,7 +335,9 @@ easypasal/
 │   └── gepa_v0.2.yaml                 # Optimized production config (GEPA + Guardrail Router)
 ├── data/
 │   ├── corpus_manifest.csv            # 21 verified statutory regulations across 5 domains
-│   └── gold/                          # 322 labeled benchmark queries (train / dev / test)
+│   ├── gold/                          # 322 labeled benchmark queries (train / dev / test)
+│   ├── eval_outputs/                  # Replay simulation outputs & judge evaluation records
+│   └── e7_router/                     # QLoRA router dataset splits (train / dev / test)
 ├── src/easypasal/
 │   ├── ingest/                        # Statutory PDF parsing & structure-aware chunking
 │   ├── index/                         # Multilingual-E5 embeddings, Qdrant store, BM25
@@ -279,15 +349,17 @@ easypasal/
 │   ├── monitoring/                    # Evidently drift reports, threshold alerting engine
 │   └── ui/                            # Interactive Gradio application
 ├── notebooks/
+│   ├── e5_gepa_prompt_optimization.ipynb # Prompt optimization with DSPy & GEPA
 │   ├── e6_vllm_benchmark.ipynb        # Colab GPU serving benchmark (vLLM on Tesla T4)
-│   └── e7_qlora_training.ipynb        # Colab QLoRA fine-tuning notebook (PEFT + TRL)
+│   ├── e7_qlora_training.ipynb        # Colab QLoRA fine-tuning notebook (PEFT + TRL)
+│   └── judge_eval_colab.ipynb         # Colab GPU LLM judge evaluation & Cohen's kappa calibration
 ├── docs/
 │   ├── architecture.md                # System design & component contracts
 │   ├── decision-log.md                # Full experimental logs (E0 through E7)
 │   ├── eval-methodology.md            # Statistical evaluation & human calibration methodology
 │   ├── runbook.md                     # Operational runbook, incident triage, rollback procedures
 │   └── images/dashboard_monitoring.png # Telemetry dashboard infographic preview
-└── tests/                             # 384 unit and integration tests (86% coverage)
+└── tests/                             # 406 unit and integration tests (90% coverage)
 ```
 
 ---
