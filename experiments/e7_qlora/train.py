@@ -179,38 +179,78 @@ def run_gpu_training(config: QLoRAConfig) -> dict[str, Any]:
     train_ds = Dataset.from_list([{"messages": it["messages"]} for it in train_raw])
     dev_ds = Dataset.from_list([{"messages": it["messages"]} for it in dev_raw])
 
-    # 5. Training Arguments
-    training_args = TrainingArguments(
-        output_dir=config.output_dir,
-        learning_rate=config.learning_rate,
-        lr_scheduler_type=config.lr_scheduler_type,
-        warmup_ratio=config.warmup_ratio,
-        num_train_epochs=config.num_train_epochs,
-        per_device_train_batch_size=config.per_device_train_batch_size,
-        per_device_eval_batch_size=config.per_device_eval_batch_size,
-        gradient_accumulation_steps=config.gradient_accumulation_steps,
-        logging_steps=config.logging_steps,
-        eval_strategy=config.eval_strategy,
-        eval_steps=config.eval_steps,
-        save_strategy=config.save_strategy,
-        save_steps=config.save_steps,
-        save_total_limit=config.save_total_limit,
-        weight_decay=config.weight_decay,
-        seed=config.seed,
-        fp16=(config.bnb_4bit_compute_dtype == "float16"),
-        bf16=(config.bnb_4bit_compute_dtype == "bfloat16"),
-        report_to="none",
-    )
+    # 5. Training Arguments / SFTConfig (compatible with both transformers 4.x and 5.x+, TRL 0.x)
+    import inspect
 
-    trainer = SFTTrainer(
-        model=model,
-        train_dataset=train_ds,
-        eval_dataset=dev_ds,
-        peft_config=peft_config,
-        max_seq_length=config.max_seq_length,
-        tokenizer=tokenizer,
-        args=training_args,
-    )
+    args_class = TrainingArguments
+    try:
+        from trl import SFTConfig
+
+        args_class = SFTConfig
+    except (ImportError, AttributeError):
+        pass
+
+    sig_params = inspect.signature(args_class.__init__).parameters
+
+    training_kwargs: dict[str, Any] = {
+        "output_dir": config.output_dir,
+        "learning_rate": config.learning_rate,
+        "lr_scheduler_type": config.lr_scheduler_type,
+        "num_train_epochs": config.num_train_epochs,
+        "per_device_train_batch_size": config.per_device_train_batch_size,
+        "per_device_eval_batch_size": config.per_device_eval_batch_size,
+        "gradient_accumulation_steps": config.gradient_accumulation_steps,
+        "logging_steps": config.logging_steps,
+        "eval_steps": config.eval_steps,
+        "save_strategy": config.save_strategy,
+        "save_steps": config.save_steps,
+        "save_total_limit": config.save_total_limit,
+        "weight_decay": config.weight_decay,
+        "seed": config.seed,
+        "fp16": (config.bnb_4bit_compute_dtype == "float16"),
+        "bf16": (config.bnb_4bit_compute_dtype == "bfloat16"),
+        "report_to": "none",
+    }
+
+    # Handle warmup_ratio (transformers <5) vs warmup_steps (transformers >=5)
+    if "warmup_ratio" in sig_params:
+        training_kwargs["warmup_ratio"] = config.warmup_ratio
+    elif "warmup_steps" in sig_params:
+        training_kwargs["warmup_steps"] = config.warmup_ratio
+
+    # Handle eval_strategy (transformers >=4.41) vs evaluation_strategy (legacy)
+    if "eval_strategy" in sig_params:
+        training_kwargs["eval_strategy"] = config.eval_strategy
+    elif "evaluation_strategy" in sig_params:
+        training_kwargs["evaluation_strategy"] = config.eval_strategy
+
+    # Handle max sequence length in SFTConfig
+    if "max_seq_length" in sig_params:
+        training_kwargs["max_seq_length"] = config.max_seq_length
+    elif "max_length" in sig_params:
+        training_kwargs["max_length"] = config.max_seq_length
+
+    training_args = args_class(**training_kwargs)
+
+    # 6. SFTTrainer initialization with backward/forward compatibility
+    trainer_sig = inspect.signature(SFTTrainer.__init__).parameters
+    trainer_kwargs: dict[str, Any] = {
+        "model": model,
+        "train_dataset": train_ds,
+        "eval_dataset": dev_ds,
+        "peft_config": peft_config,
+        "args": training_args,
+    }
+
+    if "processing_class" in trainer_sig:
+        trainer_kwargs["processing_class"] = tokenizer
+    elif "tokenizer" in trainer_sig:
+        trainer_kwargs["tokenizer"] = tokenizer
+
+    if "max_seq_length" in trainer_sig and "max_seq_length" not in training_kwargs:
+        trainer_kwargs["max_seq_length"] = config.max_seq_length
+
+    trainer = SFTTrainer(**trainer_kwargs)
 
     logger.info("Starting training loop...")
     train_result = trainer.train()
