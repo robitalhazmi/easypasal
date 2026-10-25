@@ -30,7 +30,7 @@ base_model_name: Qwen/Qwen2.5-0.5B-Instruct
 load_in_4bit: true
 bnb_4bit_quant_type: nf4
 bnb_4bit_use_double_quant: true
-bnb_4bit_compute_dtype: bfloat16
+bnb_4bit_compute_dtype: float16
 
 lora_r: 16
 lora_alpha: 32

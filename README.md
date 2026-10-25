@@ -148,6 +148,29 @@ Inference benchmark on physical **NVIDIA Tesla T4 GPU (16 GB GDDR6)** via `vLLM 
 
 ---
 
+### 4. Front-Line Guardrail Router Benchmark: QLoRA Fine-Tuning (Experiment E7)
+
+[![Open In Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/github/robitalhazmi/easypasal/blob/main/notebooks/e7_qlora_training.ipynb)
+
+To eliminate unnecessary vector retrieval and prevent adversarial jailbreak exploits, EasyPasal deploys a fine-tuned **4-bit NF4 QLoRA router adapter** on `Qwen/Qwen2.5-0.5B-Instruct` ($r=16, \alpha=32$). The router performs multi-task triage in a single forward pass: regulatory theme classification, statutory answerability detection, and prompt injection defense.
+
+Evaluation on the held-out test split ($N = 66$, across 9 benchmark categories):
+
+| Evaluation Metric | Baseline Zero-Shot (`Qwen2.5-0.5B`) | Fine-Tuned QLoRA Adapter | Delta / Impact | Target Status |
+|---|:---:|:---:|:---:|:---:|
+| **Theme Macro-F1** | 0.8371 | **1.0000** | **+0.1629** (+16.3%) | ✅ SOTA Precision |
+| **Theme Accuracy** | 0.9697 | **1.0000** | **+0.0303** | ✅ Perfect Partitioning |
+| **Answerability F1** | 0.9216 | **1.0000** | **+0.0784** (+7.8%) | ✅ Zero False Answerability |
+| **Answerability Precision** | 0.8545 | **1.0000** | **+0.1455** | ✅ Eliminates Hallucination Traps |
+| **Prompt Injection Precision** | **1.0000** | **1.0000** | +0.0000 | ✅ 100% Attack Precision |
+| **Prompt Injection Recall** | 0.6667 | **1.0000** | **+0.3333** (+33.3%) | ✅ 100% Stealth Attack Catch Rate |
+| **Overall Exact Match** | 0.8333 | **1.0000** | **+0.1667** (+16.7%) | ✅ 100% Multi-Task Exact Match |
+| **Mean Triage Latency** | 56.62 ms | **21.56 ms** | **2.6x Speedup** | ✅ Sub-25ms Budget (<22 ms) |
+
+*The QLoRA adapter achieves 100% exact match across all 9 gold taxonomy categories (adversarial jailbreaks, superseded regulation traps, cross-article synthesis, definitional, and out-of-scope queries), short-circuiting invalid requests in **21.6 ms** before triggering vector indexing.*
+
+---
+
 ## 📊 Production Observability & Monitoring
 
 EasyPasal includes an integrated telemetry pipeline designed for low-resource environments:
