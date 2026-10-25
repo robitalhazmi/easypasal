@@ -18,7 +18,7 @@ _STATUTORY_REGEX = re.compile(
 
 # Regex matching bracket citations, e.g. [POJK 22 Tahun 2023, Pasal 71 ayat (1)]
 _BRACKET_CITATION_REGEX = re.compile(
-    r"\[\s*([^\]]*?(?:UU|POJK|PBI|PADG|SEOJK|PP|Pasal|Ayat)[^\]]*?)\s*\]",
+    r"\[\s*((?:(?:Undang-Undang|UU|POJK|PBI|PADG|SEOJK|PP|Perpu|Penjelasan)\s+[\w\.\/\-]+|Pasal\s+\d+)[^\]\n]{0,100})\s*\]",
     re.IGNORECASE,
 )
 
@@ -39,6 +39,28 @@ _ABSTAIN_PHRASES_ID = [
     "di luar cakupan",
     "tidak memuat ketentuan",
     "tidak memuat informasi",
+    "belum dikemukakan dalam dokumen",
+    "belum dikemukakan",
+    "tidak dikemukakan dalam dokumen",
+    "tidak dikemukakan",
+    "tidak disebutkan dalam dokumen",
+    "tidak disebutkan dalam regulasi",
+    "tidak disebutkan",
+    "belum diatur dalam dokumen",
+    "belum diatur dalam regulasi",
+    "belum diatur",
+    "tidak tercantum dalam dokumen",
+    "tidak tercantum dalam regulasi",
+    "tidak tercantum",
+    "dokumen yang ada tidak memuat",
+    "regulasi yang ada tidak memuat",
+    "tidak dijelaskan dalam dokumen",
+    "tidak dijelaskan dalam regulasi",
+    "tidak ada ketentuan mengenai",
+    "tidak ditemukan",
+    "belum ada ketentuan",
+    "tidak memuat rincian",
+    "belum memuat",
 ]
 
 _ABSTAIN_PHRASES_EN = [
@@ -50,6 +72,16 @@ _ABSTAIN_PHRASES_EN = [
     "outside the scope of",
     "does not contain information",
     "not regulated in",
+    "not stated in the provided documents",
+    "not stated in the documents",
+    "not mentioned in the documents",
+    "not specified in the available documents",
+    "not found in the documents",
+    "has not been provided in the documents",
+    "no further details are provided",
+    "not mentioned in the regulations",
+    "is not specified in the documents",
+    "not contained in the documents",
 ]
 
 

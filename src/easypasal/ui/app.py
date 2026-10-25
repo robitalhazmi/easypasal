@@ -547,11 +547,17 @@ def build_ui(
             try:
                 max_tokens_env = os.getenv("EASYPASAL_MAX_TOKENS")
                 eff_max_tokens = int(max_tokens_env) if max_tokens_env else None
+                strict_env = os.getenv("EASYPASAL_STRICT_GROUNDING", "true").lower() in (
+                    "1",
+                    "true",
+                    "yes",
+                )
                 output = active_pipeline.ask(
                     clean_q,
                     language=lang,
                     variant=variant,
                     max_tokens=eff_max_tokens,
+                    strict_grounding=strict_env,
                 )
             except Exception as exc:
                 logger.error("Error during answer generation: %s", exc)
@@ -595,7 +601,7 @@ def build_ui(
                     logger.warning("Failed to log request in UI: %s", log_exc)
 
             # Determine status badge
-            if output.abstained:
+            if output.abstained or len(output.citations) == 0:
                 badge_html = (
                     "<span style='background:#fee2e2; color:#b91c1c; padding:3px 10px; "
                     "border-radius:4px; font-weight:600;'>⚠️ Tidak Ada Dasar Hukum / Abstained</span>"

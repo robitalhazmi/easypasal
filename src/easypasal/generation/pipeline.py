@@ -252,10 +252,15 @@ class RAGPipeline:
             if verify_citations is not None
             else (self.config.guardrails.verify_citations if self.config else True)
         )
+        strict_env = os.getenv("EASYPASAL_STRICT_GROUNDING")
         eff_strict = (
             strict_grounding
             if strict_grounding is not None
-            else (self.config.guardrails.strict_grounding if self.config else False)
+            else (
+                strict_env.lower() in ("1", "true", "yes")
+                if strict_env
+                else (self.config.guardrails.strict_grounding if self.config else False)
+            )
         )
         eff_enable_router = (
             enable_router
@@ -350,6 +355,16 @@ class RAGPipeline:
         answer_text = trim_incomplete_sentence(gen_res.text)
         citations = extract_citations(answer_text)
         abstained = check_abstention(answer_text, language=lang)
+
+        # Standardize Grounded Abstention response (Scenario A)
+        if abstained:
+            from easypasal.generation.prompts import (
+                STANDARD_ABSTAIN_EN,
+                STANDARD_ABSTAIN_ID,
+            )
+
+            answer_text = STANDARD_ABSTAIN_EN if lang == "en" else STANDARD_ABSTAIN_ID
+            citations = []
 
         # 6. Post-Hoc Citation Verification (T1.7)
         verification_dict = None

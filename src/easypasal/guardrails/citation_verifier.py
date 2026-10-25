@@ -7,7 +7,7 @@ import re
 from dataclasses import dataclass, field
 from typing import TYPE_CHECKING
 
-from easypasal.generation.citations import extract_citations
+from easypasal.generation.citations import check_abstention, extract_citations
 
 if TYPE_CHECKING:
     from easypasal.retrieval.models import RetrievedChunk
@@ -260,13 +260,16 @@ def verify_citations(
 
     # If no citations were generated:
     if not cites:
+        is_abstain = check_abstention(answer)
         return VerificationResult(
-            is_valid=True,
+            is_valid=is_abstain,
             total_citations=0,
             grounded_count=0,
-            ungrounded_count=0,
+            ungrounded_count=0 if is_abstain else 1,
             checks=[],
-            ungrounded_citations=[],
+            ungrounded_citations=[]
+            if is_abstain
+            else ["Tidak ada sitasi regulasi yang dicantumkan"],
             hallucinated_pasal=[],
         )
 

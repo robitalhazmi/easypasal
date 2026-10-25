@@ -178,6 +178,18 @@ def test_verify_citations_valid_abstention_pass() -> None:
 # ==============================================================================
 
 
+def test_verify_citations_uncited_answer_fails() -> None:
+    """FAIL CASE: Model answers without citing any regulatory article."""
+    chunk = _make_chunk("c1", "POJK 22 Tahun 2023", "POJK 22 Tahun 2023, Pasal 71", pasal="71")
+    answer = "PUJK wajib menyelesaikan pengaduan paling lambat 10 hari kerja tanpa ada sitasi."
+
+    res = verify_citations(answer=answer, retrieved_chunks=[chunk])
+    assert res.is_valid is False
+    assert res.total_citations == 0
+    assert res.ungrounded_count == 1
+    assert "Tidak ada sitasi regulasi" in res.ungrounded_citations[0]
+
+
 def test_verify_citations_hallucinated_pasal_fail() -> None:
     """FAIL CASE: Regulation is present, but the cited Pasal does NOT exist in retrieved chunks."""
     chunk = _make_chunk(
@@ -344,6 +356,79 @@ def test_pipeline_strict_grounding_triggers_abstention() -> None:
     assert v_info is not None
     assert v_info["is_valid"] is False
     assert len(v_info["hallucinated_pasal"]) > 0
+
+
+def test_pipeline_bank_umum_capital_abstention_scenario_a() -> None:
+    """Verify Scenario A: Query about Bank Umum establishment capital abstains when corpus lacks POJK 12/2021."""
+    chunk = _make_chunk(
+        "c_uu4_30a",
+        "UU Nomor 4 Tahun 2023",
+        "UU Nomor 4 Tahun 2023, Pasal 30A ayat (1)",
+        pasal="30A",
+        text="Bank wajib memenuhi rasio kecukupan modal minimum sesuai dengan profil risiko Bank.",
+    )
+
+    mock_retriever = MagicMock()
+    mock_retriever.retrieve.return_value = RetrievalResult(
+        query="modal minimum pendirian bank umum",
+        mode="hybrid",
+        chunks=[chunk],
+        total_candidates=1,
+        dense_count=1,
+        bm25_count=1,
+        duration_ms=1.5,
+    )
+
+    # 1. Test when generator hedges with missing document detail
+    mock_gen_dodge = MagicMock()
+    mock_gen_dodge.model_name = "hedging-generator"
+    mock_gen_dodge.generate.return_value = MagicMock(
+        text=(
+            "[Berdasarkan regulasi di bawah, modal disetornya untuk pendirian Bank Umum harus melebihi batas minimal. "
+            "Namun, detail lebih lanjut tentang nilai minimum tersebut belum dikemukakan dalam dokumen yang ada.]"
+        ),
+        prompt_tokens=20,
+        completion_tokens=30,
+        latency_ms=10.0,
+        tokens_per_second=3.0,
+    )
+
+    pipeline = RAGPipeline(retriever=mock_retriever, generator=mock_gen_dodge)
+    output = pipeline.ask(
+        "Apa syarat modal disetor minimum untuk pendirian Bank Umum konvensional?",
+        strict_grounding=True,
+    )
+
+    assert output.abstained is True
+    assert (
+        output.answer
+        == "Berdasarkan regulasi yang tersedia, tidak ditemukan dasar hukum mengenai hal tersebut."
+    )
+    assert output.citations == []
+
+    # 2. Test when generator babbles without statutory citations
+    mock_gen_uncited = MagicMock()
+    mock_gen_uncited.model_name = "uncited-generator"
+    mock_gen_uncited.generate.return_value = MagicMock(
+        text="Modal disetor untuk pendirian Bank Umum harus melebihi batas minimal yang ditetapkan OJK.",
+        prompt_tokens=20,
+        completion_tokens=20,
+        latency_ms=10.0,
+        tokens_per_second=2.0,
+    )
+
+    pipeline_uncited = RAGPipeline(retriever=mock_retriever, generator=mock_gen_uncited)
+    output_uncited = pipeline_uncited.ask(
+        "Apa syarat modal disetor minimum untuk pendirian Bank Umum konvensional?",
+        strict_grounding=True,
+    )
+
+    assert output_uncited.abstained is True
+    assert (
+        output_uncited.answer
+        == "Berdasarkan regulasi yang tersedia, tidak ditemukan dasar hukum mengenai hal tersebut."
+    )
+    assert output_uncited.citations == []
 
 
 # ==============================================================================

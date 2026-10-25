@@ -144,6 +144,12 @@ def test_extract_citations() -> None:
     assert len(inline_cites) > 0
     assert any("POJK 11/POJK.03/2022" in c for c in inline_cites)
 
+    # Bracketed non-citation prose must not match as a citation
+    prose_in_brackets = (
+        "[Berdasarkan regulasi di bawah, modal disetornya untuk pendirian Bank Umum...]"
+    )
+    assert extract_citations(prose_in_brackets) == []
+
 
 def test_check_abstention() -> None:
     """Verify identification of abstention refusal phrases."""
@@ -156,6 +162,14 @@ def test_check_abstention() -> None:
     assert (
         check_abstention(
             "Informasi tersebut tidak terdapat dalam regulasi yang tersedia.", language="id"
+        )
+        is True
+    )
+    assert (
+        check_abstention(
+            "[Berdasarkan regulasi di bawah, modal disetornya untuk pendirian Bank Umum harus melebihi batas minimal. "
+            "Namun, detail lebih lanjut tentang nilai minimum tersebut belum dikemukakan dalam dokumen yang ada.]",
+            language="id",
         )
         is True
     )
