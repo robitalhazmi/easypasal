@@ -539,6 +539,31 @@ def test_router_direct_out_of_scope_detection() -> None:
     )
     assert dec_code.should_block is True
 
+    # Non-financial commercial / F&B (e.g. coffee shop)
+    dec_cafe = router.route(
+        "Berapa modal minimum yang dibutuhkan untuk membuka kedai kopi di Jakarta Selatan?",
+        language="id",
+    )
+    assert dec_cafe.should_block is True
+    assert dec_cafe.theme == "Out of Scope"
+    assert dec_cafe.is_answerable is False
+    assert check_abstention(dec_cafe.refusal_response or "", language="id") is True
+
+    dec_cafe_en = router.route(
+        "What is the minimum capital required to open a coffee shop in Jakarta?",
+        language="en",
+    )
+    assert dec_cafe_en.should_block is True
+    assert dec_cafe_en.theme == "Out of Scope"
+    assert check_abstention(dec_cafe_en.refusal_response or "", language="en") is True
+
+    # Financial payment exception: Merchant with QRIS should NOT be blocked
+    dec_qris = router.route(
+        "Bagaimana kewajiban merchant restoran dalam penggunaan QRIS?",
+        language="id",
+    )
+    assert dec_qris.should_block is False
+
 
 def test_router_direct_in_scope_themes() -> None:
     """Verify QuestionRouter accurately classifies valid financial regulatory themes."""

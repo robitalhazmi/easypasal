@@ -52,12 +52,10 @@ REFUSAL_SUPERSEDED_EN = (
 )
 
 REFUSAL_OUT_OF_SCOPE_ID = (
-    "Maaf, informasi tidak ditemukan dalam regulasi keuangan yang relevan dalam korpus "
-    "Otoritas Jasa Keuangan (OJK) dan Bank Indonesia."
+    "Berdasarkan regulasi yang tersedia, tidak ditemukan dasar hukum mengenai hal tersebut."
 )
 REFUSAL_OUT_OF_SCOPE_EN = (
-    "Sorry, information not found in the relevant financial regulations within the "
-    "OJK and Bank Indonesia corpus."
+    "Based on the available regulations, no legal basis was found regarding this matter."
 )
 
 # Regex matching adversarial injection and jailbreak attempts
@@ -119,6 +117,24 @@ _OUT_OF_SCOPE_PATTERNS = [
         r"\b(?:perkawinan\s+campuran|hukum\s+waris|kompilasi\s+hukum\s+islam)\b", re.IGNORECASE
     ),
 ]
+
+# Regex matching non-financial commercial entities, F&B, hospitality, and retail/services
+_NON_FINANCIAL_COMMERCIAL_PATTERNS = [
+    re.compile(
+        r"\b(?:kedai\s+kopi|coffee\s+shop|warkop|kafe\b|cafe\b|restoran|rumah\s+makan|warung(?:\s+makan|\s+kopi)?|"
+        r"toko\s+(?:kelontong|baju|pakaian|sepatu|sembako|elektronik|online)|minimarket|supermarket|"
+        r"bengkel(?:\s+motor|\s+mobil)?|laundry|salon(?:\s+kecantikan)?|barbershop|cucian\s+(?:motor|mobil)|"
+        r"bakery|toko\s+roti|warteg|katering|catering|peternakan|perkebunan)\b",
+        re.IGNORECASE,
+    ),
+]
+
+# Regulated financial terms that override non-financial commercial blocking (e.g. QRIS merchant rules)
+_FINANCIAL_OVERRIDE_TERMS = re.compile(
+    r"\b(?:qris|edc|payment\s+gateway|gerbang\s+pembayaran|kur\b|kredit\s+usaha\s+rakyat|"
+    r"fasilitas\s+kredit|pinjaman\s+bank|pembiayaan\s+bank|rekening\s+bank)\b",
+    re.IGNORECASE,
+)
 
 
 class RouteDecision(BaseModel):
@@ -208,7 +224,26 @@ class QuestionRouter:
                     latency_ms=max(elapsed_ms, 1.5),
                 )
 
-        # 4. In-Scope Regulatory Query (Theme Identification)
+        # 4. Non-Financial Commercial Business & Retail/F&B Check
+        has_override = bool(_FINANCIAL_OVERRIDE_TERMS.search(clean_q))
+        if not has_override:
+            for pat in _NON_FINANCIAL_COMMERCIAL_PATTERNS:
+                if pat.search(clean_q):
+                    elapsed_ms = round((time.perf_counter() - start_t) * 1000, 2)
+                    refusal = (
+                        REFUSAL_OUT_OF_SCOPE_EN if language == "en" else REFUSAL_OUT_OF_SCOPE_ID
+                    )
+                    return RouteDecision(
+                        theme="Out of Scope",
+                        is_answerable=False,
+                        is_injection=False,
+                        should_block=True,
+                        refusal_reason="Out-of-scope non-financial commercial/F&B business query",
+                        refusal_response=refusal,
+                        latency_ms=max(elapsed_ms, 1.5),
+                    )
+
+        # 5. In-Scope Regulatory Query (Theme Identification)
         theme = self._infer_theme(clean_q)
         elapsed_ms = round((time.perf_counter() - start_t) * 1000, 2)
 
