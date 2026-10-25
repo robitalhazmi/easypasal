@@ -52,9 +52,9 @@ logger = logging.getLogger("easypasal.ui.app")
 
 DEFAULT_EXAMPLES = [
     [
-        "Apa syarat modal disetor minimum untuk pendirian Bank Umum konvensional?",
+        "Di mana Bank Umum wajib menempatkan Pusat Data dan Pusat Pemulihan Bencana menurut regulasi OJK?",
         "id",
-        "baseline_v0.1",
+        "gepa_v0.2",
     ],
     [
         "Berapa batas maksimum manfaat ekonomi atau bunga pinjaman pada fintech P2P lending?",
@@ -429,7 +429,7 @@ def build_ui(
                     gr.Markdown("### 📝 Input Pertanyaan / Query")
                     question_input = gr.Textbox(
                         label="Tulis Pertanyaan Regulasi / Enter Compliance Question:",
-                        placeholder="Contoh: Apa syarat modal disetor minimum untuk pendirian Bank Umum?",
+                        placeholder="Contoh: Di mana Bank Umum wajib menempatkan Pusat Data menurut regulasi OJK?",
                         lines=3,
                         autofocus=True,
                     )
