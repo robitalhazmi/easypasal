@@ -141,6 +141,19 @@ def run_gpu_training(config: QLoRAConfig) -> dict[str, Any]:
 
     logger.info("Initializing GPU QLoRA training on %s...", torch.cuda.get_device_name(0))
 
+    # 0. Hardware Capability Check (Tesla T4 is CC 7.5; BFloat16 GEMM requires CC >= 8.0)
+    if torch.cuda.is_available():
+        major, minor = torch.cuda.get_device_capability(0)
+        if (major, minor) < (8, 0) and config.bnb_4bit_compute_dtype == "bfloat16":
+            logger.warning(
+                "CUDA device %s has compute capability %d.%d (< 8.0) which lacks native BFloat16 GEMM. "
+                "Switching bnb_4bit_compute_dtype and training flags to float16.",
+                torch.cuda.get_device_name(0),
+                major,
+                minor,
+            )
+            config.bnb_4bit_compute_dtype = "float16"
+
     # 1. 4-bit Quantization Config
     compute_dtype = getattr(torch, config.bnb_4bit_compute_dtype, torch.float16)
     bnb_config = BitsAndBytesConfig(

@@ -24,7 +24,7 @@ class QLoRAConfig:
     load_in_4bit: bool = True
     bnb_4bit_quant_type: str = "nf4"
     bnb_4bit_use_double_quant: bool = True
-    bnb_4bit_compute_dtype: str = "bfloat16"
+    bnb_4bit_compute_dtype: str = "float16"
 
     # LoRA Adapter parameters
     lora_r: int = 16
