@@ -308,7 +308,7 @@ class TransformersBackend:
         device: str | None = None,
         torch_dtype: str | None = None,
         max_seq_length: int = 4096,
-        lazy_load: bool = False,
+        lazy_load: bool = True,
     ) -> None:
         self._model_name = model_name
         self._device = device
@@ -337,46 +337,56 @@ class TransformersBackend:
                 "Install them with: pip install torch transformers accelerate"
             ) from exc
 
-        logger.info("Loading Transformers tokenizer for %s...", self._model_name)
-        self._tokenizer = AutoTokenizer.from_pretrained(
-            self._model_name,
-            trust_remote_code=True,
-        )
-        if self._tokenizer.pad_token is None:
-            self._tokenizer.pad_token = self._tokenizer.eos_token
-
-        logger.info("Loading Transformers model for %s...", self._model_name)
-        target_device = self._device
-        if target_device is None:
-            target_device = "cuda" if torch.cuda.is_available() else "cpu"
-
-        dtype_map = {
-            "float16": torch.float16,
-            "bfloat16": torch.bfloat16,
-            "float32": torch.float32,
-        }
-        chosen_dtype = dtype_map.get(
-            self._torch_dtype or ("float16" if target_device == "cuda" else "float32"),
-            torch.float32,
-        )
-
-        if target_device == "cuda":
-            self._model = AutoModelForCausalLM.from_pretrained(
+        if self._tokenizer is None:
+            logger.info("Loading Transformers tokenizer for %s...", self._model_name)
+            self._tokenizer = AutoTokenizer.from_pretrained(
                 self._model_name,
-                torch_dtype=chosen_dtype,
-                device_map="auto",
                 trust_remote_code=True,
             )
-        else:
-            self._model = AutoModelForCausalLM.from_pretrained(
-                self._model_name,
-                torch_dtype=chosen_dtype,
-                low_cpu_mem_usage=True,
-                trust_remote_code=True,
-            )
-            self._model.to(target_device)
+            if self._tokenizer.pad_token is None:
+                self._tokenizer.pad_token = self._tokenizer.eos_token
 
-        self._model.eval()
+        if self._model is None:
+            logger.info("Loading Transformers model for %s...", self._model_name)
+            target_device = self._device
+            if target_device is None:
+                target_device = "cuda" if torch.cuda.is_available() else "cpu"
+
+            dtype_map = {
+                "float16": torch.float16,
+                "bfloat16": torch.bfloat16,
+                "float32": torch.float32,
+            }
+            chosen_dtype = dtype_map.get(
+                self._torch_dtype or ("float16" if target_device == "cuda" else "float32"),
+                torch.float32,
+            )
+
+            if target_device == "cuda":
+                try:
+                    self._model = AutoModelForCausalLM.from_pretrained(
+                        self._model_name,
+                        torch_dtype=chosen_dtype,
+                        device_map="auto",
+                        trust_remote_code=True,
+                    )
+                except Exception:
+                    self._model = AutoModelForCausalLM.from_pretrained(
+                        self._model_name,
+                        torch_dtype=chosen_dtype,
+                        trust_remote_code=True,
+                    )
+                    self._model.to("cuda")
+            else:
+                self._model = AutoModelForCausalLM.from_pretrained(
+                    self._model_name,
+                    torch_dtype=chosen_dtype,
+                    low_cpu_mem_usage=True,
+                    trust_remote_code=True,
+                )
+                self._model.to(target_device)
+
+            self._model.eval()
 
     def generate(
         self,
@@ -735,6 +745,7 @@ def get_generator_backend(
     if provider == "transformers":
         return TransformersBackend(
             model_name=model_name or repo_id or DEFAULT_TRANSFORMERS_MODEL,
+            lazy_load=True,
         )
 
     if provider == "hf":
@@ -775,6 +786,7 @@ def get_generator_backend(
             logger.info("Auto-selecting TransformersBackend for Hugging Face Space.")
             return TransformersBackend(
                 model_name=model_name or repo_id or DEFAULT_TRANSFORMERS_MODEL,
+                lazy_load=True,
             )
         except Exception as e:
             logger.warning("Could not initialize TransformersBackend on Space: %s", e)

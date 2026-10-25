@@ -288,6 +288,21 @@ def test_get_generator_backend_space_auto(monkeypatch: pytest.MonkeyPatch) -> No
     assert hasattr(gen, "generate")
 
 
+def test_get_generator_backend_space_auto_with_torch(monkeypatch: pytest.MonkeyPatch) -> None:
+    """Verify auto-provider detection logic in Hugging Face Space runtime when torch is present."""
+    import sys
+
+    from easypasal.generation.backends import TransformersBackend
+
+    monkeypatch.setenv("SPACE_ID", "robitalhazmi/easypasal")
+    monkeypatch.setitem(sys.modules, "torch", MagicMock())
+    monkeypatch.setitem(sys.modules, "transformers", MagicMock())
+
+    gen = get_generator_backend(provider="auto")
+    assert isinstance(gen, TransformersBackend)
+    assert gen.model_name == "Qwen/Qwen2.5-1.5B-Instruct"
+
+
 def test_pipeline_unit_mock() -> None:
     """Verify end-to-end RAGPipeline with mock retriever and mock generator."""
     chunk = _make_dummy_chunk(
