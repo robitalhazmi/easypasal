@@ -29,7 +29,7 @@ In banking and fintech compliance, **hallucinations carry regulatory fines and l
 ### The EasyPasal Solution
 EasyPasal is built with a strict **cite-or-abstain standard**:
 1. **Grounded or Silent:** Every claim must link directly to an exact regulatory article (*pasal*) and paragraph (*ayat*) retrieved from in-force statutory text. If evidence is missing or below the grounding threshold (<0.60), the system explicitly refuses to guess and abstains.
-2. **Structure-Aware Regulatory Parsing:** Unlike naive fixed-size chunking that chops legal clauses in half, EasyPasal uses a hierarchical parser preserving Indonesian statutory topology (*Bab*, *Pasal*, *Ayat*, *Huruf*) with contextual statutory breadcrumbs (+18.4% retrieval recall).
+2. **Structure-Aware Regulatory Parsing:** Unlike naive fixed-size chunking that chops legal clauses in half, EasyPasal uses a hierarchical parser preserving Indonesian statutory topology (*Bab*, *Pasal*, *Ayat*, *Huruf*) with contextual statutory breadcrumbs (+15.1% absolute / +123% relative Recall@5).
 3. **Sub-25ms Front-Line Guardrail Router:** Fine-tuned 4-bit QLoRA router detects prompt injection attacks, superseded regulation traps, and out-of-scope non-financial queries, short-circuiting them in **<25 ms** before triggering expensive retrieval.
 4. **Reflective Prompt Optimization (GEPA):** Multi-objective evolutionary prompt optimization (DSPy + GEPA) yields **+4.0% Grounding Fidelity gain** on held-out test data without prompt overfitting.
 5. **Multi-Tier Serving & Production Observability:** Runs on local CPU via 4-bit GGUF (`llama.cpp`) or high-throughput GPU via `vLLM` (187.8 tok/s on a single Tesla T4). Monitored end-to-end via an isolated VPS log collector (<55 MB RSS), Evidently data drift reports, and automated threshold alerts.
@@ -103,9 +103,9 @@ Every architectural choice in EasyPasal was validated through empirical experime
 
 | Exp | Research Focus | Baseline Candidate | Winning Architecture | Primary Metric Impact | Decision Summary |
 |:---:|---|---|---|---|---|
-| **E1** | **Chunking Strategy** | Fixed 500-token Chunks | **Structure-Aware + Breadcrumbs** | **+18.4% Recall@5** ($p = 0.0210$) | Eliminates clause-splitting; anchors pasal numbers to parent chapter headers. |
-| **E2** | **Embedding Model** | `all-MiniLM-L6-v2` (384-d) | **`multilingual-e5-large`** (1024-d) | **+117% Recall@5** (0.368 vs 0.170, $p = 0.0064$) | Task-prefixed cross-lingual retrieval unlocks high accuracy on Indonesian legal terms. |
-| **E3** | **Retrieval Pipeline** | Sparse BM25 Only | **Pure Dense (Default) / Hybrid RRF** | **MRR: 0.2396** (Sub-100ms vector search) | Dense vectors capture legal semantics; BM25 keyword hits available via hybrid switch. |
+| **E1** | **Chunking Strategy** | Fixed 500-token Chunks | **Structure-Aware + Breadcrumbs** | **+15.1% Recall@5** (0.274 vs 0.123, $p = 0.0210$) | Eliminates clause-splitting; anchors pasal numbers to parent chapter headers. |
+| **E2** | **Embedding Model** | `MiniLM-L12-v2` (384-d) | **`multilingual-e5-large`** (1024-d) | **+117% Recall@5** (0.368 vs 0.170, $p = 0.0064$) | Task-prefixed cross-lingual retrieval unlocks high accuracy on Indonesian legal terms. |
+| **E3** | **Retrieval Pipeline** | Sparse BM25 Only | **Pure Dense (Default) / Hybrid RRF** | **MRR: 0.2396** (0.368 vs 0.226 Recall@5) | Dense captures legal semantics (+62% Recall@5 over BM25); BM25 available via hybrid switch. |
 | **E4** | **CPU Generator Selection** | `Qwen2.5-3B-Instruct` (CPU) | **`Llama-3.2-1B-Instruct`** (CPU) | **3.2x Throughput** (2.8 tok/s, 96.4s p95) | 1B fits in 4.3 GB RAM with 80.3% abstention accuracy; 3B reserved for GPU serving. |
 | **E5** | **Prompt Optimization** | Expert-Authored Baseline | **DSPy + GEPA Reflective Optimization** | **+4.0% Grounding Fidelity** on held-out test | Evolved system prompt enforces bracket syntax `[POJK X Pasal Y]` and eliminates hallucinations. |
 | **E6** | **vLLM GPU Serving** | Quad-core CPU `llama.cpp` | **`vLLM` on NVIDIA Tesla T4 GPU** | **187.8 tok/s** at $c=32$ (**78.2x speedup**) | Compresses p95 multi-user latency from 48 minutes on CPU to **11.38s** on GPU. |
@@ -115,7 +115,7 @@ Every architectural choice in EasyPasal was validated through empirical experime
 
 ### 2. Held-Out Statutory Evaluation ($N = 66$, Test Split)
 
-Evaluation on the held-out gold test set with paired counterfactual replay simulation and unified calibrated LLM judge ($\kappa = 0.9429$, 97.1% human agreement):
+Evaluation on the held-out gold test set with paired counterfactual replay simulation and unified calibrated LLM judge (PABAK $\kappa = 0.9429$, 97.1% human agreement):
 
 | Metric | Variant A (`baseline_v0.1`) | Variant B (`gepa_v0.2`) | Paired Delta [95% Bootstrap CI] | $p$-value | Status |
 |---|:---:|:---:|:---:|:---:|:---:|
@@ -248,7 +248,7 @@ make replay-ab          # Run counterfactual paired A/B replay simulation
 In strict adherence to the project's **Honest-Claims Protocol**, all capabilities, performance metrics, and hardware boundaries are explicitly disclosed:
 
 1. **Hardware & Latency Boundaries:** CPU generation takes ~45–70s per query on a quad-core laptop; GPU generation via `vLLM` on an NVIDIA Tesla T4 achieves 187.8 tok/s and 11.38s p95 latency under 32 concurrent requests.
-2. **Offline Replay Simulation vs Live Users:** The A/B evaluation reported in Section 2 is an **offline counterfactual replay simulation** using a calibrated LLM judge ($\kappa = 0.9429$, 97.1% human agreement) on gold benchmark queries, not a live user experiment.
+2. **Offline Replay Simulation vs Live Users:** The A/B evaluation reported in Section 2 is an **offline counterfactual replay simulation** using a calibrated LLM judge (PABAK $\kappa = 0.9429$, 97.1% human agreement) on gold benchmark queries, not a live user experiment.
 3. **Telemetry Logs:** Monitoring telemetry in `logs/requests.jsonl` and SQLite `collector.db` reflects a structured developer-conducted evaluation session (35 real-world queries across 8 regulatory themes, 24 realistic feedback ratings) and automated alerting drill harnesses.
 4. **Independent Demonstration:** EasyPasal is an independent engineering project and is not affiliated with or endorsed by OJK or Bank Indonesia.
 
