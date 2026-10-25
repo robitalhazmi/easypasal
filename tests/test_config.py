@@ -58,7 +58,7 @@ def test_default_config_instantiation() -> None:
     assert config.generator.cpu_default.repo_id == "bartowski/Llama-3.2-1B-Instruct-GGUF"
     assert config.generator.cpu_default.filename == "Llama-3.2-1B-Instruct-Q4_K_M.gguf"
     assert config.generator.cpu_default.n_ctx == 8192
-    assert config.generator.cpu_default.max_tokens == 160
+    assert config.generator.cpu_default.max_tokens == 512
     assert config.generator.cpu_default.temperature == 0.1
     assert "<|eot_id|>" in config.generator.cpu_default.stop_tokens
 
@@ -240,7 +240,7 @@ def test_rag_pipeline_ask_uses_config_defaults() -> None:
         mode="dense",
         status_filter="berlaku",
     )
-    # Check that generator was invoked with max_tokens=160 and temp=0.1 from config
+    # Check that generator was invoked with max_tokens=512 and temp=0.1 from config
     mock_gen.generate.assert_called_once()
     assert mock_gen.generate.call_args[1]["temperature"] == 0.1
-    assert mock_gen.generate.call_args[1]["max_tokens"] == 160
+    assert mock_gen.generate.call_args[1]["max_tokens"] == 512

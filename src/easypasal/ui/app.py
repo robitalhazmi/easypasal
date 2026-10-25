@@ -545,10 +545,13 @@ def build_ui(
                     active_pipeline = RAGPipeline.from_defaults(provider="mock")
 
             try:
+                max_tokens_env = os.getenv("EASYPASAL_MAX_TOKENS")
+                eff_max_tokens = int(max_tokens_env) if max_tokens_env else None
                 output = active_pipeline.ask(
                     clean_q,
                     language=lang,
                     variant=variant,
+                    max_tokens=eff_max_tokens,
                 )
             except Exception as exc:
                 logger.error("Error during answer generation: %s", exc)

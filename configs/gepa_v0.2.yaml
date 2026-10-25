@@ -54,7 +54,7 @@ generator:
     quantization: "Q4_K_M"
     n_ctx: 8192
     n_threads: 4
-    max_tokens: 160
+    max_tokens: 512
     temperature: 0.1
     stop_tokens:
       - "<|eot_id|>"
@@ -68,7 +68,7 @@ generator:
     repo_id: "Qwen/Qwen2.5-3B-Instruct-GGUF"
     filename: "qwen2.5-3b-instruct-q4_k_m.gguf"
     n_ctx: 8192
-    max_tokens: 160
+    max_tokens: 512
     temperature: 0.1
 
 guardrails:

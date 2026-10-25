@@ -210,7 +210,7 @@ class RAGPipeline:
             mode: Retrieval strategy ('dense', 'hybrid', or 'bm25') (default: from config or 'dense').
             status_filter: Regulation status constraint (default: from config or 'berlaku').
             temperature: LLM sampling temperature (default: from config or 0.1).
-            max_tokens: Maximum tokens in generated completion (default: from config or 160).
+            max_tokens: Maximum tokens in generated completion (default: from config or 512).
             system_prompt_override: Custom system instructions if desired.
             prompt_variant: Prompt template variant ('gepa' or 'baseline').
             variant: Optional high-level pipeline variant ID (e.g. 'baseline_v0.1', 'gepa_v0.2', 'A', 'B').
@@ -245,7 +245,7 @@ class RAGPipeline:
         eff_max_tokens = (
             max_tokens
             if max_tokens is not None
-            else (self.config.generator.cpu_default.max_tokens if self.config else 160)
+            else (self.config.generator.cpu_default.max_tokens if self.config else 512)
         )
         eff_verify = (
             verify_citations

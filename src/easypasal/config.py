@@ -94,7 +94,7 @@ class GeneratorModelConfig(BaseModel):
     quantization: str = "Q4_K_M"
     n_ctx: int = Field(default=8192, ge=512, le=32768)
     n_threads: int = Field(default=4, ge=1, le=64)
-    max_tokens: int = Field(default=160, ge=16, le=4096)
+    max_tokens: int = Field(default=512, ge=16, le=4096)
     temperature: float = Field(default=0.1, ge=0.0, le=2.0)
     stop_tokens: list[str] = Field(
         default_factory=lambda: [
@@ -118,7 +118,7 @@ class GeneratorConfig(BaseModel):
             repo_id="Qwen/Qwen2.5-3B-Instruct-GGUF",
             filename="qwen2.5-3b-instruct-q4_k_m.gguf",
             n_ctx=8192,
-            max_tokens=160,
+            max_tokens=512,
             temperature=0.1,
         )
     )
