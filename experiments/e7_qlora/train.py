@@ -119,7 +119,11 @@ def run_gpu_training(config: QLoRAConfig) -> dict[str, Any]:
     try:
         import torch
         from datasets import Dataset  # type: ignore[import-not-found]
-        from peft import LoraConfig, get_peft_model, prepare_model_for_kbit_training  # type: ignore[import-not-found]
+        from peft import (  # type: ignore[import-not-found]
+            LoraConfig,
+            PeftModel,
+            prepare_model_for_kbit_training,
+        )
         from transformers import (
             AutoModelForCausalLM,
             AutoTokenizer,
@@ -159,7 +163,7 @@ def run_gpu_training(config: QLoRAConfig) -> dict[str, Any]:
     )
     model = prepare_model_for_kbit_training(model)
 
-    # 3. LoRA Config
+    # 3. LoRA Config (passed directly to SFTTrainer to avoid double-wrapping)
     peft_config = LoraConfig(
         r=config.lora_r,
         lora_alpha=config.lora_alpha,
@@ -168,7 +172,6 @@ def run_gpu_training(config: QLoRAConfig) -> dict[str, Any]:
         task_type="CAUSAL_LM",
         target_modules=config.target_modules,
     )
-    model = get_peft_model(model, peft_config)
 
     # 4. Load datasets
     with open(config.train_data_path, encoding="utf-8") as f:
@@ -238,9 +241,12 @@ def run_gpu_training(config: QLoRAConfig) -> dict[str, Any]:
         "model": model,
         "train_dataset": train_ds,
         "eval_dataset": dev_ds,
-        "peft_config": peft_config,
         "args": training_args,
     }
+
+    # Pass peft_config only if model has not already been wrapped as a PeftModel
+    if not isinstance(model, PeftModel):
+        trainer_kwargs["peft_config"] = peft_config
 
     if "processing_class" in trainer_sig:
         trainer_kwargs["processing_class"] = tokenizer
