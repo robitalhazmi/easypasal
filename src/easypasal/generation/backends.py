@@ -718,6 +718,30 @@ class LlamaCppBackend:
         gc.collect()
 
 
+def _resolve_transformers_model(model_name: str | None) -> str:
+    """Resolve model identifier for TransformersBackend, excluding GGUF files/repos."""
+    if (
+        model_name
+        and not model_name.endswith(".gguf")
+        and not model_name.endswith("-GGUF")
+        and "GGUF" not in model_name
+    ):
+        return model_name
+    return os.getenv("EASYPASAL_TRANSFORMERS_MODEL", DEFAULT_TRANSFORMERS_MODEL)
+
+
+def _resolve_hf_model(model_name: str | None) -> str:
+    """Resolve model identifier for HuggingFaceInferenceBackend, excluding GGUF files/repos."""
+    if (
+        model_name
+        and not model_name.endswith(".gguf")
+        and not model_name.endswith("-GGUF")
+        and "GGUF" not in model_name
+    ):
+        return model_name
+    return os.getenv("EASYPASAL_HF_MODEL", DEFAULT_HF_MODEL)
+
+
 def get_generator_backend(
     provider: str = "auto",
     model_name: str | None = None,
@@ -744,13 +768,13 @@ def get_generator_backend(
 
     if provider == "transformers":
         return TransformersBackend(
-            model_name=model_name or repo_id or DEFAULT_TRANSFORMERS_MODEL,
+            model_name=_resolve_transformers_model(model_name),
             lazy_load=True,
         )
 
     if provider == "hf":
         return HuggingFaceInferenceBackend(
-            model_name=model_name or repo_id or DEFAULT_HF_MODEL,
+            model_name=_resolve_hf_model(model_name),
         )
 
     if provider == "ollama":
@@ -785,7 +809,7 @@ def get_generator_backend(
 
             logger.info("Auto-selecting TransformersBackend for Hugging Face Space.")
             return TransformersBackend(
-                model_name=model_name or repo_id or DEFAULT_TRANSFORMERS_MODEL,
+                model_name=_resolve_transformers_model(model_name),
                 lazy_load=True,
             )
         except Exception as e:
@@ -796,7 +820,7 @@ def get_generator_backend(
             try:
                 logger.info("Auto-selecting HuggingFaceInferenceBackend with token.")
                 return HuggingFaceInferenceBackend(
-                    model_name=model_name or repo_id or DEFAULT_HF_MODEL,
+                    model_name=_resolve_hf_model(model_name),
                     token=hf_token,
                 )
             except Exception as e:

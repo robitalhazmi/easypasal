@@ -8,10 +8,25 @@ and transparent abstention handling.
 from __future__ import annotations
 
 import argparse
+import asyncio.selector_events
+import contextlib
 import logging
 import os
 import time
 from typing import Any
+
+# Silence benign BaseEventLoop.__del__ ValueError on Linux container GC
+try:
+    if hasattr(asyncio.selector_events.BaseSelectorEventLoop, "_close_self_pipe"):
+        _orig_close_self_pipe = asyncio.selector_events.BaseSelectorEventLoop._close_self_pipe
+
+        def _safe_close_self_pipe(self: Any) -> None:
+            with contextlib.suppress(ValueError, KeyError, OSError):
+                _orig_close_self_pipe(self)
+
+        asyncio.selector_events.BaseSelectorEventLoop._close_self_pipe = _safe_close_self_pipe
+except Exception:
+    pass
 
 # Import spaces before heavy AI libraries for Hugging Face ZeroGPU compatibility
 try:
