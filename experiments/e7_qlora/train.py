@@ -168,13 +168,31 @@ def run_gpu_training(config: QLoRAConfig) -> dict[str, Any]:
     if tokenizer.pad_token is None:
         tokenizer.pad_token = tokenizer.eos_token
 
-    model = AutoModelForCausalLM.from_pretrained(
-        config.base_model_name,
-        quantization_config=bnb_config,
-        torch_dtype=compute_dtype,
-        device_map="auto",
-        trust_remote_code=True,
-    )
+    # Handle transformers v5+ (dtype) vs v4 (torch_dtype)
+    model_kwargs: dict[str, Any] = {
+        "quantization_config": bnb_config,
+        "device_map": "auto",
+        "trust_remote_code": True,
+    }
+    try:
+        model = AutoModelForCausalLM.from_pretrained(
+            config.base_model_name,
+            dtype=compute_dtype,
+            **model_kwargs,
+        )
+    except (TypeError, ValueError):
+        model = AutoModelForCausalLM.from_pretrained(
+            config.base_model_name,
+            torch_dtype=compute_dtype,
+            **model_kwargs,
+        )
+
+    # Align model config dtypes so PEFT adopts compute_dtype for LoRA adapters
+    model.config.torch_dtype = compute_dtype
+    if hasattr(model.config, "dtype"):
+        model.config.dtype = compute_dtype
+    model.config.use_cache = False
+
     model = prepare_model_for_kbit_training(model)
 
     # Ensure all non-quantized float weights match compute_dtype (guards against bfloat16 on Tesla T4)
@@ -277,6 +295,12 @@ def run_gpu_training(config: QLoRAConfig) -> dict[str, Any]:
         trainer_kwargs["max_seq_length"] = config.max_seq_length
 
     trainer = SFTTrainer(**trainer_kwargs)
+
+    # Ensure all LoRA adapter parameters and unquantized weights are strictly compute_dtype
+    if compute_dtype == torch.float16:
+        for param in trainer.model.parameters():
+            if param.dtype == torch.bfloat16:
+                param.data = param.data.to(torch.float16)
 
     logger.info("Starting training loop...")
     train_result = trainer.train()
