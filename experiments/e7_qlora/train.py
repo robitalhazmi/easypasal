@@ -171,10 +171,17 @@ def run_gpu_training(config: QLoRAConfig) -> dict[str, Any]:
     model = AutoModelForCausalLM.from_pretrained(
         config.base_model_name,
         quantization_config=bnb_config,
+        torch_dtype=compute_dtype,
         device_map="auto",
         trust_remote_code=True,
     )
     model = prepare_model_for_kbit_training(model)
+
+    # Ensure all non-quantized float weights match compute_dtype (guards against bfloat16 on Tesla T4)
+    if compute_dtype == torch.float16:
+        for param in model.parameters():
+            if param.dtype == torch.bfloat16:
+                param.data = param.data.to(torch.float16)
 
     # 3. LoRA Config (passed directly to SFTTrainer to avoid double-wrapping)
     peft_config = LoraConfig(
