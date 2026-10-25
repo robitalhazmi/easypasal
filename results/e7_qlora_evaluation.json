@@ -3,7 +3,7 @@
   "task_name": "Question Router & Guardrail Classifier (Theme + Answerability + Injection)",
   "base_model": "Qwen/Qwen2.5-0.5B-Instruct",
   "finetuned_adapter": "experiments/e7_qlora/adapter",
-  "timestamp": "2026-10-16T06:14:56Z",
+  "timestamp": "2026-10-25T05:57:38Z",
   "honest_claims_disclaimer": "OFFLINE BENCHMARK NOTICE: Experiment E7 evaluates a narrow parameter-efficient QLoRA router adapter on an offline benchmark dataset. It does not represent generalized financial LLM fine-tuning or live online user traffic.",
   "results": {
     "dev": {
