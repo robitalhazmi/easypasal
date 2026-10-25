@@ -180,7 +180,18 @@ def test_on_ask_status_badge(mock_pipeline: MagicMock, mock_request_logger: Requ
     _, badge_2, _, _, _, _ = on_ask("q", "id", "gepa_v0.2")
     assert "Sitasi Belum Terverifikasi" in badge_2
 
-    # 3. Abstained -> Red badge
+    # 3. Answered without formal citations (not abstained) -> Slate/Neutral badge
+    mock_pipeline.ask.return_value = GenerationOutput(
+        question="q",
+        answer="Bank wajib menempatkan di Indonesia.",
+        language="id",
+        citations=[],
+        abstained=False,
+    )
+    _, badge_3, _, _, _, _ = on_ask("q", "id", "baseline_v0.1")
+    assert "Dijawab Tanpa Sitasi Formal" in badge_3
+
+    # 4. Abstained -> Red badge
     mock_pipeline.ask.return_value = GenerationOutput(
         question="q",
         answer="tidak ada dasar hukum",
@@ -188,8 +199,8 @@ def test_on_ask_status_badge(mock_pipeline: MagicMock, mock_request_logger: Requ
         citations=[],
         abstained=True,
     )
-    _, badge_3, _, _, _, _ = on_ask("q", "id", "gepa_v0.2")
-    assert "Tidak Ada Dasar Hukum" in badge_3
+    _, badge_4, _, _, _, _ = on_ask("q", "id", "gepa_v0.2")
+    assert "Tidak Ada Dasar Hukum" in badge_4
 
 
 def test_format_citations_markdown() -> None:

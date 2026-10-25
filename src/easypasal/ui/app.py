@@ -611,10 +611,15 @@ def build_ui(
             )
             is_valid_cit = v_data.get("is_valid", True) if v_data else True
 
-            if output.abstained or len(output.citations) == 0:
+            if output.abstained:
                 badge_html = (
                     "<span style='background:#fee2e2; color:#b91c1c; padding:3px 10px; "
                     "border-radius:4px; font-weight:600;'>⚠️ Tidak Ada Dasar Hukum / Abstained</span>"
+                )
+            elif len(output.citations) == 0:
+                badge_html = (
+                    "<span style='background:#f1f5f9; color:#475569; padding:3px 10px; "
+                    "border-radius:4px; font-weight:600;'>ℹ️ Dijawab Tanpa Sitasi Formal</span>"
                 )
             elif not is_valid_cit:
                 badge_html = (
