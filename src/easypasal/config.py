@@ -88,7 +88,7 @@ class RetrievalConfig(BaseModel):
 class GeneratorModelConfig(BaseModel):
     """Configuration for a specific generator LLM backend instance."""
 
-    provider: Literal["llamacpp", "vllm", "mock", "hf", "openai"] = "llamacpp"
+    provider: Literal["llamacpp", "vllm", "mock", "hf", "openai", "transformers"] = "llamacpp"
     repo_id: str = "bartowski/Llama-3.2-1B-Instruct-GGUF"
     filename: str = "Llama-3.2-1B-Instruct-Q4_K_M.gguf"
     quantization: str = "Q4_K_M"

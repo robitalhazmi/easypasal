@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import contextlib
 import logging
+import os
 import re
 import time
 from dataclasses import dataclass
@@ -23,6 +24,8 @@ logger = logging.getLogger("easypasal.generation.backends")
 DEFAULT_GGUF_REPO: str = "bartowski/Llama-3.2-1B-Instruct-GGUF"
 DEFAULT_GGUF_FILE: str = "Llama-3.2-1B-Instruct-Q4_K_M.gguf"
 DEFAULT_OLLAMA_MODEL: str = "llama3.2:1b"
+DEFAULT_TRANSFORMERS_MODEL: str = "Qwen/Qwen2.5-1.5B-Instruct"
+DEFAULT_HF_MODEL: str = "Qwen/Qwen2.5-3B-Instruct"
 
 
 @dataclass
@@ -293,6 +296,270 @@ class OpenAICompatibleBackend:
         )
 
 
+class TransformersBackend:
+    """In-process PyTorch/Transformers causal language model backend.
+
+    Supports dynamic GPU acceleration via torch.cuda and Hugging Face ZeroGPU (@spaces.GPU).
+    """
+
+    def __init__(
+        self,
+        model_name: str = DEFAULT_TRANSFORMERS_MODEL,
+        device: str | None = None,
+        torch_dtype: str | None = None,
+        max_seq_length: int = 4096,
+        lazy_load: bool = False,
+    ) -> None:
+        self._model_name = model_name
+        self._device = device
+        self._torch_dtype = torch_dtype
+        self._max_seq_length = max_seq_length
+        self._tokenizer: Any = None
+        self._model: Any = None
+
+        if not lazy_load:
+            self._ensure_loaded()
+
+    @property
+    def model_name(self) -> str:
+        return self._model_name
+
+    def _ensure_loaded(self) -> None:
+        if self._model is not None and self._tokenizer is not None:
+            return
+
+        try:
+            import torch
+            from transformers import AutoModelForCausalLM, AutoTokenizer
+        except ImportError as exc:
+            raise ImportError(
+                "PyTorch and Transformers are required for TransformersBackend. "
+                "Install them with: pip install torch transformers accelerate"
+            ) from exc
+
+        logger.info("Loading Transformers tokenizer for %s...", self._model_name)
+        self._tokenizer = AutoTokenizer.from_pretrained(
+            self._model_name,
+            trust_remote_code=True,
+        )
+        if self._tokenizer.pad_token is None:
+            self._tokenizer.pad_token = self._tokenizer.eos_token
+
+        logger.info("Loading Transformers model for %s...", self._model_name)
+        target_device = self._device
+        if target_device is None:
+            target_device = "cuda" if torch.cuda.is_available() else "cpu"
+
+        dtype_map = {
+            "float16": torch.float16,
+            "bfloat16": torch.bfloat16,
+            "float32": torch.float32,
+        }
+        chosen_dtype = dtype_map.get(
+            self._torch_dtype or ("float16" if target_device == "cuda" else "float32"),
+            torch.float32,
+        )
+
+        if target_device == "cuda":
+            self._model = AutoModelForCausalLM.from_pretrained(
+                self._model_name,
+                torch_dtype=chosen_dtype,
+                device_map="auto",
+                trust_remote_code=True,
+            )
+        else:
+            self._model = AutoModelForCausalLM.from_pretrained(
+                self._model_name,
+                torch_dtype=chosen_dtype,
+                low_cpu_mem_usage=True,
+                trust_remote_code=True,
+            )
+            self._model.to(target_device)
+
+        self._model.eval()
+
+    def generate(
+        self,
+        prompt: str,
+        temperature: float = 0.1,
+        max_tokens: int = 512,
+        stop: list[str] | None = None,
+    ) -> LLMGenerationResult:
+        self._ensure_loaded()
+        try:
+            import torch
+        except ImportError as exc:
+            raise ImportError("PyTorch is required for TransformersBackend.") from exc
+
+        start_time = time.perf_counter()
+
+        # Format input using chat template if system tags are present
+        sys_match = re.search(r"<system>\s*(.*?)\s*</system>", prompt, re.DOTALL)
+        user_body = re.sub(r"<system>\s*.*?\s*</system>", "", prompt, flags=re.DOTALL).strip()
+
+        if sys_match and hasattr(self._tokenizer, "apply_chat_template"):
+            messages = [
+                {"role": "system", "content": sys_match.group(1).strip()},
+                {"role": "user", "content": user_body},
+            ]
+            try:
+                formatted_prompt = self._tokenizer.apply_chat_template(
+                    messages,
+                    tokenize=False,
+                    add_generation_prompt=True,
+                )
+            except Exception:
+                formatted_prompt = prompt
+        else:
+            formatted_prompt = prompt
+
+        inputs = self._tokenizer(
+            formatted_prompt,
+            return_tensors="pt",
+            truncation=True,
+            max_length=self._max_seq_length,
+        )
+
+        model_device = getattr(self._model, "device", "cpu")
+        inputs = {k: v.to(model_device) for k, v in inputs.items()}
+        prompt_tokens = inputs["input_ids"].shape[1]
+
+        do_sample = temperature > 0.01
+        gen_kwargs: dict[str, Any] = {
+            "max_new_tokens": max_tokens,
+            "pad_token_id": self._tokenizer.pad_token_id,
+            "eos_token_id": self._tokenizer.eos_token_id,
+        }
+        if do_sample:
+            gen_kwargs["temperature"] = temperature
+            gen_kwargs["do_sample"] = True
+            gen_kwargs["top_p"] = 0.95
+        else:
+            gen_kwargs["do_sample"] = False
+
+        with torch.inference_mode():
+            output_ids = self._model.generate(
+                **inputs,
+                **gen_kwargs,
+            )
+
+        generated_tokens = output_ids[0][prompt_tokens:]
+        text = self._tokenizer.decode(generated_tokens, skip_special_tokens=True).strip()
+        completion_tokens = len(generated_tokens)
+
+        if stop:
+            for s in stop:
+                if s in text:
+                    text = text.split(s)[0].strip()
+
+        elapsed = time.perf_counter() - start_time
+        latency_ms = round(elapsed * 1000, 2)
+        tokens_per_second = (
+            round(completion_tokens / elapsed, 2) if elapsed > 0 and completion_tokens > 0 else 0.0
+        )
+
+        return LLMGenerationResult(
+            text=text,
+            prompt_tokens=prompt_tokens,
+            completion_tokens=completion_tokens,
+            latency_ms=latency_ms,
+            model_name=self._model_name,
+            tokens_per_second=tokens_per_second,
+        )
+
+    def close(self) -> None:
+        """Release PyTorch model memory."""
+        import gc
+
+        self._model = None
+        self._tokenizer = None
+        gc.collect()
+        with contextlib.suppress(Exception):
+            import torch
+
+            if torch.cuda.is_available():
+                torch.cuda.empty_cache()
+
+
+class HuggingFaceInferenceBackend:
+    """Client for Hugging Face Serverless Inference API."""
+
+    def __init__(
+        self,
+        model_name: str = DEFAULT_HF_MODEL,
+        token: str | None = None,
+        timeout: float = 60.0,
+    ) -> None:
+        try:
+            from huggingface_hub import InferenceClient
+        except ImportError as exc:
+            raise ImportError(
+                "huggingface_hub is required for HuggingFaceInferenceBackend."
+            ) from exc
+
+        self._model_name = model_name
+        self.token = token or os.getenv("HF_TOKEN") or os.getenv("HUGGING_FACE_HUB_TOKEN")
+        self.client = InferenceClient(model=self._model_name, token=self.token, timeout=timeout)
+
+    @property
+    def model_name(self) -> str:
+        return self._model_name
+
+    def generate(
+        self,
+        prompt: str,
+        temperature: float = 0.1,
+        max_tokens: int = 512,
+        stop: list[str] | None = None,
+    ) -> LLMGenerationResult:
+        start_time = time.perf_counter()
+
+        sys_match = re.search(r"<system>\s*(.*?)\s*</system>", prompt, re.DOTALL)
+        user_body = re.sub(r"<system>\s*.*?\s*</system>", "", prompt, flags=re.DOTALL).strip()
+
+        messages = []
+        if sys_match:
+            messages.append({"role": "system", "content": sys_match.group(1).strip()})
+        messages.append({"role": "user", "content": user_body})
+
+        try:
+            resp = self.client.chat.completions.create(
+                messages=messages,
+                max_tokens=max_tokens,
+                temperature=temperature,
+                stop=stop,
+            )
+            choice = resp.choices[0]
+            text = (choice.message.content or "").strip()
+            prompt_tokens = getattr(
+                getattr(resp, "usage", None), "prompt_tokens", len(prompt.split())
+            )
+            completion_tokens = getattr(
+                getattr(resp, "usage", None), "completion_tokens", len(text.split())
+            )
+        except Exception as exc:
+            logger.error("Hugging Face Inference API failed for %s: %s", self._model_name, exc)
+            raise
+
+        elapsed = time.perf_counter() - start_time
+        latency_ms = round(elapsed * 1000, 2)
+        tokens_per_second = (
+            round(completion_tokens / elapsed, 2) if elapsed > 0 and completion_tokens > 0 else 0.0
+        )
+        return LLMGenerationResult(
+            text=text,
+            prompt_tokens=prompt_tokens,
+            completion_tokens=completion_tokens,
+            latency_ms=latency_ms,
+            model_name=self._model_name,
+            tokens_per_second=tokens_per_second,
+        )
+
+    def close(self) -> None:
+        """Close client if needed."""
+        pass
+
+
 class LlamaCppBackend:
     """In-process GGUF generator running on CPU via llama-cpp-python."""
 
@@ -454,14 +721,26 @@ def get_generator_backend(
     """Factory creating a generator backend based on available infrastructure.
 
     Providers:
+        - 'transformers': In-process PyTorch/Transformers causal LM (ZeroGPU / CUDA / CPU).
+        - 'hf': Hugging Face Serverless Inference API via InferenceClient.
         - 'llamacpp': In-process llama.cpp execution (GGUF).
         - 'ollama': Local Ollama HTTP daemon.
         - 'openai': OpenAI-compatible HTTP endpoint.
         - 'mock': Offline deterministic generator for tests and CI.
-        - 'auto': Attempts local Ollama/LlamaCpp, falling back gracefully to Mock.
+        - 'auto': Intelligently selects Transformers (on Spaces/GPU), Ollama, LlamaCpp, or Mock.
     """
     if provider == "mock":
         return MockGeneratorBackend(model_name=model_name or "mock-generator")
+
+    if provider == "transformers":
+        return TransformersBackend(
+            model_name=model_name or repo_id or DEFAULT_TRANSFORMERS_MODEL,
+        )
+
+    if provider == "hf":
+        return HuggingFaceInferenceBackend(
+            model_name=model_name or repo_id or DEFAULT_HF_MODEL,
+        )
 
     if provider == "ollama":
         return OllamaBackend(
@@ -484,7 +763,34 @@ def get_generator_backend(
             n_threads=n_threads,
         )
 
-    # Provider == 'auto': Check local Ollama server first
+    # Provider == 'auto':
+    # 1. Check if running inside Hugging Face Spaces
+    is_hf_space = bool(os.getenv("SPACE_ID") or os.getenv("SPACE_HOST"))
+    if is_hf_space:
+        logger.info("Detected Hugging Face Space runtime (%s).", os.getenv("SPACE_ID"))
+        try:
+            import torch  # noqa: F401
+            import transformers  # noqa: F401
+
+            logger.info("Auto-selecting TransformersBackend for Hugging Face Space.")
+            return TransformersBackend(
+                model_name=model_name or repo_id or DEFAULT_TRANSFORMERS_MODEL,
+            )
+        except Exception as e:
+            logger.warning("Could not initialize TransformersBackend on Space: %s", e)
+
+        hf_token = os.getenv("HF_TOKEN") or os.getenv("HUGGING_FACE_HUB_TOKEN")
+        if hf_token:
+            try:
+                logger.info("Auto-selecting HuggingFaceInferenceBackend with token.")
+                return HuggingFaceInferenceBackend(
+                    model_name=model_name or repo_id or DEFAULT_HF_MODEL,
+                    token=hf_token,
+                )
+            except Exception as e:
+                logger.warning("Could not initialize HuggingFaceInferenceBackend on Space: %s", e)
+
+    # 2. Check local Ollama server
     try:
         check_url = (base_url or "http://localhost:11434").rstrip("/") + "/api/tags"
         resp = httpx.get(check_url, timeout=0.8)
@@ -497,13 +803,24 @@ def get_generator_backend(
     except Exception:
         pass
 
-    # Check if explicit GGUF path is available on disk
+    # 3. Check if explicit GGUF path is available on disk
     if model_path and Path(model_path).exists():
         try:
             return LlamaCppBackend(model_path=model_path)
         except Exception as e:
             logger.warning("Failed to initialize LlamaCppBackend: %s", e)
 
+    # 4. Check if HF_TOKEN is present in env for Serverless API
+    hf_token = os.getenv("HF_TOKEN") or os.getenv("HUGGING_FACE_HUB_TOKEN")
+    if hf_token:
+        try:
+            return HuggingFaceInferenceBackend(
+                model_name=model_name or repo_id or DEFAULT_HF_MODEL,
+                token=hf_token,
+            )
+        except Exception as e:
+            logger.warning("Failed to initialize HuggingFaceInferenceBackend: %s", e)
+
     # Default auto fallback to MockGeneratorBackend
-    logger.info("No active local LLM daemon detected; using MockGeneratorBackend.")
+    logger.info("No active local or remote LLM daemon detected; using MockGeneratorBackend.")
     return MockGeneratorBackend(model_name=model_name or "mock-generator")

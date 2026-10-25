@@ -59,6 +59,7 @@ def prepare_space_bundle(output_dir: Path | str = "dist/hf_space") -> Path:
         "import sys\n\n"
         "# Ensure src/ is on Python search path\n"
         'sys.path.insert(0, os.path.abspath("src"))\n\n'
+        "# Import spaces before torch/transformers for ZeroGPU hook initialization\n"
         "try:\n"
         "    import spaces\n"
         "except ImportError:\n"
@@ -76,10 +77,12 @@ def prepare_space_bundle(output_dir: Path | str = "dist/hf_space") -> Path:
         '    level=logging.INFO, format="%(asctime)s [%(levelname)s] %(name)s: %(message)s"\n'
         ")\n"
         'logger = logging.getLogger("easypasal.space")\n\n'
-        "# Initialize RAGPipeline with mock fallback\n"
+        "# Initialize RAGPipeline with provider resolution (auto picks Transformers on ZeroGPU)\n"
+        "provider = os.getenv('EASYPASAL_LLM_PROVIDER', 'auto')\n"
         "try:\n"
-        '    pipeline = RAGPipeline.from_defaults(provider="auto")\n'
-        '    logger.info("RAGPipeline loaded successfully.")\n'
+        '    logger.info("Initializing RAGPipeline for Space with provider=%s...", provider)\n'
+        "    pipeline = RAGPipeline.from_defaults(provider=provider)\n"
+        '    logger.info("RAGPipeline loaded successfully with generator=%s.", pipeline.generator.model_name)\n'
         "except Exception as exc:\n"
         '    logger.error("Failed to initialize RAGPipeline: %s", exc)\n'
         "    pipeline = None\n\n"
@@ -87,13 +90,6 @@ def prepare_space_bundle(output_dir: Path | str = "dist/hf_space") -> Path:
         '    collector_url=os.getenv("EASYPASAL_COLLECTOR_URL"),\n'
         '    collector_token=os.getenv("EASYPASAL_COLLECTOR_TOKEN", "easypasal-vps-secret-token-v1"),\n'
         ")\n\n"
-        "@spaces.GPU\n"
-        "def query_regulatory_assistant(question: str, language: str = 'id') -> str:\n"
-        '    """ZeroGPU entrypoint for regulatory query processing."""\n'
-        "    if pipeline is not None:\n"
-        "        out = pipeline.ask(question=question, language=language)\n"
-        "        return out.answer\n"
-        '    return "EasyPasal is starting..."\n\n'
         "# Export demo at module level for Hugging Face Gradio runner\n"
         "demo = build_ui(pipeline=pipeline, request_logger=request_logger)\n\n"
         'if __name__ == "__main__":\n'
@@ -103,6 +99,9 @@ def prepare_space_bundle(output_dir: Path | str = "dist/hf_space") -> Path:
 
     requirements_txt = (
         "gradio==6.30.0\n"
+        "torch>=2.2.0\n"
+        "transformers>=4.45.0\n"
+        "accelerate>=0.30.0\n"
         "pydantic>=2.10.0\n"
         "pydantic-settings>=2.6.0\n"
         "httpx>=0.27.0\n"

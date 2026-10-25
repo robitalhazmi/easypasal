@@ -151,6 +151,16 @@ def test_prepare_space_bundle(tmp_path: Path) -> None:
     assert "sdk: gradio" in readme_content
     assert "app_file: app.py" in readme_content
 
+    # Verify requirements.txt and app.py for ZeroGPU / Transformers support
+    requirements_content = (prepared / "requirements.txt").read_text(encoding="utf-8")
+    assert "torch" in requirements_content
+    assert "transformers" in requirements_content
+    assert "accelerate" in requirements_content
+
+    app_py_content = (prepared / "app.py").read_text(encoding="utf-8")
+    assert "import spaces" in app_py_content
+    assert "RAGPipeline.from_defaults" in app_py_content
+
 
 def test_measure_cold_start_unreachable() -> None:
     """Verify measure_cold_start returns None on unreachable endpoint without hanging."""

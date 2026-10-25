@@ -202,6 +202,92 @@ def test_get_generator_backend_factory() -> None:
     assert hasattr(auto_gen, "generate")
 
 
+def test_transformers_backend_lazy_and_mock(monkeypatch: pytest.MonkeyPatch) -> None:
+    """Verify TransformersBackend initialization, generation, and cleanup."""
+    import sys
+
+    from easypasal.generation.backends import TransformersBackend
+
+    # Mock torch in sys.modules for CPU/CI environments without torch installed
+    mock_torch = MagicMock()
+    mock_torch.inference_mode.return_value = MagicMock(__enter__=MagicMock(), __exit__=MagicMock())
+    monkeypatch.setitem(sys.modules, "torch", mock_torch)
+
+    # Test lazy load without torch
+    backend = TransformersBackend(model_name="test-model", lazy_load=True)
+    assert backend.model_name == "test-model"
+
+    # Mock tokenizer and model
+    mock_tokenizer = MagicMock()
+    mock_tokenizer.pad_token = None
+    mock_tokenizer.eos_token = "<eos>"
+    mock_tokenizer.pad_token_id = 0
+    mock_tokenizer.eos_token_id = 1
+
+    class DummyInputDict(dict):
+        def __getitem__(self, key: str) -> Any:
+            if key == "input_ids":
+                mock_ids = MagicMock()
+                mock_ids.shape = [1, 5]
+                return mock_ids
+            return MagicMock()
+
+    mock_tokenizer.return_value = DummyInputDict(
+        {"input_ids": MagicMock(shape=[1, 5]), "attention_mask": MagicMock()}
+    )
+    mock_tokenizer.decode.return_value = "Jawaban dari regulasi OJK [POJK 12]."
+
+    mock_model = MagicMock()
+    mock_model.device = "cpu"
+    mock_model.generate.return_value = [[0, 1, 2, 3, 4, 10, 11]]
+
+    backend._tokenizer = mock_tokenizer
+    backend._model = mock_model
+
+    result = backend.generate("Pertanyaan kepatuhan?", temperature=0.0)
+    assert "Jawaban dari regulasi OJK [POJK 12]." in result.text
+    assert result.model_name == "test-model"
+
+    backend.close()
+    assert backend._model is None
+    assert backend._tokenizer is None
+
+
+def test_huggingface_inference_backend() -> None:
+    """Verify HuggingFaceInferenceBackend chat completion generation."""
+    from easypasal.generation.backends import HuggingFaceInferenceBackend
+
+    backend = HuggingFaceInferenceBackend(
+        model_name="Qwen/Qwen2.5-1.5B-Instruct", token="test-token"
+    )
+    assert backend.model_name == "Qwen/Qwen2.5-1.5B-Instruct"
+
+    mock_client = MagicMock()
+    mock_resp = MagicMock()
+    mock_resp.choices = [
+        MagicMock(message=MagicMock(content="Berdasarkan [POJK 22], diatur bahwa..."))
+    ]
+    mock_resp.usage = MagicMock(prompt_tokens=10, completion_tokens=15)
+    mock_client.chat.completions.create.return_value = mock_resp
+    backend.client = mock_client
+
+    res = backend.generate("Pertanyaan kepatuhan?", temperature=0.1)
+    assert "Berdasarkan [POJK 22]" in res.text
+    assert res.completion_tokens == 15
+    assert res.model_name == "Qwen/Qwen2.5-1.5B-Instruct"
+
+    backend.close()
+
+
+def test_get_generator_backend_space_auto(monkeypatch: pytest.MonkeyPatch) -> None:
+    """Verify auto-provider detection logic in Hugging Face Space runtime."""
+    monkeypatch.setenv("SPACE_ID", "robitalhazmi/easypasal")
+
+    # In environment without torch, auto-detection catches ImportError and falls back
+    gen = get_generator_backend(provider="auto")
+    assert hasattr(gen, "generate")
+
+
 def test_pipeline_unit_mock() -> None:
     """Verify end-to-end RAGPipeline with mock retriever and mock generator."""
     chunk = _make_dummy_chunk(

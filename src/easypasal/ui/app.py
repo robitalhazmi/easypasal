@@ -13,6 +13,20 @@ import os
 import time
 from typing import Any
 
+# Import spaces before heavy AI libraries for Hugging Face ZeroGPU compatibility
+try:
+    import spaces  # type: ignore[import-not-found]
+except ImportError:
+
+    class _MockSpaces:
+        @staticmethod
+        def GPU(func: Any = None, **_kwargs: Any) -> Any:
+            if func is not None:
+                return func
+            return lambda f: f
+
+    spaces = _MockSpaces()
+
 import gradio as gr
 
 from easypasal.generation.pipeline import RAGPipeline
@@ -468,6 +482,7 @@ def build_ui(
                     feedback_status = gr.HTML(value="")
 
         # Interaction Handlers
+        @spaces.GPU(duration=120)
         def on_ask(
             query: str,
             lang: str,
@@ -491,7 +506,9 @@ def build_ui(
             if active_pipeline is None:
                 try:
                     logger.info("Initializing EasyPasal RAGPipeline for UI...")
-                    active_pipeline = RAGPipeline.from_defaults(provider="auto")
+                    active_pipeline = RAGPipeline.from_defaults(
+                        provider=os.getenv("EASYPASAL_LLM_PROVIDER", "auto")
+                    )
                 except Exception as exc:
                     logger.warning("Pipeline fallback to mock in UI: %s", exc)
                     active_pipeline = RAGPipeline.from_defaults(provider="mock")
@@ -708,7 +725,7 @@ def main() -> None:
     )
     parser.add_argument(
         "--provider",
-        choices=["auto", "mock", "ollama", "llamacpp"],
+        choices=["auto", "mock", "ollama", "llamacpp", "transformers", "hf"],
         default=os.getenv("EASYPASAL_LLM_PROVIDER", "auto"),
         help="LLM provider for RAGPipeline (default: auto or EASYPASAL_LLM_PROVIDER)",
     )

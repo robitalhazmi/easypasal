@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import argparse
 import logging
+import os
 import time
 from pathlib import Path
 
@@ -113,9 +114,8 @@ class RAGPipeline:
 
         effective_strategy = strategy or config.chunking.strategy
         effective_model = model_name or config.embeddings.model_name
-        effective_provider = (
-            provider if provider != "auto" else config.generator.cpu_default.provider
-        )
+        env_provider = os.getenv("EASYPASAL_LLM_PROVIDER")
+        effective_provider = provider if provider != "auto" else (env_provider or "auto")
 
         # Check if prebuilt indexes exist; if not, attempt auto-download from Hugging Face Space
         q_dir = Path(index_dir) / "qdrant"
@@ -159,14 +159,28 @@ class RAGPipeline:
             )
         except Exception as gen_exc:
             logger.warning(
-                "Generator backend %r failed (%s), falling back to MockGeneratorBackend.",
+                "Generator backend %r failed (%s), attempting auto fallback.",
                 effective_provider,
                 gen_exc,
             )
-            generator = get_generator_backend(
-                provider="mock",
-                model_name=model_name or "mock-generator",
-            )
+            if effective_provider != "auto":
+                try:
+                    generator = get_generator_backend(
+                        provider="auto",
+                        model_name=model_name,
+                        model_path=model_path,
+                        base_url=base_url,
+                    )
+                except Exception:
+                    generator = get_generator_backend(
+                        provider="mock",
+                        model_name=model_name or "mock-generator",
+                    )
+            else:
+                generator = get_generator_backend(
+                    provider="mock",
+                    model_name=model_name or "mock-generator",
+                )
 
         return cls(retriever=retriever, generator=generator, config=config)
 
