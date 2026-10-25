@@ -65,13 +65,13 @@ When describing EasyPasal on resumes, LinkedIn, and during engineering interview
 ### Recommended Resume Bullets (Data Scientist / LLM Systems Engineer)
 - **Architected & Shipped EasyPasal:** Built an end-to-end, citation-grounded statutory RAG system for Indonesian financial regulations (OJK & Bank Indonesia) with strict cite-or-abstain guardrails, achieving **100% Faithfulness and 81.8% Abstention Accuracy** on a held-out gold test set ($N=66$).
 - **Evolutionary Prompt Optimization (DSPy + GEPA):** Optimized multi-objective statutory prompts using Genetic Pareto Prompt Optimization (GEPA), delivering a **+4.0% Grounding Fidelity gain** on held-out test data without prompt overfitting ($gap = 0.0050 \le 0.15$).
-- **Sub-25ms Guardrail Router (QLoRA):** Fine-tuned a parameter-efficient 4-bit QLoRA multi-task router on `Qwen2.5-1.5B`, achieving **1.0000 Theme Macro-F1 and 100% prompt injection precision** in under 25 ms, short-circuiting adversarial and out-of-scope requests.
-- **High-Throughput GPU Serving (vLLM):** Benchmarked `Qwen2.5-3B-Instruct` on an NVIDIA Tesla T4 GPU, achieving **187.8 tok/s at concurrency 32** (78.2x throughput speedup over CPU baseline).
-- **Production Observability & CI Quality Gate:** Deployed a lightweight VPS Log Collector (<55 MB RSS), an interactive telemetry dashboard, and an automated GitHub Actions CI regression gate running 384 tests at 86% coverage.
+- **Sub-25ms Guardrail Router (QLoRA):** Fine-tuned a parameter-efficient 4-bit QLoRA multi-task router on `Qwen2.5-0.5B`, achieving **1.0000 Theme Macro-F1 and 100% prompt injection precision** in under 25 ms, short-circuiting adversarial and out-of-scope requests.
+- **High-Throughput GPU Serving (vLLM):** Benchmarked `Qwen2.5-3B-Instruct` on an NVIDIA Tesla T4 GPU, achieving **159.2 tok/s at concurrency 32** (66.3x throughput speedup over CPU baseline).
+- **Production Observability & CI Quality Gate:** Deployed a lightweight VPS Log Collector (<55 MB RSS), an interactive telemetry dashboard, and an automated GitHub Actions CI regression gate running 406 tests at 90% coverage.
 
 ### What to Say in Technical Interviews
 - *"To validate prompt improvements without risking hallucinations on end users, we designed an offline counterfactual replay-based A/B simulation engine that evaluates candidate pipelines against paired gold benchmarks with bootstrap confidence intervals."*
-- *"Because financial regulations require statutory precision, we built a structure-aware parser preserving Bab, Pasal, and Ayat hierarchies, outperforming naive fixed-size chunking by +18.4% in retrieval recall."*
+- *"Because financial regulations require statutory precision, we built a structure-aware parser preserving Bab, Pasal, and Ayat hierarchies, outperforming naive fixed-size chunking by +15.1% in retrieval recall."*
 
 ---
 

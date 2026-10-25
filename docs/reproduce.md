@@ -260,7 +260,7 @@ E6 benchmarked high-throughput serving of `Qwen/Qwen2.5-3B-Instruct` on an NVIDI
    Open [`notebooks/e6_vllm_benchmark.ipynb`](../notebooks/e6_vllm_benchmark.ipynb) on a free Colab GPU runtime and execute the benchmark.
    - **Observed Metrics on NVIDIA T4:**
      - $c=1$: 31.75 tok/s, TTFT 207.8 ms, p95 6.30s.
-     - $c=32$: **187.79 tok/s**, p95 11.38s (**78.2x speedup** over CPU 1B, **391.2x speedup** over CPU 3B).
+     - $c=32$: **159.22 tok/s**, p95 13.31s (**66.3x speedup** over CPU 1B, **331.7x speedup** over CPU 3B).
 
 ### 8.3 Experiment E7: QLoRA Multi-Task Router Fine-Tuning
 E7 trained a parameter-efficient adapter (PEFT QLoRA 4-bit, rank $r=16$) on `Qwen/Qwen2.5-1.5B-Instruct` to act as an upfront question router (9 categories: 5 legal themes, out-of-scope, legal advice, prompt injection, conversational).

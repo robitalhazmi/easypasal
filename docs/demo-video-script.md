@@ -20,7 +20,7 @@ This script is structured for recording a concise, high-impact **3 to 5-minute v
 | **0:45 – 1:45** | Live Gradio UI Demo | Query 1 (Banking Capital Requirement) & Query 2 (Cross-regulation comparative question). Show exact statutory citation cards and passage evidence. |
 | **1:45 – 2:30** | Live Gradio UI Demo | Query 3 (Refusal / Abstention on out-of-scope query) & Query 4 (Adversarial prompt injection defense). Sub-25ms guardrail short-circuiting. |
 | **2:30 – 3:15** | Monitoring Dashboard | Production observability: p50/p95 latencies, A/B variant split (Variant A vs Variant B), Evidently data drift detection, and automated threshold alerts. |
-| **3:15 – 3:45** | Decision Log & Benchmarks | Empirical engineering highlights: 322 gold items, judge calibration ($\kappa=0.9429$), DSPy GEPA optimization (+4.0% test gain), and vLLM GPU serving (187.8 tok/s). |
+| **3:15 – 3:45** | Decision Log & Benchmarks | Empirical engineering highlights: 322 gold items, judge calibration ($\kappa=0.9429$), DSPy GEPA optimization (+4.0% test gain), and vLLM GPU serving (159.2 tok/s). |
 | **3:45 – 4:00** | Conclusion & GitHub Link | Honest-claims protocol recap, Apache-2.0 open-source code, and reproducible Docker Compose stack. |
 
 ---
@@ -124,7 +124,7 @@ Click **Submit**.
 > - We curated a **322-item gold evaluation benchmark** across 5 regulatory themes.
 > - We calibrated our LLM judge against 35 human expert labels, achieving **97.1% agreement and a Cohen's Kappa of 0.9429**.
 > - On the held-out test split, our DSPy GEPA prompt optimization achieved **100% Faithfulness and +4.0% Grounding Fidelity gain** over baseline.
-> - For serving, our vLLM benchmark on an NVIDIA Tesla T4 GPU achieved **187.8 tokens per second**, demonstrating a 78x throughput boost over CPU."
+> - For serving, our vLLM benchmark on an NVIDIA Tesla T4 GPU achieved **159.2 tokens per second**, demonstrating a 66x throughput boost over CPU."
 
 ---
 

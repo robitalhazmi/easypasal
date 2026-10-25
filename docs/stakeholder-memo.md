@@ -96,7 +96,7 @@ All metrics reported below were measured on author-labeled gold Indonesian regul
 
 | Infrastructure Tier | Throughput | Median ($p_{50}$) Latency | 95th Percentile ($p_{95}$) Latency | Concurrency / Capacity |
 |---|:---:|:---:|:---:|:---:|
-| **Cloud GPU (NVIDIA Tesla T4 via vLLM)** | **187.8 tokens/sec** | **207.8 ms** (TTFT) | **11.38 seconds** | Supports **32 concurrent compliance officers** with 78.2x speedup over CPU. |
+| **Cloud GPU (NVIDIA Tesla T4 via vLLM)** | **159.2 tokens/sec** | **398.1 ms** (TTFT) | **13.31 seconds** | Supports **32 concurrent compliance officers** with 66.3x speedup over CPU. |
 | **Air-Gapped On-Premise CPU (4-Core Laptop)** | 2.87 tokens/sec | ~45.0 seconds | 96.40 seconds | Single-user fallback mode; operates completely offline within 4.3 GB RAM. |
 | **Pre-Retrieval Guardrail Router** | >1,000 req/sec | **21.56 ms** | **25.20 ms** | Instantly short-circuits malicious attacks and out-of-scope traps before search. |
 

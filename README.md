@@ -32,7 +32,7 @@ EasyPasal is built with a strict **cite-or-abstain standard**:
 2. **Structure-Aware Regulatory Parsing:** Unlike naive fixed-size chunking that chops legal clauses in half, EasyPasal uses a hierarchical parser preserving Indonesian statutory topology (*Bab*, *Pasal*, *Ayat*, *Huruf*) with contextual statutory breadcrumbs (+15.1% absolute / +123% relative Recall@5).
 3. **Sub-25ms Front-Line Guardrail Router:** Fine-tuned 4-bit QLoRA router detects prompt injection attacks, superseded regulation traps, and out-of-scope non-financial queries, short-circuiting them in **<25 ms** before triggering expensive retrieval.
 4. **Reflective Prompt Optimization (GEPA):** Multi-objective evolutionary prompt optimization (DSPy + GEPA) yields **+4.0% Grounding Fidelity gain** on held-out test data without prompt overfitting.
-5. **Multi-Tier Serving & Production Observability:** Runs on local CPU via 4-bit GGUF (`llama.cpp`) or high-throughput GPU via `vLLM` (187.8 tok/s on a single Tesla T4). Monitored end-to-end via an isolated VPS log collector (<55 MB RSS), Evidently data drift reports, and automated threshold alerts.
+5. **Multi-Tier Serving & Production Observability:** Runs on local CPU via 4-bit GGUF (`llama.cpp`) or high-throughput GPU via `vLLM` (159.2 tok/s on a single Tesla T4). Monitored end-to-end via an isolated VPS log collector (<55 MB RSS), Evidently data drift reports, and automated threshold alerts.
 
 ---
 
@@ -108,7 +108,7 @@ Every architectural choice in EasyPasal was validated through empirical experime
 | **E3** | **Retrieval Pipeline** | Sparse BM25 Only | **Pure Dense (Default) / Hybrid RRF** | **MRR: 0.2396** (0.368 vs 0.226 Recall@5) | Dense captures legal semantics (+62% Recall@5 over BM25); BM25 available via hybrid switch. |
 | **E4** | **CPU Generator Selection** | `Qwen2.5-3B-Instruct` (CPU) | **`Llama-3.2-1B-Instruct`** (CPU) | **3.2x Throughput** (2.8 tok/s, 96.4s p95) | 1B fits in 4.3 GB RAM with 80.3% abstention accuracy; 3B reserved for GPU serving. |
 | **E5** | **Prompt Optimization** | Expert-Authored Baseline | **DSPy + GEPA Reflective Optimization** | **+4.0% Grounding Fidelity** on held-out test | Evolved system prompt enforces bracket syntax `[POJK X Pasal Y]` and eliminates hallucinations. |
-| **E6** | **vLLM GPU Serving** | Quad-core CPU `llama.cpp` | **`vLLM` on NVIDIA Tesla T4 GPU** | **187.8 tok/s** at $c=32$ (**78.2x speedup**) | Compresses p95 multi-user latency from 48 minutes on CPU to **11.38s** on GPU. |
+| **E6** | **vLLM GPU Serving** | Quad-core CPU `llama.cpp` | **`vLLM` on NVIDIA Tesla T4 GPU** | **159.2 tok/s** at $c=32$ (**66.3x speedup**) | Compresses p95 multi-user latency from 48 minutes on CPU to **13.31s** on GPU. |
 | **E7** | **QLoRA Multi-Task Router** | Zero-Shot Qwen-0.5B | **4-bit NF4 QLoRA Adapter** | **1.0000 Theme F1**, 100% Injection Precision | Short-circuits invalid queries in **21.6 ms** (2.6x speedup), bypassing retrieval entirely. |
 
 ---
@@ -139,10 +139,10 @@ Inference benchmark on physical **NVIDIA Tesla T4 GPU (16 GB GDDR6)** via `vLLM 
 
 | Concurrency ($c$) | vLLM GPU Tok/s (3B) | vLLM p95 Latency | vLLM p95 TTFT | CPU Tok/s (1B) | CPU p95 Latency (1B) | Throughput Multiplier |
 |:---:|:---:|:---:|:---:|:---:|:---:|:---:|
-| **$c = 1$** (Single Client) | **13.08** tok/s | **6.30 s** | **207.8 ms** | 2.87 tok/s | 91.90 s | **4.6x** (21.8x vs 3B CPU) |
-| **$c = 4$** (Team Load) | **50.27** tok/s | **7.83 s** | **3,010.8 ms** | 2.92 tok/s | 365.20 s | **17.2x** (81.1x vs 3B CPU) |
-| **$c = 16$** (Dept. Load) | **105.15** tok/s | **14.14 s** | **8,311.0 ms** | 2.65 tok/s | 1,450.40 s (24 min) | **39.7x** (191.2x vs 3B CPU) |
-| **$c = 32$** (Stress Test) | **187.79** tok/s | **11.38 s** | **3,858.1 ms** | 2.40 tok/s | 2,900.00 s (48 min) | **78.2x** (391.2x vs 3B CPU) |
+| **$c = 1$** (Single Client) | **4.54** tok/s | **17.89 s** | **398.1 ms** | 2.87 tok/s | 91.90 s | **1.6x** (7.6x vs 3B CPU) |
+| **$c = 4$** (Team Load) | **46.00** tok/s | **7.78 s** | **2,303.6 ms** | 2.92 tok/s | 365.20 s | **15.8x** (74.2x vs 3B CPU) |
+| **$c = 16$** (Dept. Load) | **137.74** tok/s | **8.94 s** | **2,697.0 ms** | 2.65 tok/s | 1,450.40 s (24 min) | **52.0x** (250.4x vs 3B CPU) |
+| **$c = 32$** (Stress Test) | **159.22** tok/s | **13.31 s** | **3,072.0 ms** | 2.40 tok/s | 2,900.00 s (48 min) | **66.3x** (331.7x vs 3B CPU) |
 
 ![vLLM GPU vs llama.cpp CPU Serving Benchmark](docs/assets/e6_benchmark_comparison.png)
 
@@ -247,7 +247,7 @@ make replay-ab          # Run counterfactual paired A/B replay simulation
 
 In strict adherence to the project's **Honest-Claims Protocol**, all capabilities, performance metrics, and hardware boundaries are explicitly disclosed:
 
-1. **Hardware & Latency Boundaries:** CPU generation takes ~45–70s per query on a quad-core laptop; GPU generation via `vLLM` on an NVIDIA Tesla T4 achieves 187.8 tok/s and 11.38s p95 latency under 32 concurrent requests.
+1. **Hardware & Latency Boundaries:** CPU generation takes ~45–70s per query on a quad-core laptop; GPU generation via `vLLM` on an NVIDIA Tesla T4 achieves 159.2 tok/s and 13.31s p95 latency under 32 concurrent requests.
 2. **Offline Replay Simulation vs Live Users:** The A/B evaluation reported in Section 2 is an **offline counterfactual replay simulation** using a calibrated LLM judge (PABAK $\kappa = 0.9429$, 97.1% human agreement) on gold benchmark queries, not a live user experiment.
 3. **Telemetry Logs:** Monitoring telemetry in `logs/requests.jsonl` and SQLite `collector.db` reflects a structured developer-conducted evaluation session (35 real-world queries across 8 regulatory themes, 24 realistic feedback ratings) and automated alerting drill harnesses.
 4. **Independent Demonstration:** EasyPasal is an independent engineering project and is not affiliated with or endorsed by OJK or Bank Indonesia.
