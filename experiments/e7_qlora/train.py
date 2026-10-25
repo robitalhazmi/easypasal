@@ -195,11 +195,10 @@ def run_gpu_training(config: QLoRAConfig) -> dict[str, Any]:
 
     model = prepare_model_for_kbit_training(model)
 
-    # Ensure all non-quantized float weights match compute_dtype (guards against bfloat16 on Tesla T4)
-    if compute_dtype == torch.float16:
-        for param in model.parameters():
-            if param.dtype == torch.bfloat16:
-                param.data = param.data.to(torch.float16)
+    # Ensure any residual bfloat16 weights are cast to float32 for Tesla T4 compatibility
+    for param in model.parameters():
+        if param.dtype == torch.bfloat16:
+            param.data = param.data.to(torch.float32)
 
     # 3. LoRA Config (passed directly to SFTTrainer to avoid double-wrapping)
     peft_config = LoraConfig(
@@ -296,11 +295,17 @@ def run_gpu_training(config: QLoRAConfig) -> dict[str, Any]:
 
     trainer = SFTTrainer(**trainer_kwargs)
 
-    # Ensure all LoRA adapter parameters and unquantized weights are strictly compute_dtype
-    if compute_dtype == torch.float16:
-        for param in trainer.model.parameters():
-            if param.dtype == torch.bfloat16:
-                param.data = param.data.to(torch.float16)
+    # For PyTorch AMP GradScaler with fp16=True on Tesla T4:
+    # Trainable LoRA adapter parameters MUST be float32 master weights so GradScaler
+    # can safely unscale them without "Attempting to unscale FP16 gradients" or
+    # "NotImplementedError for BFloat16". Any residual bfloat16 tensors are also cast to float32.
+    for param in trainer.model.parameters():
+        if param.requires_grad or param.dtype == torch.bfloat16:
+            param.data = param.data.to(torch.float32)
+
+    for buffer in trainer.model.buffers():
+        if buffer.dtype == torch.bfloat16:
+            buffer.data = buffer.data.to(torch.float32)
 
     logger.info("Starting training loop...")
     train_result = trainer.train()
