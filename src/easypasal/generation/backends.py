@@ -51,6 +51,31 @@ def get_process_peak_memory_mb() -> float:
     return round(rusage / 1024, 2)
 
 
+def sanitize_prompt_artifacts(text: str) -> str:
+    """Strip echoed prompt placeholders, instruction tags, and meta-prompts from generated output."""
+    if not text or not text.strip():
+        return text
+
+    # Remove leaked placeholder brackets, e.g. "[Kalimat jawaban substantif langsung]" or "[Regulation Name...]"
+    patterns = [
+        r"\[\s*Kalimat\s+jawaban[^\]]*\]\s*",
+        r"<\s*Kalimat\s+jawaban[^>]*>\s*",
+        r"\[\s*Direct\s+substantive[^\]]*\]\s*",
+        r"<\s*Direct\s+substantive[^>]*>\s*",
+        r"\[\s*Nama\s+Regulasi[^\]]*\]\s*",
+        r"\[\s*Regulation\s+Name[^\]]*\]\s*",
+        r"\[\s*POJK\s*\.{2,}\s*\]\s*",
+        r"\[\s*Contoh\s+format[^\]]*\]\s*",
+        r"Contoh\s+format\s*:\s*",
+        r"Format\s+example\s*:\s*",
+    ]
+    cleaned = text
+    for p in patterns:
+        cleaned = re.sub(p, "", cleaned, flags=re.IGNORECASE)
+
+    return cleaned.strip()
+
+
 def trim_incomplete_sentence(text: str) -> str:
     """Trim trailing incomplete sentences or cut-off fragments if generation stopped prematurely.
 
@@ -58,7 +83,11 @@ def trim_incomplete_sentence(text: str) -> str:
     question mark, or closing citation bracket), preventing dangling words, severed clauses,
     or orphaned trailing list numbers.
     """
-    stripped = text.rstrip()
+    if not text or not text.strip():
+        return text
+
+    cleaned = sanitize_prompt_artifacts(text)
+    stripped = cleaned.rstrip()
     if not stripped:
         return text
 

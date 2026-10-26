@@ -24,7 +24,8 @@ ATURAN MUTLAK PENJAWABAN:
    - Jika cuplikan teks memuat ketentuan substantif yang menjawab pertanyaan menggunakan istilah baku tersebut (seperti ketentuan kewajiban "Bank" untuk menjawab kueri "Bank Umum"), Anda WAJIB menjawabnya secara langsung dengan mengutip pasalnya.
 2. FORMAT LANGSUNG DI AWAL (BOTTOM-LINE-UP-FRONT) & HIERARKI NORMA:
    - Kalimat pertama WAJIB memberikan jawaban substantif secara langsung, tegas, dan definitif yang menjawab pertanyaan pengguna, disertai sitasi pasal imperatif utama dalam tanda kurung siku (format: [<Nama Regulasi>, Pasal <Nomor> ayat (<Angka>)]). DILARANG membuka jawaban dengan kalimat mengambang atau daftar pasal.
-   - Dahulukan Norma Pokok/Imperatif ("wajib", "harus", "dilarang") di atas norma pengecualian/izin ("dapat"). Jika suatu pasal/ayat menetapkan kewajiban umum ("wajib") dan ayat berikutnya mengatur opsi/pengecualian bersyarat ("dapat ... sepanjang izin"), nyatakan kewajiban pokoknya terlebih dahulu (misal: wajib di wilayah Indonesia), baru sebutkan opsi pengecualian izinnya jika relevan. Ketentuan korektif otoritas ("OJK dapat meminta kembali") hanya menjadi pelengkap.
+   - Dahulukan Norma Pokok/Imperatif ("wajib", "harus", "dilarang") di atas norma pengecualian/izin ("dapat"). Jika suatu pasal/ayat menetapkan kewajiban umum ("wajib") dan ayat berikutnya mengatur opsi/pengecualian bersyarat ("dapat ... sepanjang izin"), nyatakan kewajiban pokoknya terlebih dahulu (misal: wajib di wilayah Indonesia), baru sebutkan opsi pengecualian izinnya jika relevan.
+   - Penyelarasan Subjek Hukum Pertanyaan: Jika pertanyaan menanyakan kewajiban atau larangan suatu entitas (misal: "Bank wajib...", "PUJK wajib..."), Anda WAJIB mengutip pasal/ayat yang menetapkan kewajiban entitas tersebut sebagai subjek hukum utama (contoh: "Bank wajib menempatkan..."), BUKAN ayat kewenangan pengawasan atau tindakan korektif otoritas (contoh: "OJK dapat meminta Bank..."). Ketentuan wewenang otoritas hanya boleh dikutip sebagai keterangan tambahan jika relevan.
 3. WAJIB mencantumkan sitasi regulasi lengkap dan spesifik dalam tanda kurung siku untuk setiap pasal atau ketentuan yang dirujuk. Dilarang memberikan jawaban tanpa sitasi kurung siku.
 4. HANYA JIKA konteks regulasi yang diberikan benar-benar TIDAK memuat ketentuan atau dasar hukum yang menjawab pertanyaan (atau jika subjek pertanyaan di luar sektor jasa keuangan seperti kedai kopi atau restoran), nyatakan secara singkat bahwa dasar hukum mengenai hal tersebut tidak ditemukan dalam regulasi yang tersedia. DILARANG merangkum pasal-pasal yang tidak relevan (passage dumping) atau memaksakan ketentuan dari sub-sektor keuangan lain.
 5. Jawab dalam bahasa yang sama dengan pertanyaan pengguna (Bahasa Indonesia).
@@ -40,7 +41,8 @@ STRICT ANSWERING RULES:
    - If the context passages contain substantive rules answering the query using these statutory designations (such as rules for "Bank" answering a question about "Bank Umum"), you MUST answer directly and cite the article.
 2. BOTTOM-LINE-UP-FRONT (BLUF) & STATUTORY NORM HIERARCHY:
    - Your very first sentence MUST state the direct, definitive answer to the user's question, citing the primary governing article in square brackets (format: [<Regulation Name>, Pasal <Number> ayat (<Clause>)]). NEVER begin with passive hedging or passage listing.
-   - Prioritize Primary Imperative Norms ("wajib", "harus", "dilarang") over permissive exceptions ("dapat"). If an article/clause establishes a general obligation ("wajib") and subsequent clauses provide conditional permissions/exceptions ("dapat ... sepanjang izin"), state the primary general obligation first, then mention the exception if applicable. Remedial authority clauses ("OJK may order...") must only be cited as secondary qualifications.
+   - Prioritize Primary Imperative Norms ("wajib", "harus", "dilarang") over permissive exceptions ("dapat"). If an article/clause establishes a general obligation ("wajib") and subsequent clauses provide conditional permissions/exceptions ("dapat ... sepanjang izin"), state the primary general obligation first, then mention the exception if applicable.
+   - Legal Subject & Grammatical Agent Alignment: If the question inquires about an entity's obligation or prohibition (e.g. "Bank wajib...", "PUJK must..."), you MUST cite the clause where that entity is the primary grammatical subject of the obligation (e.g. "Bank must place..."), NOT provisions where the supervisory authority is the subject exercising discretionary or corrective enforcement powers (e.g. "OJK may request/order..."). Authority enforcement powers may only be cited as secondary qualifications.
 3. You MUST cite the exact regulation, article, and clause in square brackets for every statutory rule mentioned. Always cite the regulation in square brackets.
 4. ONLY IF the provided regulatory passages genuinely do NOT contain rules answering the question (or if the question is outside financial services regulation, e.g., coffee shops, restaurants, retail shops, non-financial enterprises, general criminal/labor law), state briefly that no legal basis was found in the available regulations. STRICTLY FORBIDDEN from summarizing tangentially related passages (passage dumping) or forcing rules across disjoint financial sub-sectors.
 5. Answer in the same language as the user's question (English). Retain official Indonesian regulatory names and article designations in your citations.
@@ -62,6 +64,7 @@ ATURAN MUTLAK PENJAWABAN:
 2. STRUKTUR LANGSUNG DI AWAL (BLUF) & HIERARKI NORMA:
    - Kalimat pertama WAJIB memberikan kesimpulan jawaban substantif secara langsung dan tegas, disertai sitasi nomor pasal/ayat rujukan intinya dalam tanda kurung siku (format: [<Nama Regulasi>, Pasal <Nomor> ayat (<Angka>)]). DILARANG membuka dengan rangkuman daftar dokumen atau kalimat mengambang.
    - Dahulukan Norma Pokok/Imperatif ("wajib", "harus", "dilarang") di atas norma pengecualian/izin ("dapat"). Jika suatu pasal/ayat menetapkan kewajiban umum ("wajib") dan ayat berikutnya mengatur opsi/pengecualian bersyarat ("dapat ... sepanjang izin"), nyatakan kewajiban pokoknya terlebih dahulu (misal: wajib di wilayah Indonesia), baru sebutkan opsi pengecualian izinnya jika relevan.
+   - Penyelarasan Subjek Hukum Pertanyaan: Jika pertanyaan menanyakan kewajiban atau larangan suatu entitas (misal: "Bank wajib...", "PUJK wajib..."), Anda WAJIB mengutip pasal/ayat yang menetapkan kewajiban entitas tersebut sebagai subjek hukum utama (contoh: "Bank wajib menempatkan..."), BUKAN ayat kewenangan pengawasan atau tindakan korektif otoritas (contoh: "OJK dapat meminta Bank..."). Ketentuan wewenang otoritas hanya menjadi pelengkap jika relevan.
 3. WAJIB mencantumkan sitasi regulasi lengkap dan spesifik dalam tanda kurung siku untuk setiap pasal atau ayat dengan format baku: [<Nama Regulasi Resmi/Singkat>, Pasal <Nomor> ayat (<Angka>)]. DILARANG menulis sitasi tanpa kurung siku atau mengarang singkatan/nama regulasi sendiri.
 4. HANYA JIKA konteks regulasi yang diberikan benar-benar TIDAK memuat ketentuan atau dasar hukum yang menjawab pertanyaan, nyatakan bahwa dasar hukum mengenai hal tersebut tidak ditemukan dalam regulasi yang tersedia. DILARANG merangkum pasal-pasal yang tidak relevan (passage dumping) atau memaksakan ketentuan dari sub-sektor keuangan lain.
 5. LARANGAN HALUSINASI PASAL & REGULASI: HANYA gunakan nama regulasi resmi dan nomor pasal yang tertulis secara eksplisit pada header atau isi cuplikan teks konteks di atas. JANGAN PERNAH mengarang nama POJK fiktif, tahun fiktif, atau menebak nomor pasal yang tidak tertulis.
@@ -80,6 +83,7 @@ STRICT ANSWERING RULES:
 2. BOTTOM-LINE-UP-FRONT (BLUF) & STATUTORY NORM HIERARCHY:
    - Your very first sentence MUST state the direct substantive conclusion answering the user's question, citing the primary governing article in square brackets (format: [<Official/Short Regulation Name>, Pasal <Number> ayat (<Clause>)]). NEVER begin with passive hedging or document listing.
    - Prioritize Primary Imperative Norms ("wajib", "harus", "dilarang") over permissive exceptions ("dapat"). If an article/clause establishes a general obligation ("wajib") and subsequent clauses provide conditional permissions/exceptions ("dapat ... sepanjang izin"), state the primary general obligation first, then mention the exception if applicable.
+   - Legal Subject & Grammatical Agent Alignment: If the question inquires about an entity's obligation or prohibition (e.g. "Bank wajib...", "PUJK must..."), you MUST cite the clause where that entity is the primary grammatical subject of the obligation (e.g. "Bank must place..."), NOT provisions where the supervisory authority is the subject exercising discretionary or corrective enforcement powers (e.g. "OJK may request/order..."). Authority enforcement powers may only be cited as secondary qualifications.
 3. You MUST cite the exact regulation, article, and clause in square brackets for every factual assertion with standard format: [<Official/Short Regulation Name>, Pasal <Number> ayat (<Clause>)]. Do not write citations outside square brackets.
 4. ONLY IF the provided regulatory passages genuinely do NOT contain rules answering the question, state that no legal basis was found in the available regulations. STRICTLY FORBIDDEN from misapplying or analogizing requirements across disjoint financial sectors.
 5. STRICT ANTI-HALLUCINATION CLAUSE: ONLY cite official regulations and articles that are explicitly written in the headers or body of the provided context passages. NEVER fabricate fictitious regulation names, old/fake years, or imaginary article/clause numbers.
@@ -158,6 +162,74 @@ def detect_language(text: str) -> str:
     return "id"
 
 
+def _detect_statutory_role(text: str) -> str:
+    """Classify the primary normative role of a regulatory passage chunk.
+
+    Tags help smaller LLMs prioritize primary substantive duties of regulated entities
+    over discretionary supervisory actions or conditional exceptions.
+    """
+    if not text:
+        return ""
+
+    lower = text.lower()
+
+    # 1. Primary imperative duties of entities: "Bank wajib", "PUJK wajib", "Perusahaan dilarang"
+    # Matches entity subject followed by imperative verb or verb starting with imperative action
+    has_entity_duty = bool(
+        re.search(
+            r"\b(?:bank|pujk|perusahaan|penyelenggara|ljk|pihak)\s+(?:wajib|harus|dilarang)\b",
+            lower,
+        )
+        or re.search(
+            r"\bwajib\s+(?:menempatkan|memiliki|menerapkan|menyediakan|menyampaikan|memenuhi|menggunakan|menjaga|melakukan)\b",
+            lower,
+        )
+    )
+
+    # 2. Authority corrective / discretionary supervisory / sanction powers
+    # e.g., "OJK dapat meminta", "Otoritas Jasa Keuangan berwenang", "dikenai sanksi"
+    has_authority = bool(
+        re.search(
+            r"\b(?:ojk|otoritas jasa keuangan|bank indonesia|bi)\s+(?:dapat|berwenang|meminta|memerintahkan|mengenakan|menjatuhkan)\b",
+            lower,
+        )
+        or re.search(r"\b(?:dikenai|pengenaan)\s+sanksi\b", lower)
+    )
+
+    # 3. Conditional permission / exceptions: "Bank dapat menempatkan ... sepanjang izin"
+    has_permission = bool(
+        re.search(
+            r"\b(?:bank|pujk|perusahaan|penyelenggara|ljk)\s+dapat\b",
+            lower,
+        )
+        or re.search(r"\bdapat\b.*\b(?:sepanjang|setelah|dengan persetujuan|izin)\b", lower)
+    )
+
+    if has_entity_duty and has_authority:
+        duty_match = re.search(
+            r"\b(?:bank|pujk|perusahaan|penyelenggara|ljk|pihak)\s+(?:wajib|harus|dilarang)\b|\bwajib\b",
+            lower,
+        )
+        auth_match = re.search(
+            r"\b(?:ojk|otoritas jasa keuangan|bank indonesia|bi)\s+(?:dapat|berwenang|meminta|memerintahkan|mengenakan|menjatuhkan)\b|\bsanksi\b",
+            lower,
+        )
+        pos_duty = duty_match.start() if duty_match else 999999
+        pos_auth = auth_match.start() if auth_match else 999999
+        if pos_duty < pos_auth:
+            return "[Peran: Kewajiban Pokok Entitas]"
+        else:
+            return "[Peran: Wewenang Korektif Otoritas / Sanksi]"
+    elif has_entity_duty:
+        return "[Peran: Kewajiban Pokok Entitas]"
+    elif has_authority:
+        return "[Peran: Wewenang Korektif Otoritas / Sanksi]"
+    elif has_permission:
+        return "[Peran: Opsi Pengecualian / Izin Bersyarat]"
+
+    return ""
+
+
 def format_passages(chunks: list[RetrievedChunk]) -> str:
     """Format retrieved regulatory chunks into a structured context string."""
     if not chunks:
@@ -167,10 +239,13 @@ def format_passages(chunks: list[RetrievedChunk]) -> str:
     for idx, chunk in enumerate(chunks, start=1):
         label = chunk.citation_label or chunk.chunk_id
         title_note = f"[Tentang: {chunk.doc_title}]" if chunk.doc_title else ""
+        role_note = _detect_statutory_role(chunk.text)
         status_note = f"(Status: {chunk.status})" if chunk.status else ""
         header_parts = [f"--- DOKUMEN {idx}: {label}"]
         if title_note:
             header_parts.append(title_note)
+        if role_note:
+            header_parts.append(role_note)
         if status_note:
             header_parts.append(status_note)
         header = f"{' '.join(header_parts)} ---".strip()
@@ -211,9 +286,10 @@ def build_rag_prompt(
 {question}
 </question>
 
-Answer the question in the format:
-<Direct substantive answer statement> [<Regulation Name, Pasal ...>].
-Followed by any conditions or related provisions if applicable:"""
+Provide a direct answer citing the official regulation in square brackets.
+Format example:
+Financial institutions must provide consumer complaint services [POJK 22/2023, Pasal 71].
+Followed by any related provisions or conditions if applicable:"""
 
     return f"""<system>
 {system_prompt}
@@ -227,6 +303,7 @@ Followed by any conditions or related provisions if applicable:"""
 {question}
 </question>
 
-Jawab pertanyaan dengan format:
-<Kalimat jawaban substantif langsung> [<Nama Regulasi, Pasal ...>].
+Jawab secara langsung dengan mencantumkan sitasi resmi dalam tanda kurung siku.
+Contoh format:
+PUJK wajib melayani pengaduan konsumen [POJK 22/2023, Pasal 71].
 Disusul penjelasan atau ketentuan terkait jika ada:"""

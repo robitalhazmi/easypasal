@@ -102,6 +102,52 @@ def test_trim_incomplete_sentence() -> None:
     assert trim_incomplete_sentence(severed_bullet) == "Pusat Data wajib di Indonesia."
 
 
+def test_sanitize_prompt_artifacts() -> None:
+    """Verify prompt artifacts and instruction placeholders are cleanly stripped."""
+    from easypasal.generation.backends import sanitize_prompt_artifacts
+
+    # Leaked prompt placeholder brackets
+    leaked_id = "[Kalimat jawaban substantif langsung] [POJK 11/POJK.03/2022, Pasal 36 ayat (4)].\nWajib di Indonesia."
+    cleaned_id = sanitize_prompt_artifacts(leaked_id)
+    assert "[Kalimat jawaban substantif langsung]" not in cleaned_id
+    assert cleaned_id.startswith("[POJK 11/POJK.03/2022, Pasal 36 ayat (4)].")
+
+    # Leaked english placeholder
+    leaked_en = "<Direct substantive answer statement> [POJK 22/2023, Pasal 71]."
+    assert sanitize_prompt_artifacts(leaked_en) == "[POJK 22/2023, Pasal 71]."
+
+    # Empty or whitespace handling
+    assert sanitize_prompt_artifacts("") == ""
+    assert sanitize_prompt_artifacts("   ") == "   "
+
+    # Normal text untouched
+    normal = "Bank wajib menempatkan Sistem Elektronik di wilayah Indonesia [POJK 11/POJK.03/2022, Pasal 35 ayat (1)]."
+    assert sanitize_prompt_artifacts(normal) == normal
+
+
+def test_detect_statutory_role() -> None:
+    """Verify classification of normative statutory roles in regulatory passages."""
+    from easypasal.generation.prompts import _detect_statutory_role
+
+    # 1. Primary entity duty (Bank wajib...)
+    chunk_duty = "Bank wajib menempatkan Sistem Elektronik pada Pusat Data dan Pusat Pemulihan Bencana di wilayah Indonesia."
+    assert _detect_statutory_role(chunk_duty) == "[Peran: Kewajiban Pokok Entitas]"
+
+    # 2. Authority corrective / remedial power (OJK dapat meminta...)
+    chunk_auth = (
+        "Dalam hal berdasarkan penilaian Otoritas Jasa Keuangan penempatan di luar negeri ... "
+        "Otoritas Jasa Keuangan dapat meminta Bank untuk menempatkan Sistem Elektronik di Indonesia."
+    )
+    assert _detect_statutory_role(chunk_auth) == "[Peran: Wewenang Korektif Otoritas / Sanksi]"
+
+    # 3. Conditional permission (Bank dapat ... sepanjang izin)
+    chunk_perm = "Bank dapat menempatkan Sistem Elektronik di luar wilayah Indonesia sepanjang memperoleh persetujuan OJK."
+    assert _detect_statutory_role(chunk_perm) == "[Peran: Opsi Pengecualian / Izin Bersyarat]"
+
+    # 4. Empty text
+    assert _detect_statutory_role("") == ""
+
+
 def test_format_passages_and_prompt_assembly() -> None:
     """Verify context formatting and prompt assembly for Indonesian and English."""
     c1 = _make_dummy_chunk(
@@ -118,6 +164,7 @@ def test_format_passages_and_prompt_assembly() -> None:
     passages = format_passages([c1, c2])
     assert "POJK 22 Tahun 2023, Pasal 71 ayat (1)" in passages
     assert "PUJK wajib menyelesaikan pengaduan" in passages
+    assert "[Peran: Kewajiban Pokok Entitas]" in passages
 
     # Test doc_title injection in header
     c_titled = _make_dummy_chunk(
@@ -139,6 +186,8 @@ def test_format_passages_and_prompt_assembly() -> None:
     assert "ATURAN MUTLAK PENJAWABAN" in id_prompt
     assert "POJK 22 Tahun 2023, Pasal 72" in id_prompt
     assert "Berapa hari penanganan pengaduan?" in id_prompt
+    assert "PUJK wajib melayani pengaduan konsumen" in id_prompt
+    assert "<Kalimat jawaban" not in id_prompt
 
     # Test English prompt
     en_prompt = build_rag_prompt(
@@ -148,6 +197,8 @@ def test_format_passages_and_prompt_assembly() -> None:
     )
     assert "STRICT ANSWERING RULES" in en_prompt
     assert "How many days are allowed for complaint handling?" in en_prompt
+    assert "Financial institutions must provide consumer complaint services" in en_prompt
+    assert "<Direct substantive" not in en_prompt
 
     # Test empty passages
     empty_prompt = build_rag_prompt(question="Pertanyaan?", chunks=[])

@@ -381,9 +381,12 @@ class RAGPipeline:
         )
 
         # 5. Clean Incomplete Sentence Fragments, Extract Citations, and Check Abstention
-        from easypasal.generation.backends import trim_incomplete_sentence
+        from easypasal.generation.backends import (
+            sanitize_prompt_artifacts,
+            trim_incomplete_sentence,
+        )
 
-        answer_text = trim_incomplete_sentence(gen_res.text)
+        answer_text = sanitize_prompt_artifacts(trim_incomplete_sentence(gen_res.text))
         citations = extract_citations(answer_text)
         abstained = check_abstention(answer_text, language=lang)
 
