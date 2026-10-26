@@ -220,6 +220,7 @@ def verify_single_citation(
     citation_text: str,
     retrieved_chunks: list[RetrievedChunk],
     surrounding_statement: str | None = None,
+    question: str | None = None,
 ) -> CitationCheck:
     """Verify a single citation against the retrieved chunks."""
     parsed = parse_citation_details(citation_text)
@@ -293,6 +294,21 @@ def verify_single_citation(
                     reason=f"Klaim angka/nominal '{claim}' pada sitasi {citation_text} tidak didukung oleh teks regulasi yang diretrieve.",
                 )
 
+    # 5. Verify Query-Aware Sector & Concept Alignment if question is provided
+    if question and matched_chunk:
+        from easypasal.retrieval.retriever import _is_sector_mismatch
+
+        if _is_sector_mismatch(question.lower(), matched_chunk):
+            return CitationCheck(
+                citation=citation_text,
+                is_grounded=False,
+                doc_match=True,
+                pasal_match=True,
+                ayat_match=ayat_matched,
+                matched_chunk_id=matched_chunk.chunk_id,
+                reason=f"Ketidaksesuaian sektor/konteks: sitasi {citation_text} tidak mengatur subjek yang ditanyakan.",
+            )
+
     return CitationCheck(
         citation=citation_text,
         is_grounded=True,
@@ -308,6 +324,7 @@ def verify_citations(
     answer: str,
     retrieved_chunks: list[RetrievedChunk],
     citations: list[str] | None = None,
+    question: str | None = None,
 ) -> VerificationResult:
     """Verify that all citations in the generated answer are grounded in the retrieved chunks.
 
@@ -315,6 +332,7 @@ def verify_citations(
         answer: Generated response text from RAG pipeline.
         retrieved_chunks: Candidate passages retrieved for the query.
         citations: Optional pre-extracted citations list. If None, extracted automatically.
+        question: Optional user question to validate sector and concept alignment.
 
     Returns:
         VerificationResult detailing grounding status, pass/fail checks, and hallucinated pasal.
@@ -342,14 +360,23 @@ def verify_citations(
 
     for cite in cites:
         statement = _find_surrounding_statement(answer, cite)
-        check = verify_single_citation(cite, retrieved_chunks, surrounding_statement=statement)
+        check = verify_single_citation(
+            cite,
+            retrieved_chunks,
+            surrounding_statement=statement,
+            question=question,
+        )
         checks.append(check)
         if not check.is_grounded:
             ungrounded.append(cite)
             if check.doc_match and not check.pasal_match:
                 parsed = parse_citation_details(cite)
                 hallucinated.append(f"Pasal {parsed.pasal} ({parsed.doc_number or 'Regulasi'})")
-            elif not check.doc_match or "Klaim angka" in check.reason:
+            elif (
+                not check.doc_match
+                or "Klaim angka" in check.reason
+                or "Ketidaksesuaian sektor" in check.reason
+            ):
                 hallucinated.append(f"{cite} [{check.reason}]")
             else:
                 hallucinated.append(cite)

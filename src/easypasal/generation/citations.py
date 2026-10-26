@@ -98,8 +98,9 @@ def extract_citations(text: str) -> list[str]:
     # 2. Inline Statutory Pattern Matches
     for match in _STATUTORY_REGEX.finditer(text):
         raw = match.group(0).strip()
-        if raw and raw.lower() not in seen:
-            seen.add(raw.lower())
+        r_low = raw.lower()
+        if raw and r_low not in seen and not any(r_low in c.lower() for c in citations):
+            seen.add(r_low)
             citations.append(raw)
 
     return citations

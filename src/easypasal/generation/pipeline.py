@@ -402,6 +402,7 @@ class RAGPipeline:
                 answer=answer_text,
                 retrieved_chunks=chunks,
                 citations=citations,
+                question=clean_question,
             )
             verification_dict = {
                 "is_valid": v_res.is_valid,

@@ -33,24 +33,105 @@ logger = logging.getLogger("easypasal.retrieval.retriever")
 
 
 def _is_sector_mismatch(query_lower: str, chunk: RetrievedChunk) -> bool:
-    """Determine if a retrieved candidate chunk belongs to a disjoint financial sector from the query."""
+    """Determine if a retrieved candidate chunk fails sectoral or conjunctive entity-concept alignment.
+
+    Applies two general retrieval hygiene rules:
+    1. Sectoral Exclusivity: Excludes statutes exclusive to one financial sub-sector (e.g., pure Banking
+       or pure Capital Markets) when the query explicitly targets a disjoint sub-sector (e.g., Fintech P2P).
+    2. Conjunctive Entity-Concept Gate: When a query targets a specialized sub-sector entity (e.g., P2P/LPBBTI)
+       and asks for a quantitative cap/rate or specific operational rule, excludes split-query distractor
+       chunks from umbrella statutes that lack conjunctive coverage of both the target entity and concept.
+    """
     is_p2p_query = bool(
-        re.search(r"\b(?:fintech\s+p2p|p2p\s+lending|pinjol|lpbti|peer-to-peer)\b", query_lower)
+        re.search(
+            r"\b(?:fintech\s+p2p|p2p\s+lending|p2p\b|pinjol|pinjaman\s+daring|lpbti|lpbbti|peer-to-peer)\b",
+            query_lower,
+        )
+    )
+    has_banking_query = bool(
+        re.search(
+            r"\b(?:bank\b|perbankan|bank\s+umum|bpr\b|tabungan|deposito|giro)\b",
+            query_lower,
+        )
     )
     has_capital_markets_query = bool(
         re.search(
-            r"\b(?:pasar\s+modal|saham|efek|bursa|reksa\s+dana|emiten|kliring)\b", query_lower
+            r"\b(?:pasar\s+modal|saham|efek|bursa|reksa\s+dana|emiten|perusahaan\s+terbuka|rups|kliring)\b",
+            query_lower,
         )
     )
 
-    # P2P lending query with Capital Market distractor chunk
-    if is_p2p_query and not has_capital_markets_query:
-        doc_info = f"{chunk.doc_number} {chunk.doc_title} {chunk.citation_label}".lower()
-        if any(
-            term in doc_info
-            for term in ["pasar modal", "lembaga kliring", "perusahaan efek", "bursa efek"]
-        ):
+    doc_info = f"{chunk.doc_number} {chunk.doc_title} {chunk.citation_label}".lower()
+    chunk_body = f"{doc_info} {chunk.text}".lower()
+
+    is_banking_only_doc = any(
+        term in doc_info
+        for term in [
+            "uu nomor 10 tahun 1998",
+            "uu nomor 7 tahun 1992",
+            "pojk.03",
+            "seojk.03",
+            "pojk 21 tahun 2023",
+            "oleh bank umum",
+            "bagi bank umum",
+        ]
+    )
+    is_capital_markets_only_doc = any(
+        term in doc_info
+        for term in [
+            "uu nomor 8 tahun 1995",
+            "pojk.04",
+            "pasar modal",
+            "lembaga kliring",
+            "perusahaan efek",
+            "bursa efek",
+            "perusahaan terbuka",
+            "emiten",
+        ]
+    )
+
+    # 1. Disjoint Sectoral Exclusivity Check
+    if is_p2p_query and not has_banking_query and is_banking_only_doc:
+        return True
+    if is_p2p_query and not has_capital_markets_query and is_capital_markets_only_doc:
+        return True
+    if has_banking_query and not has_capital_markets_query and is_capital_markets_only_doc:
+        return True
+    if has_capital_markets_query and not has_banking_query and is_banking_only_doc:
+        return True
+
+    # 2. Conjunctive Entity-Concept Gate for Specialized Sub-Sector Queries
+    if is_p2p_query and not has_banking_query and not has_capital_markets_query:
+        has_p2p_entity_in_chunk = bool(
+            re.search(
+                r"\b(?:peer-to-peer|p2p|lpbbti|lpbti|pendanaan\s+bersama|pinjaman\s+daring)\b",
+                chunk_body,
+            )
+        )
+        is_general_cross_sector_topic = bool(
+            re.search(
+                r"\b(?:pengaduan|sengketa|laps|data\s+pribadi|kerahasiaan|pencucian\s+uang|apu|ppt|cdd|edd)\b",
+                query_lower,
+            )
+        )
+        if not is_general_cross_sector_topic and not has_p2p_entity_in_chunk:
             return True
+
+        is_rate_or_cap_query = bool(
+            re.search(
+                r"\b(?:batas\s+maksimum|batas\s+maksimal|manfaat\s+ekonomi|bunga\s+pinjaman|suku\s+bunga|besaran\s+bunga)\b",
+                query_lower,
+            )
+        )
+        if is_rate_or_cap_query:
+            has_rate_or_cap_in_chunk = bool(
+                re.search(
+                    r"\b(?:batas\s+maksimum|batas\s+maksimal|manfaat\s+ekonomi|suku\s+bunga|bunga\s+pinjaman)\b",
+                    chunk_body,
+                )
+            )
+            if not (has_p2p_entity_in_chunk and has_rate_or_cap_in_chunk):
+                return True
 
     return False
 
@@ -263,12 +344,10 @@ class HybridRetriever:
                 f"Unsupported retrieval mode: {mode!r}. Must be 'hybrid', 'dense', 'bm25', or 'hybrid+rerank'."
             )
 
-        # Cross-Sector Entity Alignment: Deprioritize disjoint sector distractors
+        # Cross-Sector Entity & Conjunctive Alignment: Filter out disjoint sector distractors
         if final_chunks:
             q_low = query_clean.lower()
-            aligned_chunks = [c for c in final_chunks if not _is_sector_mismatch(q_low, c)]
-            if aligned_chunks:
-                final_chunks = aligned_chunks
+            final_chunks = [c for c in final_chunks if not _is_sector_mismatch(q_low, c)]
 
         # Apply score threshold filter if specified
         eff_min_score = min_score if min_score is not None else self.score_threshold

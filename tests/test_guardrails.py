@@ -786,3 +786,91 @@ def test_pipeline_router_can_be_disabled() -> None:
     assert output.metadata["routed"] is False
     mock_retriever.retrieve.assert_called_once()
     mock_gen.generate.assert_called_once()
+
+
+def test_sector_and_concept_mismatch_guardrails() -> None:
+    """Verify _is_sector_mismatch filters cross-sector and split-query distractors while preserving valid chunks."""
+    from easypasal.retrieval.retriever import _is_sector_mismatch
+
+    q_p2p_rate = (
+        "berapa batas maksimum manfaat ekonomi atau bunga pinjaman pada fintech p2p lending?"
+    )
+
+    # 1. Banking statute (UU 10/1998 BMPK) -> Mismatch for P2P query
+    chunk_bank_bmpk = _make_chunk(
+        "c_uu10",
+        "UU Nomor 10 Tahun 1998",
+        "UU Nomor 10 Tahun 1998, Pasal I ayat (1)",
+        pasal="I",
+        text="Batas maksimum pemberian kredit atau pembiayaan berdasarkan Prinsip Syariah oleh Bank.",
+    )
+    assert _is_sector_mismatch(q_p2p_rate, chunk_bank_bmpk) is True
+
+    # 2. Split-query distractor in POJK 22/2023 Pasal 40 (administrative fine cap, not P2P rate) -> Mismatch
+    chunk_pojk22_fine = _make_chunk(
+        "c_pojk22_40",
+        "POJK 22 Tahun 2023",
+        "POJK 22 Tahun 2023, Pasal 40 ayat (2)",
+        pasal="40",
+        text="Sanksi denda administratif sebagaimana dimaksud dikenakan paling banyak Rp15.000.000.000,00.",
+    )
+    assert _is_sector_mismatch(q_p2p_rate, chunk_pojk22_fine) is True
+
+    # 3. Valid P2P rate chunk (contains both P2P/LPBBTI entity and rate/manfaat ekonomi terms) -> Match (False)
+    chunk_valid_p2p_rate = _make_chunk(
+        "c_seojk19",
+        "SEOJK 19/SEOJK.06/2023",
+        "SEOJK 19/SEOJK.06/2023, Romawi V",
+        pasal="V",
+        text="Batas maksimum manfaat ekonomi atau bunga pinjaman pada LPBBTI / fintech peer-to-peer lending adalah 0,3% per hari.",
+    )
+    assert _is_sector_mismatch(q_p2p_rate, chunk_valid_p2p_rate) is False
+
+    # 4. General consumer protection query on P2P complaint handling -> POJK 22/2023 Pasal 71 is allowed
+    q_p2p_complaint = "bagaimana kewajiban penanganan pengaduan konsumen pada fintech p2p lending?"
+    chunk_pojk22_complaint = _make_chunk(
+        "c_pojk22_71",
+        "POJK 22 Tahun 2023",
+        "POJK 22 Tahun 2023, Pasal 71",
+        pasal="71",
+        text="PUJK wajib menerima dan menindaklanjuti pengaduan konsumen secara adil dan transparan.",
+    )
+    assert _is_sector_mismatch(q_p2p_complaint, chunk_pojk22_complaint) is False
+
+
+def test_verify_citations_rejects_sector_mismatch_with_question() -> None:
+    """Verify post-hoc citation verifier flags passage-dumped cross-sector citations when question is provided."""
+    q_p2p_rate = (
+        "Berapa batas maksimum manfaat ekonomi atau bunga pinjaman pada fintech P2P lending?"
+    )
+    chunk_bank = _make_chunk(
+        "c_uu10",
+        "UU Nomor 10 Tahun 1998",
+        "UU Nomor 10 Tahun 1998, Pasal I ayat (1)",
+        pasal="I",
+        ayat="1",
+        text="Menetapkan batas maksimum pemberian kredit atau pembiayaan berdasarkan Prinsip Syariah oleh Bank.",
+    )
+    chunk_pojk22 = _make_chunk(
+        "c_pojk22_40",
+        "POJK 22 Tahun 2023",
+        "POJK 22 Tahun 2023, Pasal 40 ayat (2)",
+        pasal="40",
+        ayat="2",
+        text="Huruf e dikenakan paling banyak Rp15.000.000.000,00 (lima belas miliar rupiah).",
+    )
+
+    dumped_answer = (
+        "Dari konteks regulasi yang diberikan:\n"
+        "- [UU Nomor 10 Tahun 1998, Pasal I ayat (1)] mengatur batas maksimum pemberian kredit.\n"
+        "- [POJK 22 Tahun 2023, Pasal 40 ayat (2)] dikenakan paling banyak Rp15.000.000.000,00."
+    )
+
+    res = verify_citations(
+        answer=dumped_answer,
+        retrieved_chunks=[chunk_bank, chunk_pojk22],
+        question=q_p2p_rate,
+    )
+    assert res.is_valid is False
+    assert res.ungrounded_count == 2
+    assert any("Ketidaksesuaian sektor/konteks" in h for h in res.hallucinated_pasal)
