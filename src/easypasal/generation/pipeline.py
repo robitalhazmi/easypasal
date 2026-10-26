@@ -334,6 +334,33 @@ class RAGPipeline:
             total_candidates = retrieval_res.total_candidates
 
         # 3. Assemble Grounded Prompt
+        if not chunks:
+            from easypasal.generation.prompts import (
+                STANDARD_ABSTAIN_EN,
+                STANDARD_ABSTAIN_ID,
+            )
+
+            total_latency_ms = round((time.perf_counter() - start_time) * 1000, 2)
+            answer_text = STANDARD_ABSTAIN_EN if lang == "en" else STANDARD_ABSTAIN_ID
+            return GenerationOutput(
+                question=clean_question,
+                answer=answer_text,
+                language=lang,
+                citations=[],
+                abstained=True,
+                retrieved_chunks=[],
+                prompt_tokens=0,
+                completion_tokens=0,
+                latency_ms=total_latency_ms,
+                tokens_per_second=0.0,
+                model_name=getattr(self.generator, "model_name", "retrieval_guardrail"),
+                metadata={
+                    "variant": eff_variant,
+                    "prompt_variant": eff_prompt_variant,
+                    "abstained_reason": "No relevant regulatory passages retrieved",
+                },
+            )
+
         prompt = build_rag_prompt(
             question=clean_question,
             chunks=chunks,

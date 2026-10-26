@@ -176,9 +176,50 @@ def _is_ayat_matched(parsed: ParsedCitation, chunk: RetrievedChunk) -> bool:
     return re.search(ayat_pattern, chunk.text) is not None
 
 
+def _extract_numerical_claims(statement: str, parsed: ParsedCitation) -> list[str]:
+    """Extract financial figures, currencies, and percentages asserted in a statement,
+
+    ignoring standard statutory metadata digits (regulation number, year, pasal, ayat).
+    """
+    candidates = re.findall(
+        r"(?:Rp\s*[\d\.\,]+|(?:\b\d+[\.,]?\d*|\b\d+)\s*(?:miliar|triliun|juta|ribu|persen|%)\b)",
+        statement,
+        re.IGNORECASE,
+    )
+    standalone_large = re.findall(r"\b\d{1,3}(?:\.\d{3}){2,}(?:,\d+)?\b", statement)
+    all_raw = set(candidates + standalone_large)
+
+    filtered: list[str] = []
+    meta_digits: set[str] = set()
+    if parsed.doc_number:
+        meta_digits.update(re.findall(r"\d+", parsed.doc_number))
+    if parsed.pasal:
+        meta_digits.update(re.findall(r"\d+", parsed.pasal))
+    if parsed.ayat:
+        meta_digits.update(re.findall(r"\d+", parsed.ayat))
+
+    for item in all_raw:
+        item_digits = set(re.findall(r"\d+", item))
+        if item_digits and item_digits.issubset(meta_digits):
+            continue
+        filtered.append(item.strip())
+
+    return filtered
+
+
+def _find_surrounding_statement(answer: str, citation: str) -> str:
+    """Find the specific sentence or bullet point in answer containing the citation."""
+    sentences = re.split(r"(?<=[.!?\n])\s+", answer)
+    for s in sentences:
+        if citation in s:
+            return s
+    return answer
+
+
 def verify_single_citation(
     citation_text: str,
     retrieved_chunks: list[RetrievedChunk],
+    surrounding_statement: str | None = None,
 ) -> CitationCheck:
     """Verify a single citation against the retrieved chunks."""
     parsed = parse_citation_details(citation_text)
@@ -230,6 +271,28 @@ def verify_single_citation(
         matched_chunk = matching_pasal_chunks[0]
         ayat_matched = None
 
+    # 4. Verify Numerical Claim Grounding if numerical figures are asserted
+    if surrounding_statement and matched_chunk:
+        numerical_claims = _extract_numerical_claims(surrounding_statement, parsed)
+        for claim in numerical_claims:
+            claim_digits = re.findall(r"\d+", claim)
+            if not claim_digits:
+                continue
+            primary_digit = claim_digits[0]
+            chunk_digits = set(re.findall(r"\d+", matched_chunk.text))
+            if primary_digit not in chunk_digits and not any(
+                primary_digit in d for d in chunk_digits
+            ):
+                return CitationCheck(
+                    citation=citation_text,
+                    is_grounded=False,
+                    doc_match=True,
+                    pasal_match=True,
+                    ayat_match=ayat_matched,
+                    matched_chunk_id=matched_chunk.chunk_id,
+                    reason=f"Klaim angka/nominal '{claim}' pada sitasi {citation_text} tidak didukung oleh teks regulasi yang diretrieve.",
+                )
+
     return CitationCheck(
         citation=citation_text,
         is_grounded=True,
@@ -278,14 +341,17 @@ def verify_citations(
     hallucinated: list[str] = []
 
     for cite in cites:
-        check = verify_single_citation(cite, retrieved_chunks)
+        statement = _find_surrounding_statement(answer, cite)
+        check = verify_single_citation(cite, retrieved_chunks, surrounding_statement=statement)
         checks.append(check)
         if not check.is_grounded:
             ungrounded.append(cite)
             if check.doc_match and not check.pasal_match:
                 parsed = parse_citation_details(cite)
                 hallucinated.append(f"Pasal {parsed.pasal} ({parsed.doc_number or 'Regulasi'})")
-            elif not check.doc_match:
+            elif not check.doc_match or "Klaim angka" in check.reason:
+                hallucinated.append(f"{cite} [{check.reason}]")
+            else:
                 hallucinated.append(cite)
 
     grounded_count = len(cites) - len(ungrounded)

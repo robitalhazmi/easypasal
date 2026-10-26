@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import argparse
 import logging
+import re
 import time
 from pathlib import Path
 
@@ -31,6 +32,29 @@ logging.basicConfig(
 logger = logging.getLogger("easypasal.retrieval.retriever")
 
 
+def _is_sector_mismatch(query_lower: str, chunk: RetrievedChunk) -> bool:
+    """Determine if a retrieved candidate chunk belongs to a disjoint financial sector from the query."""
+    is_p2p_query = bool(
+        re.search(r"\b(?:fintech\s+p2p|p2p\s+lending|pinjol|lpbti|peer-to-peer)\b", query_lower)
+    )
+    has_capital_markets_query = bool(
+        re.search(
+            r"\b(?:pasar\s+modal|saham|efek|bursa|reksa\s+dana|emiten|kliring)\b", query_lower
+        )
+    )
+
+    # P2P lending query with Capital Market distractor chunk
+    if is_p2p_query and not has_capital_markets_query:
+        doc_info = f"{chunk.doc_number} {chunk.doc_title} {chunk.citation_label}".lower()
+        if any(
+            term in doc_info
+            for term in ["pasar modal", "lembaga kliring", "perusahaan efek", "bursa efek"]
+        ):
+            return True
+
+    return False
+
+
 class HybridRetriever:
     """Hybrid retrieval engine with Reciprocal Rank Fusion (RRF) and optional cross-encoder reranking."""
 
@@ -44,6 +68,7 @@ class HybridRetriever:
         dense_weight: float = 1.0,
         bm25_weight: float = 1.0,
         reranker: BaseReranker | None = None,
+        score_threshold: float | None = None,
     ) -> None:
         self.qdrant_store = qdrant_store
         self.bm25_index = bm25_index
@@ -53,6 +78,7 @@ class HybridRetriever:
         self.dense_weight = dense_weight
         self.bm25_weight = bm25_weight
         self.reranker = reranker
+        self.score_threshold = score_threshold
 
     @classmethod
     def from_paths(
@@ -67,6 +93,7 @@ class HybridRetriever:
         reranker: BaseReranker | None = None,
         rerank: bool = False,
         reranker_model: str = DEFAULT_RERANKER_MODEL,
+        score_threshold: float | None = None,
     ) -> HybridRetriever:
         """Initialize HybridRetriever from serialized on-disk index directories."""
         index_path = Path(index_dir)
@@ -110,6 +137,7 @@ class HybridRetriever:
             dense_weight=dense_weight,
             bm25_weight=bm25_weight,
             reranker=target_reranker,
+            score_threshold=score_threshold,
         )
 
     def retrieve(
@@ -119,6 +147,7 @@ class HybridRetriever:
         mode: str = "hybrid",
         status_filter: str | None = None,
         candidate_limit: int | None = None,
+        min_score: float | None = None,
     ) -> RetrievalResult:
         """Perform document retrieval using hybrid RRF, pure dense, or pure BM25 search.
 
@@ -233,6 +262,18 @@ class HybridRetriever:
             raise ValueError(
                 f"Unsupported retrieval mode: {mode!r}. Must be 'hybrid', 'dense', 'bm25', or 'hybrid+rerank'."
             )
+
+        # Cross-Sector Entity Alignment: Deprioritize disjoint sector distractors
+        if final_chunks:
+            q_low = query_clean.lower()
+            aligned_chunks = [c for c in final_chunks if not _is_sector_mismatch(q_low, c)]
+            if aligned_chunks:
+                final_chunks = aligned_chunks
+
+        # Apply score threshold filter if specified
+        eff_min_score = min_score if min_score is not None else self.score_threshold
+        if eff_min_score is not None:
+            final_chunks = [c for c in final_chunks if c.score >= eff_min_score]
 
         duration_ms = round((time.perf_counter() - start_time) * 1000, 2)
         total_unique = len(

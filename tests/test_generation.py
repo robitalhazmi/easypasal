@@ -681,3 +681,25 @@ def test_llama_cpp_backend_chat_format_mock(monkeypatch: pytest.MonkeyPatch, tmp
     assert res_raw.text == "Jawaban dari raw completion."
     assert res_raw.tokens_per_second > 0.0
     mock_llm_instance.create_completion.assert_called_once()
+
+
+def test_deduplicate_repeated_blocks() -> None:
+    """Verify deduplication of consecutive identical or near-identical text blocks and sentences."""
+    from easypasal.generation.backends import deduplicate_repeated_blocks
+
+    repeated_paragraphs = (
+        "POJK 22 Tahun 2023 mengatur ketentuan pembatalan perjanjian pada masa jeda.\n\n"
+        "POJK 22 Tahun 2023 mengatur ketentuan pembatalan perjanjian pada masa jeda.\n\n"
+        "POJK 22 Tahun 2023 mengatur ketentuan pembatalan perjanjian pada masa jeda."
+    )
+    cleaned = deduplicate_repeated_blocks(repeated_paragraphs)
+    assert cleaned.count("POJK 22") == 1
+
+    repeated_bullets = (
+        "1. PUJK wajib menerima pengaduan konsumen.\n"
+        "2. PUJK wajib menerima pengaduan konsumen.\n"
+        "3. PUJK wajib menyelesaikan pengaduan."
+    )
+    cleaned_bullets = deduplicate_repeated_blocks(repeated_bullets)
+    assert cleaned_bullets.count("menerima pengaduan") == 1
+    assert "menyelesaikan pengaduan" in cleaned_bullets

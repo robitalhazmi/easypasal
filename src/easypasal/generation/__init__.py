@@ -10,6 +10,7 @@ if TYPE_CHECKING:
         MockGeneratorBackend,
         OllamaBackend,
         OpenAICompatibleBackend,
+        deduplicate_repeated_blocks,
         get_generator_backend,
         get_process_peak_memory_mb,
         trim_incomplete_sentence,
@@ -46,11 +47,13 @@ __all__ = [
     "STANDARD_ABSTAIN_ID",
     "build_rag_prompt",
     "check_abstention",
+    "deduplicate_repeated_blocks",
     "detect_language",
     "extract_citations",
     "format_passages",
     "get_generator_backend",
     "get_process_peak_memory_mb",
+    "deduplicate_repeated_blocks",
     "trim_incomplete_sentence",
     "verify_citation_coverage",
 ]
@@ -64,6 +67,7 @@ _BACKEND_SYMBOLS = {
     "OpenAICompatibleBackend",
     "get_generator_backend",
     "get_process_peak_memory_mb",
+    "deduplicate_repeated_blocks",
     "trim_incomplete_sentence",
 }
 

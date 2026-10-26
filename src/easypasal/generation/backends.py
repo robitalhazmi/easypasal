@@ -86,7 +86,7 @@ def trim_incomplete_sentence(text: str) -> str:
         (".", "!", "?", "]")
     )
     if is_terminal and not re.search(r"\b\d+\.$", stripped):
-        return stripped
+        return deduplicate_repeated_blocks(stripped)
 
     # Match genuine sentence endings (excluding list numbers like "3." or decimals like "3.5")
     pattern = r"(?:(?<!\b\d)[\.!\?]|\])[\'\"\)\*\_]*(?=\s|$)"
@@ -97,9 +97,75 @@ def trim_incomplete_sentence(text: str) -> str:
         trimmed = stripped[:cut_index].rstrip()
         trimmed = re.sub(r"(?:\n\s*|\A\s*)(?:\d+[\.\)]|[-*•])\s*$", "", trimmed).rstrip()
         if len(trimmed) >= 10:
-            return trimmed
+            return deduplicate_repeated_blocks(trimmed)
 
-    return stripped
+    return deduplicate_repeated_blocks(stripped)
+
+
+def _compute_text_overlap(s1: str, s2: str) -> float:
+    """Compute token Jaccard similarity between two strings."""
+    tokens1 = set(re.findall(r"\w+", s1.lower()))
+    tokens2 = set(re.findall(r"\w+", s2.lower()))
+    if not tokens1 or not tokens2:
+        return 0.0
+    intersection = len(tokens1 & tokens2)
+    union = len(tokens1 | tokens2)
+    return intersection / union if union > 0 else 0.0
+
+
+def deduplicate_repeated_blocks(text: str, similarity_threshold: float = 0.85) -> str:
+    """Deduplicate consecutive identical or near-identical sentences, bullet items, and paragraphs.
+
+    Prevents small-model generation degenerations where the LLM enters an attractor loop
+    and repeats the exact same sentence or paragraph multiple times.
+    """
+    if not text or len(text) < 40:
+        return text
+
+    # 1. Paragraph-level deduplication (split by double newline)
+    paragraphs = text.split("\n\n")
+    if len(paragraphs) > 1:
+        deduped_paras: list[str] = []
+        for para in paragraphs:
+            para_clean = para.strip()
+            if not para_clean:
+                continue
+            if deduped_paras:
+                prev = deduped_paras[-1].strip()
+                if para_clean == prev or (
+                    len(para_clean) > 30
+                    and len(prev) > 30
+                    and _compute_text_overlap(para_clean, prev) >= similarity_threshold
+                ):
+                    continue
+            deduped_paras.append(para)
+        text = "\n\n".join(deduped_paras)
+
+    # 2. Line/Bullet-level deduplication (split by single newline)
+    lines = text.split("\n")
+    if len(lines) > 1:
+        deduped_lines: list[str] = []
+        for line in lines:
+            line_clean = line.strip()
+            if not line_clean:
+                deduped_lines.append(line)
+                continue
+            normalized_line = re.sub(r"^(?:\d+[\.\)]|[-*•])\s*", "", line_clean).strip().lower()
+            if deduped_lines:
+                prev_clean = deduped_lines[-1].strip()
+                prev_norm = re.sub(r"^(?:\d+[\.\)]|[-*•])\s*", "", prev_clean).strip().lower()
+                if normalized_line and normalized_line == prev_norm:
+                    continue
+                if (
+                    len(normalized_line) > 30
+                    and len(prev_norm) > 30
+                    and _compute_text_overlap(normalized_line, prev_norm) >= similarity_threshold
+                ):
+                    continue
+            deduped_lines.append(line)
+        text = "\n".join(deduped_lines)
+
+    return text
 
 
 class GeneratorBackend(Protocol):

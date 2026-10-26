@@ -274,6 +274,49 @@ def test_verify_citations_mixed_grounded_and_hallucinated_fail() -> None:
     assert res.checks[1].is_grounded is False
 
 
+def test_verify_citations_numerical_claims_fail() -> None:
+    """FAIL CASE: Citation doc and article match, but model hallucinates an unsupported numerical figure."""
+    chunk = _make_chunk(
+        chunk_id="c_pojk22_40",
+        doc_number="POJK 22 Tahun 2023",
+        citation_label="POJK 22 Tahun 2023, Pasal 40 ayat (2)",
+        pasal="40",
+        ayat="2",
+        text="(2) PUJK wajib memastikan kerahasiaan dan pelindungan data konsumen.",
+    )
+
+    # Model claims maximum interest of 15 billion rupiah under Pasal 40
+    answer = (
+        "Berdasarkan [POJK 22 Tahun 2023, Pasal 40 ayat (2)], batas maksimal bunga adalah "
+        "Rp15.000.000.000 (15 miliar rupiah)."
+    )
+    res = verify_citations(answer=answer, retrieved_chunks=[chunk])
+
+    assert res.is_valid is False
+    assert res.ungrounded_count == 1
+    assert "Klaim angka" in res.checks[0].reason or "tidak didukung" in res.checks[0].reason
+
+
+def test_verify_citations_numerical_claims_pass() -> None:
+    """PASS CASE: Numerical claim matches figures present in retrieved passage."""
+    chunk = _make_chunk(
+        chunk_id="c_bank_capital",
+        doc_number="POJK 12/POJK.03/2020",
+        citation_label="POJK 12/POJK.03/2020, Pasal 3",
+        pasal="3",
+        text="Bank Umum wajib memenuhi Modal Inti minimum paling sedikit Rp3.000.000.000.000,00 (tiga triliun rupiah).",
+    )
+
+    answer = (
+        "Berdasarkan [POJK 12/POJK.03/2020, Pasal 3], modal inti minimum bank umum adalah "
+        "Rp3.000.000.000.000 atau 3 triliun rupiah."
+    )
+    res = verify_citations(answer=answer, retrieved_chunks=[chunk])
+
+    assert res.is_valid is True
+    assert res.ungrounded_count == 0
+
+
 # ==============================================================================
 # 4. PIPELINE INTEGRATION TESTS
 # ==============================================================================
