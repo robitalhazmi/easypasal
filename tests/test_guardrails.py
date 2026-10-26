@@ -924,3 +924,57 @@ def test_verify_citations_rejects_sector_mismatch_with_question() -> None:
     assert res.is_valid is False
     assert res.ungrounded_count == 2
     assert any("Ketidaksesuaian sektor/konteks" in h for h in res.hallucinated_pasal)
+
+
+def test_detect_and_realign_inverted_citations() -> None:
+    """Verify inverted remedial citations are realigned to primary entity obligations for obligation queries."""
+    from easypasal.guardrails.citation_verifier import detect_and_realign_inverted_citations
+
+    # 1. Bank DC/DRC obligation query
+    question = "Di mana Bank Umum wajib menempatkan Pusat Data dan Pusat Pemulihan Bencana menurut regulasi OJK?"
+    chunk_primary = _make_chunk(
+        "c_primary",
+        "POJK 11/POJK.03/2022",
+        "POJK 11/POJK.03/2022, Pasal 35 ayat (1)",
+        pasal="35",
+        ayat="1",
+        text="Bank wajib menempatkan Sistem Elektronik pada Pusat Data dan Pusat Pemulihan Bencana di wilayah Indonesia.",
+    )
+    chunk_remedial = _make_chunk(
+        "c_remedial",
+        "POJK 11/POJK.03/2022",
+        "POJK 11/POJK.03/2022, Pasal 36 ayat (4)",
+        pasal="36",
+        ayat="4",
+        text=(
+            "Dalam hal berdasarkan penilaian Otoritas Jasa Keuangan penempatan di luar negeri berisiko... "
+            "Otoritas Jasa Keuangan dapat meminta Bank untuk menempatkan Sistem Elektronik di wilayah Indonesia."
+        ),
+    )
+
+    # Generated answer incorrectly citing remedial clause
+    answer_with_inverted = (
+        "Wajib menempatkan Pusat Data dan Pusat Pemulihan Bencana di wilayah Indonesia "
+        "[POJK 11/POJK.03/2022, Pasal 36 ayat (4)]."
+    )
+
+    realigned_text, new_cites, replacements = detect_and_realign_inverted_citations(
+        answer=answer_with_inverted,
+        retrieved_chunks=[chunk_primary, chunk_remedial],
+        question=question,
+    )
+
+    assert "Pasal 35 ayat (1)" in realigned_text
+    assert "Pasal 36 ayat (4)" not in realigned_text
+    assert "POJK 11/POJK.03/2022, Pasal 35 ayat (1)" in new_cites
+    assert len(replacements) == 1
+
+    # 2. Authority question should NOT be realigned
+    auth_question = "Kapan OJK dapat meminta Bank menempatkan Pusat Data di Indonesia?"
+    text_auth, cites_auth, repl_auth = detect_and_realign_inverted_citations(
+        answer=answer_with_inverted,
+        retrieved_chunks=[chunk_primary, chunk_remedial],
+        question=auth_question,
+    )
+    assert "Pasal 36 ayat (4)" in text_auth
+    assert len(repl_auth) == 0

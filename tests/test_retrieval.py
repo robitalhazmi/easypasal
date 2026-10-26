@@ -235,6 +235,43 @@ def test_rrf_normative_salience_boost() -> None:
     assert fused_boosted[0].score > fused_boosted[1].score
 
 
+def test_detect_normative_intent_and_remedial_downweighting() -> None:
+    """Verify normative intent detection and supervisory remedial penalty under obligation queries."""
+    from easypasal.retrieval.fusion import (
+        _compute_normative_salience_boost,
+        detect_normative_intent,
+    )
+
+    assert (
+        detect_normative_intent("Di mana Bank Umum wajib menempatkan Pusat Data?") == "obligation"
+    )
+    assert (
+        detect_normative_intent("Kapan OJK dapat meminta Bank memindahkan Pusat Data?")
+        == "sanction_enforcement"
+    )
+    assert (
+        detect_normative_intent(
+            "Kapan Bank dapat menempatkan Pusat Data di luar negeri sepanjang izin?"
+        )
+        == "permission_exemption"
+    )
+
+    # For obligation query:
+    q_obl = "Di mana Bank Umum wajib menempatkan Pusat Data?"
+    payload_primary = {
+        "text": "Bank wajib menempatkan Sistem Elektronik pada Pusat Data di wilayah Indonesia."
+    }
+    payload_remedial = {
+        "text": "Otoritas Jasa Keuangan dapat meminta Bank untuk menempatkan Sistem Elektronik di wilayah Indonesia."
+    }
+
+    boost_primary = _compute_normative_salience_boost(q_obl, payload_primary)
+    boost_remedial = _compute_normative_salience_boost(q_obl, payload_remedial)
+
+    assert boost_primary > 0.20
+    assert boost_remedial < 0.0
+
+
 def test_hybrid_retriever_in_memory() -> None:
     """Verify HybridRetriever operations across all modes using in-memory components."""
     qdrant = QdrantVectorStore(path=":memory:")

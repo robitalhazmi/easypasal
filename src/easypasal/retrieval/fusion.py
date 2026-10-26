@@ -17,10 +17,45 @@ logger = logging.getLogger("easypasal.retrieval.fusion")
 DEFAULT_K_RRF: int = 60
 
 
-def _compute_normative_salience_boost(query: str, payload: dict[str, Any]) -> float:
-    """Compute a modest, scale-invariant RRF boost (0.0 to 0.25) for chunks carrying
+def detect_normative_intent(query: str) -> str:
+    """Classify the user's normative intent: 'obligation', 'permission_exemption', 'sanction_enforcement', or 'general'."""
+    if not query:
+        return "general"
+    q_low = query.lower()
 
-    the direct imperative action predicate or target interrogative answer to the query.
+    # Sanction / Enforcement / Authority power queries
+    # e.g. "kapan ojk dapat meminta", "apa sanksi", "denda pelanggaran", "wewenang ojk"
+    if re.search(
+        r"\b(?:sanksi|denda|hukuman|pidana|administratif|teguran|peringatan|pembekuan|pencabutan|penalty|sanction|enforcement|punishment|fine)\b",
+        q_low,
+    ) or re.search(
+        r"\b(?:kapan|apakah)\s+(?:ojk|otoritas|bi|bank indonesia)\s+(?:dapat|berwenang|meminta|memerintahkan)\b",
+        q_low,
+    ):
+        return "sanction_enforcement"
+
+    # Permission / Exemption queries
+    # e.g. "kapan boleh di luar negeri", "syarat pengecualian", "izin penempatan luar negeri"
+    if re.search(
+        r"\b(?:dapat|pengecualian|izin|persetujuan|dispensasi|may|permitted|exception|exemption|waiver)\b",
+        q_low,
+    ) and not re.search(r"\b(?:wajib|harus|kewajiban|keharusan)\b", q_low):
+        return "permission_exemption"
+
+    # Obligation / Prohibition queries
+    # e.g. "di mana bank umum wajib menempatkan", "apa kewajiban pujk", "harus dipenuhi"
+    if re.search(
+        r"\b(?:wajib|harus|kewajiban|keharusan|dilarang|larangan|must|mandatory|required|shall|prohibited|obligation)\b",
+        q_low,
+    ):
+        return "obligation"
+
+    return "general"
+
+
+def _compute_normative_salience_boost(query: str, payload: dict[str, Any]) -> float:
+    """Compute a scale-invariant RRF boost/penalty (-0.25 to +0.35) for chunks carrying
+    normative alignment with the query's legal intent.
     """
     if not query:
         return 0.0
@@ -32,6 +67,8 @@ def _compute_normative_salience_boost(query: str, payload: dict[str, Any]) -> fl
     q_low = query.lower()
     t_low = text.lower()
     boost = 0.0
+
+    intent = detect_normative_intent(query)
 
     # 1. Direct Imperative Action Predicate Concordance
     # e.g., Query: "... wajib menempatkan ..." -> Action verb: "menempatkan"
@@ -45,7 +82,43 @@ def _compute_normative_salience_boost(query: str, payload: dict[str, Any]) -> fl
         ):
             boost += 0.15
 
-    # 2. Interrogative Target Alignment
+    # 2. Intent-Based Normative Primacy Boost / Penalty
+    # Check if chunk represents authority corrective action / sanction vs entity primary obligation
+    has_authority_remedial = bool(
+        re.search(
+            r"\b(?:ojk|otoritas jasa keuangan|bank indonesia|bi)\s+(?:dapat\s+meminta|berwenang|memerintahkan|mengenakan|menjatuhkan)\b",
+            t_low,
+        )
+        or re.search(r"\b(?:dikenai|pengenaan)\s+sanksi\b", t_low)
+    )
+    has_entity_obligation = bool(
+        re.search(
+            r"\b(?:bank|pujk|perusahaan|penyelenggara|ljk|pihak)\s+(?:wajib|harus|dilarang)\b",
+            t_low,
+        )
+        or re.search(
+            r"\bwajib\s+(?:menempatkan|memiliki|menerapkan|menyediakan|menyampaikan|memenuhi|menggunakan|menjaga|melakukan)\b",
+            t_low,
+        )
+    )
+
+    if intent == "obligation":
+        if has_entity_obligation and not has_authority_remedial:
+            boost += 0.15
+        elif has_authority_remedial and not (has_entity_obligation and t_low.startswith("bank")):
+            # Downweight remedial/supervisory clause when user asked about entity obligation
+            boost -= 0.15
+    elif intent == "sanction_enforcement":
+        if has_authority_remedial:
+            boost += 0.20
+        elif has_entity_obligation:
+            boost -= 0.10
+    elif intent == "permission_exemption" and re.search(
+        r"\b(?:bank|pujk|perusahaan)\s+dapat\b|\bsepanjang\s+memperoleh\s+izin\b", t_low
+    ):
+        boost += 0.15
+
+    # 3. Interrogative Target Alignment
     # Where? ("di mana") -> Check for geographical/jurisdictional placement terms
     if (
         ("di mana" in q_low or "dimana" in q_low)
@@ -81,11 +154,11 @@ def _compute_normative_salience_boost(query: str, payload: dict[str, Any]) -> fl
     ):
         boost += 0.05
 
-    # 3. Concise Statutory Density Bonus (Anti-Length-Penalization)
+    # 4. Concise Statutory Density Bonus (Anti-Length-Penalization for concise general obligations)
     if boost > 0 and len(text) < 450:
         boost += 0.03
 
-    return min(boost, 0.25)
+    return max(-0.25, min(boost, 0.35))
 
 
 def reciprocal_rank_fusion(

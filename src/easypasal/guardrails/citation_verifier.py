@@ -51,6 +51,7 @@ class VerificationResult:
     checks: list[CitationCheck] = field(default_factory=list)
     ungrounded_citations: list[str] = field(default_factory=list)
     hallucinated_pasal: list[str] = field(default_factory=list)
+    realigned_citations: dict[str, str] = field(default_factory=dict)
 
 
 def parse_citation_details(citation_text: str) -> ParsedCitation:
@@ -393,3 +394,95 @@ def verify_citations(
         ungrounded_citations=ungrounded,
         hallucinated_pasal=hallucinated,
     )
+
+
+def detect_and_realign_inverted_citations(
+    answer: str,
+    retrieved_chunks: list[RetrievedChunk],
+    question: str,
+) -> tuple[str, list[str], dict[str, str]]:
+    """Detect and automatically realign inverted statutory citations where a supervisory/remedial
+    clause (e.g. OJK dapat meminta) was mistakenly cited instead of the entity's primary general
+    obligation clause (e.g. Bank/PUJK wajib), or vice versa.
+
+    Returns:
+        tuple of (realigned_answer_text, realigned_citations_list, mapping_of_replacements)
+    """
+    if not answer or not retrieved_chunks or not question:
+        cites = extract_citations(answer)
+        return answer, cites, {}
+
+    q_low = question.lower()
+    is_obligation_query = bool(
+        re.search(
+            r"\b(?:wajib|harus|kewajiban|keharusan|dilarang|larangan|must|mandatory|required|shall|prohibited|obligation)\b",
+            q_low,
+        )
+        and not re.search(
+            r"\b(?:kapan|apakah)\s+(?:ojk|otoritas|bi|bank indonesia)\s+(?:dapat|berwenang|meminta|memerintahkan)\b",
+            q_low,
+        )
+    )
+
+    if not is_obligation_query:
+        cites = extract_citations(answer)
+        return answer, cites, {}
+
+    current_cites = extract_citations(answer)
+    if not current_cites:
+        return answer, [], {}
+
+    realigned_text = answer
+    replacements: dict[str, str] = {}
+
+    from easypasal.generation.prompts import _detect_statutory_role
+
+    for cite in current_cites:
+        parsed = parse_citation_details(cite)
+        matching_chunks = [
+            c
+            for c in retrieved_chunks
+            if _is_doc_matched(parsed, c) and _is_pasal_matched(parsed, c)
+        ]
+        if not matching_chunks:
+            continue
+
+        matched_chunk = matching_chunks[0]
+        chunk_role = _detect_statutory_role(matched_chunk.text)
+
+        # If cited chunk is an authority remedial / sanction power clause:
+        if chunk_role == "[Peran: Wewenang Korektif Otoritas / Sanksi]":
+            # Search among all retrieved chunks in the SAME regulation for a primary entity obligation chunk
+            candidate_primaries = [
+                c
+                for c in retrieved_chunks
+                if _is_doc_matched(parsed, c)
+                and _detect_statutory_role(c.text) == "[Peran: Kewajiban Pokok Entitas]"
+                and (not c.status or c.status == "berlaku")
+            ]
+            if candidate_primaries:
+                primary_chunk = candidate_primaries[0]
+                new_label = primary_chunk.citation_label
+                if new_label and new_label != cite:
+                    clean_cite = cite.strip("[]")
+                    clean_new = new_label.strip("[]")
+                    realigned_text = re.sub(
+                        rf"\[\s*{re.escape(clean_cite)}\s*\]",
+                        f"[{clean_new}]",
+                        realigned_text,
+                    )
+                    realigned_text = re.sub(
+                        rf"\b{re.escape(clean_cite)}\b",
+                        clean_new,
+                        realigned_text,
+                    )
+                    replacements[cite] = f"[{clean_new}]"
+                    logger.warning(
+                        "Inverted legal reasoning detected for query %r: realigned remedial citation %s -> %s",
+                        question[:50],
+                        cite,
+                        new_label,
+                    )
+
+    new_citations = extract_citations(realigned_text)
+    return realigned_text, new_citations, replacements

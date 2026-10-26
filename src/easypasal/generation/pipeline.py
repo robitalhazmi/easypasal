@@ -400,6 +400,19 @@ class RAGPipeline:
             answer_text = STANDARD_ABSTAIN_EN if lang == "en" else STANDARD_ABSTAIN_ID
             citations = []
 
+        # 5b. Post-Generation Hierarchical Guardrail: Realign Inverted Legal Citations
+        realignments: dict[str, str] = {}
+        if not abstained and citations:
+            from easypasal.guardrails.citation_verifier import (
+                detect_and_realign_inverted_citations,
+            )
+
+            answer_text, citations, realignments = detect_and_realign_inverted_citations(
+                answer=answer_text,
+                retrieved_chunks=chunks,
+                question=clean_question,
+            )
+
         # 6. Post-Hoc Citation Verification (T1.7)
         verification_dict = None
         if eff_verify:
@@ -418,6 +431,7 @@ class RAGPipeline:
                 "ungrounded_count": v_res.ungrounded_count,
                 "ungrounded_citations": v_res.ungrounded_citations,
                 "hallucinated_pasal": v_res.hallucinated_pasal,
+                "realigned_citations": realignments,
             }
 
             if not v_res.is_valid and eff_strict and not abstained:
@@ -468,6 +482,7 @@ class RAGPipeline:
                 "retrieval_mode": mode,
                 "total_candidates": total_candidates,
                 "citation_verification": verification_dict,
+                "realigned_citations": realignments,
                 "routed": bool(eff_enable_router and self.router),
                 "theme": route_decision.theme if route_decision else None,
             },
