@@ -414,18 +414,29 @@ class RAGPipeline:
             }
 
             if not v_res.is_valid and eff_strict and not abstained:
-                logger.warning(
-                    "Strict grounding triggered: ungrounded citations detected %s. Reverting to abstention.",
-                    v_res.ungrounded_citations,
+                has_sector_mismatch = any(
+                    "Ketidaksesuaian sektor" in h for h in v_res.hallucinated_pasal
                 )
-                from easypasal.generation.prompts import (
-                    STANDARD_ABSTAIN_EN,
-                    STANDARD_ABSTAIN_ID,
-                )
+                if v_res.grounded_count == 0 or has_sector_mismatch:
+                    logger.warning(
+                        "Strict grounding triggered: zero grounded citations or sector mismatch %s. Reverting to abstention.",
+                        v_res.ungrounded_citations,
+                    )
+                    from easypasal.generation.prompts import (
+                        STANDARD_ABSTAIN_EN,
+                        STANDARD_ABSTAIN_ID,
+                    )
 
-                answer_text = STANDARD_ABSTAIN_EN if lang == "en" else STANDARD_ABSTAIN_ID
-                abstained = True
-                citations = []
+                    answer_text = STANDARD_ABSTAIN_EN if lang == "en" else STANDARD_ABSTAIN_ID
+                    abstained = True
+                    citations = []
+                else:
+                    logger.info(
+                        "Strict grounding soft-pruning: preserving %d grounded citation(s), pruning ungrounded %s.",
+                        v_res.grounded_count,
+                        v_res.ungrounded_citations,
+                    )
+                    citations = [c for c in citations if c not in v_res.ungrounded_citations]
 
         total_latency_ms = round((time.perf_counter() - start_time) * 1000, 2)
 

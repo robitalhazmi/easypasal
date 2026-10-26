@@ -34,6 +34,7 @@ def _make_dummy_chunk(
     text: str,
     doc_number: str = "POJK 22 Tahun 2023",
     status: str = "berlaku",
+    doc_title: str = "",
 ) -> RetrievedChunk:
     return RetrievedChunk(
         chunk_id=chunk_id,
@@ -41,6 +42,7 @@ def _make_dummy_chunk(
         citation_label=citation_label,
         doc_id="POJK_22_2023",
         doc_number=doc_number,
+        doc_title=doc_title,
         status=status,
         text=text,
     )
@@ -116,6 +118,16 @@ def test_format_passages_and_prompt_assembly() -> None:
     passages = format_passages([c1, c2])
     assert "POJK 22 Tahun 2023, Pasal 71 ayat (1)" in passages
     assert "PUJK wajib menyelesaikan pengaduan" in passages
+
+    # Test doc_title injection in header
+    c_titled = _make_dummy_chunk(
+        "c_titled",
+        "POJK 11/POJK.03/2022, Pasal 35 ayat (1)",
+        "Bank wajib menempatkan Sistem Elektronik di Indonesia.",
+        doc_title="Penyelenggaraan Teknologi Informasi oleh Bank Umum",
+    )
+    passages_titled = format_passages([c_titled])
+    assert "[Tentang: Penyelenggaraan Teknologi Informasi oleh Bank Umum]" in passages_titled
 
     # Test Indonesian prompt
     id_prompt = build_rag_prompt(

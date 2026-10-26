@@ -401,6 +401,56 @@ def test_pipeline_strict_grounding_triggers_abstention() -> None:
     assert len(v_info["hallucinated_pasal"]) > 0
 
 
+def test_pipeline_strict_grounding_soft_prunes_secondary_citations() -> None:
+    """Verify that strict_grounding=True preserves answer if at least 1 primary citation is grounded,
+
+    pruning only the ungrounded secondary citation from output.citations without wiping out the answer.
+    """
+    chunk = _make_chunk(
+        "c1",
+        "POJK 22 Tahun 2023",
+        "POJK 22 Tahun 2023, Pasal 71",
+        pasal="71",
+        text="PUJK wajib melayani pengaduan konsumen.",
+    )
+
+    mock_retriever = MagicMock()
+    mock_retriever.retrieve.return_value = RetrievalResult(
+        query="pengaduan",
+        mode="hybrid",
+        chunks=[chunk],
+        total_candidates=1,
+        dense_count=1,
+        bm25_count=1,
+        duration_ms=2.0,
+    )
+
+    mock_gen = MagicMock()
+    mock_gen.model_name = "partially-grounded-generator"
+    mock_gen.generate.return_value = MagicMock(
+        text=(
+            "Kewajiban penanganan pengaduan diatur dalam [POJK 22 Tahun 2023, Pasal 71]. "
+            "Rincian tambahan disebutkan dalam [POJK 22 Tahun 2023, Pasal 999]."
+        ),
+        prompt_tokens=20,
+        completion_tokens=25,
+        latency_ms=5.0,
+    )
+
+    pipeline = RAGPipeline(retriever=mock_retriever, generator=mock_gen)
+    output = pipeline.ask("Pengaduan?", strict_grounding=True)
+
+    # Should NOT have reverted to abstention because grounded_count >= 1
+    assert output.abstained is False
+    assert "Kewajiban penanganan pengaduan diatur dalam" in output.answer
+    # Ungrounded Pasal 999 should be pruned from output.citations list
+    assert output.citations == ["POJK 22 Tahun 2023, Pasal 71"]
+    v_info = output.metadata.get("citation_verification")
+    assert v_info is not None
+    assert v_info["grounded_count"] == 1
+    assert v_info["ungrounded_count"] == 1
+
+
 def test_pipeline_bank_umum_capital_abstention_scenario_a() -> None:
     """Verify Scenario A: Query about Bank Umum establishment capital abstains when corpus lacks POJK 12/2021."""
     chunk = _make_chunk(
