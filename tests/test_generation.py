@@ -90,6 +90,12 @@ def test_trim_incomplete_sentence() -> None:
     orphaned_bullet = "Pusat Data wajib di Indonesia.\n\n3."
     assert trim_incomplete_sentence(orphaned_bullet) == "Pusat Data wajib di Indonesia."
 
+    orphaned_letter_bullet = "Pusat Data wajib di Indonesia. b."
+    assert trim_incomplete_sentence(orphaned_letter_bullet) == "Pusat Data wajib di Indonesia."
+
+    hanging_letter = "Pusat Data wajib di Indonesia.\n    b"
+    assert trim_incomplete_sentence(hanging_letter) == "Pusat Data wajib di Indonesia."
+
     severed_bullet = "Pusat Data wajib di Indonesia.\n\n3. Bank wajib men"
     assert trim_incomplete_sentence(severed_bullet) == "Pusat Data wajib di Indonesia."
 

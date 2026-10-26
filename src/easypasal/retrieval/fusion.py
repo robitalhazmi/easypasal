@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import logging
+import re
 from typing import TYPE_CHECKING, Any
 
 from easypasal.retrieval.models import RetrievedChunk
@@ -16,6 +17,77 @@ logger = logging.getLogger("easypasal.retrieval.fusion")
 DEFAULT_K_RRF: int = 60
 
 
+def _compute_normative_salience_boost(query: str, payload: dict[str, Any]) -> float:
+    """Compute a modest, scale-invariant RRF boost (0.0 to 0.25) for chunks carrying
+
+    the direct imperative action predicate or target interrogative answer to the query.
+    """
+    if not query:
+        return 0.0
+
+    text = payload.get("text", "")
+    if not text:
+        return 0.0
+
+    q_low = query.lower()
+    t_low = text.lower()
+    boost = 0.0
+
+    # 1. Direct Imperative Action Predicate Concordance
+    # e.g., Query: "... wajib menempatkan ..." -> Action verb: "menempatkan"
+    # Chunk: "... wajib menempatkan ..." -> Exact imperative predicate concordance!
+    m_action = re.search(r"\b(?:wajib|harus|dilarang)\s+(\w+)", q_low)
+    if m_action:
+        action_verb = m_action.group(1)
+        if len(action_verb) >= 4 and re.search(
+            rf"\b(?:wajib|harus|dilarang)\s+(?:\w+\s+)?{re.escape(action_verb)}\b",
+            t_low,
+        ):
+            boost += 0.15
+
+    # 2. Interrogative Target Alignment
+    # Where? ("di mana") -> Check for geographical/jurisdictional placement terms
+    if (
+        ("di mana" in q_low or "dimana" in q_low)
+        and any(
+            loc in t_low
+            for loc in [
+                "di wilayah indonesia",
+                "di indonesia",
+                "wilayah negara kesatuan",
+                "luar wilayah indonesia",
+                "pada kantor",
+            ]
+        )
+        or any(
+            k in q_low
+            for k in [
+                "berapa",
+                "batas waktu",
+                "jangka waktu",
+                "paling lambat",
+                "paling lama",
+                "maksimum",
+                "minimum",
+            ]
+        )
+        and (
+            re.search(
+                r"\b(?:\d+|satu|dua|tiga|lima|tujuh|sepuluh|empat belas|dua puluh|tiga puluh)\s+(?:hari|bulan|tahun|hari kerja|jam)\b",
+                t_low,
+            )
+            or re.search(r"\brp\s*[\d\.]+", t_low)
+        )
+    ):
+        boost += 0.05
+
+    # 3. Concise Statutory Density Bonus (Anti-Length-Penalization)
+    if boost > 0 and len(text) < 450:
+        boost += 0.03
+
+    return min(boost, 0.25)
+
+
 def reciprocal_rank_fusion(
     dense_results: list[VectorSearchResult],
     bm25_results: list[BM25SearchResult],
@@ -23,6 +95,7 @@ def reciprocal_rank_fusion(
     dense_weight: float = 1.0,
     bm25_weight: float = 1.0,
     top_k: int = 10,
+    query: str | None = None,
 ) -> list[RetrievedChunk]:
     """Fuse ranked candidate lists from dense vector search and sparse BM25 search.
 
@@ -36,6 +109,7 @@ def reciprocal_rank_fusion(
         dense_weight: Multiplier weight for dense vector rankings.
         bm25_weight: Multiplier weight for BM25 sparse rankings.
         top_k: Maximum number of fused results to return.
+        query: Optional user query string to apply normative action salience boosting.
 
     Returns:
         A list of up to `top_k` `RetrievedChunk` instances sorted by descending RRF score.
@@ -89,7 +163,14 @@ def reciprocal_rank_fusion(
 
         candidates[cid]["rrf_score"] += bm25_weight / (k_rrf + rank)
 
-    # 3. Sort candidates by RRF score descending with deterministic secondary keys
+    # 3. Apply Normative Salience Boosting if query is provided
+    if query:
+        for item in candidates.values():
+            n_boost = _compute_normative_salience_boost(query, item.get("payload") or {})
+            if n_boost > 0:
+                item["rrf_score"] = item["rrf_score"] * (1.0 + n_boost)
+
+    # 4. Sort candidates by RRF score descending with deterministic secondary keys
     sorted_candidates = sorted(
         candidates.values(),
         key=lambda item: (
@@ -101,7 +182,7 @@ def reciprocal_rank_fusion(
         reverse=True,
     )
 
-    # 4. Convert top-k candidates to RetrievedChunk instances
+    # 5. Convert top-k candidates to RetrievedChunk instances
     fused_chunks: list[RetrievedChunk] = []
     for item in sorted_candidates[:top_k]:
         chunk = RetrievedChunk.from_payload(

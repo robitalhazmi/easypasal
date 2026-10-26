@@ -295,6 +295,7 @@ class HybridRetriever:
                 dense_weight=self.dense_weight,
                 bm25_weight=self.bm25_weight,
                 top_k=top_k,
+                query=query_clean,
             )
         elif mode in ("hybrid+rerank", "hybrid_rerank"):
             rerank_pool_limit = max(top_k, 15)
@@ -305,6 +306,7 @@ class HybridRetriever:
                 dense_weight=self.dense_weight,
                 bm25_weight=self.bm25_weight,
                 top_k=rerank_pool_limit,
+                query=query_clean,
             )
             if self.reranker is not None:
                 final_chunks = self.reranker.rerank(

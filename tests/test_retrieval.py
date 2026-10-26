@@ -55,15 +55,17 @@ def _make_vector_result(
     score: float,
     status: str = "berlaku",
     pasal: str = "1",
+    text: str | None = None,
+    citation_label: str | None = None,
 ) -> VectorSearchResult:
-    citation_label = f"POJK 1 Tahun 2024, Pasal {pasal}"
+    cit_label = citation_label or f"POJK 1 Tahun 2024, Pasal {pasal}"
     doc_id = "POJK_1_Tahun_2024"
     doc_number = "POJK 1 Tahun 2024"
     ayat = "1"
-    text = f"Isi pengujian untuk pasal {pasal}."
+    content_text = text if text is not None else f"Isi pengujian untuk pasal {pasal}."
     payload: dict[str, Any] = {
         "chunk_id": chunk_id,
-        "citation_label": citation_label,
+        "citation_label": cit_label,
         "doc_id": doc_id,
         "doc_number": doc_number,
         "doc_title": "Peraturan Uji Coba",
@@ -73,20 +75,20 @@ def _make_vector_result(
         "source_url": "https://example.com/pojk1.pdf",
         "pasal": pasal,
         "ayat": ayat,
-        "text": text,
+        "text": content_text,
         "raw_content": f"Isi pasal {pasal}.",
     }
     return VectorSearchResult(
         chunk_id=chunk_id,
         point_id="00000000-0000-0000-0000-000000000001",
         score=score,
-        citation_label=citation_label,
+        citation_label=cit_label,
         doc_id=doc_id,
         doc_number=doc_number,
         pasal=pasal,
         ayat=ayat,
         status=status,
-        text=text,
+        text=content_text,
         payload=payload,
     )
 
@@ -194,6 +196,43 @@ def test_rrf_edge_cases() -> None:
     # Invalid k_rrf
     with pytest.raises(ValueError, match="k_rrf must be positive"):
         reciprocal_rank_fusion(res, [], k_rrf=0)
+
+
+def test_rrf_normative_salience_boost() -> None:
+    """Verify that query imperative action predicate concordance boosts primary norm chunks."""
+    # Chunk A: Ancillary general clause (dense rank 1)
+    res_ancillary = _make_vector_result(
+        "ancillary",
+        0.95,
+        text="Bank wajib memastikan sistem kelangsungan usaha tetap berjalan.",
+        citation_label="POJK 11/2022, Pasal 37",
+    )
+    # Chunk B: Direct imperative action clause matching query (dense rank 2)
+    res_primary = _make_vector_result(
+        "primary",
+        0.90,
+        text="Bank wajib menempatkan Sistem Elektronik pada Pusat Data di wilayah Indonesia.",
+        citation_label="POJK 11/2022, Pasal 35 ayat (1)",
+    )
+
+    query = "Di mana Bank Umum wajib menempatkan Pusat Data?"
+
+    # Without query: dense rank 1 (ancillary) beats dense rank 2 (primary)
+    fused_unboosted = reciprocal_rank_fusion(
+        dense_results=[res_ancillary, res_primary],
+        bm25_results=[],
+        query=None,
+    )
+    assert fused_unboosted[0].chunk_id == "ancillary"
+
+    # With query: primary chunk receives imperative action concordance boost ("wajib menempatkan" + "di mana")
+    fused_boosted = reciprocal_rank_fusion(
+        dense_results=[res_ancillary, res_primary],
+        bm25_results=[],
+        query=query,
+    )
+    assert fused_boosted[0].chunk_id == "primary"
+    assert fused_boosted[0].score > fused_boosted[1].score
 
 
 def test_hybrid_retriever_in_memory() -> None:
