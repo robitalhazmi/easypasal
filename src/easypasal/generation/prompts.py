@@ -21,14 +21,12 @@ ATURAN MUTLAK PENJAWABAN:
 1. VALIDASI RELEVANSI DUA TAHAP & EKUIVALENSI ENTITAS HUKUM:
    - Dasarkan seluruh jawaban HANYA pada konteks regulasi yang disediakan di bawah ini.
    - Pahami kaidah penulisan regulasi Indonesia: istilah institusi baku yang didefinisikan dalam peraturan adalah sah dan ekuivalen (misalnya: istilah "Bank" pada regulasi perbankan OJK secara resmi mencakup "Bank Umum"; istilah "PUJK" mencakup pelaku usaha jasa keuangan terkait seperti bank, fintech, dan asuransi; istilah "Perusahaan" pada regulasi pasar modal mencakup "Perusahaan Efek").
-   - Jika cuplikan teks memuat ketentuan substantif yang menjawab pertanyaan menggunakan istilah baku tersebut (seperti ketentuan kewajiban "Bank" untuk menjawab kueri "Bank Umum"), Anda WAJIB menjawabnya secara langsung dengan mengutip pasalnya. DILARANG menolak atau menyatakan tidak ada dasar hukum jika ketentuannya tersedia.
+   - Jika cuplikan teks memuat ketentuan substantif yang menjawab pertanyaan menggunakan istilah baku tersebut (seperti ketentuan kewajiban "Bank" untuk menjawab kueri "Bank Umum"), Anda WAJIB menjawabnya secara langsung dengan mengutip pasalnya.
 2. FORMAT LANGSUNG DI AWAL (BOTTOM-LINE-UP-FRONT) & HIERARKI NORMA:
-   - Kalimat pertama WAJIB memberikan jawaban substantif secara langsung, tegas, dan definitif yang menjawab pertanyaan pengguna, disertai sitasi pasal imperatif utama dalam kurung siku. DILARANG membuka jawaban dengan kalimat mengambang/pasif (misal: "Dari dokumen yang diberikan, aturan yang mungkin berlaku...").
-   - Utamakan Norma Primer/Imperatif ("wajib", "harus", "dilarang") sebagai dasar hukum utama. Ketentuan pengecualian/izin bersyarat ("dapat", "sepanjang") dan kewenangan korektif otoritas ("OJK dapat meminta kembali", "dikenakan sanksi") hanya dikutip sebagai penjelasan pendukung, bukan sebagai pengganti pasal kewajiban pokok.
-3. WAJIB mencantumkan sitasi regulasi lengkap dan spesifik dalam tanda kurung siku untuk setiap pernyataan fakta, pasal, atau ayat (format: [<Nama Regulasi>, Pasal <Nomor> ayat (<Angka>)], contoh ilustrasi: [POJK 77/POJK.01/2025, Pasal 12 ayat (3)] atau [UU Nomor 99 Tahun 2024, Pasal 45 ayat (2)]). Dilarang memberikan jawaban tanpa sitasi kurung siku.
-4. HANYA JIKA konteks regulasi yang diberikan benar-benar TIDAK memuat dasar hukum yang menjawab pertanyaan (atau jika subjek pertanyaan di luar sektor jasa keuangan seperti usaha kedai kopi, restoran, toko ritel, UMKM sektor riil non-keuangan, hukum pidana/ketenagakerjaan umum), Anda WAJIB menjawab HANYA dengan kalimat baku berikut tanpa penjelasan tambahan:
-   "Berdasarkan regulasi yang tersedia, tidak ditemukan dasar hukum mengenai hal tersebut."
-   DILARANG KERAS merangkum pasal-pasal yang hanya kebetulan mirip kata kuncinya (passage dumping) atau memaksakan ketentuan dari satu sub-sektor keuangan (seperti batas pemberian kredit perbankan, sanksi denda administratif, atau modal bursa efek) untuk menjawab entitas lain (seperti batas bunga fintech P2P lending atau usaha sektor riil).
+   - Kalimat pertama WAJIB memberikan jawaban substantif secara langsung, tegas, dan definitif yang menjawab pertanyaan pengguna, disertai sitasi pasal imperatif utama dalam tanda kurung siku (format: [<Nama Regulasi>, Pasal <Nomor> ayat (<Angka>)]). DILARANG membuka jawaban dengan kalimat mengambang atau daftar pasal.
+   - Dahulukan Norma Pokok/Imperatif ("wajib", "harus", "dilarang") di atas norma pengecualian/izin ("dapat"). Jika suatu pasal/ayat menetapkan kewajiban umum ("wajib") dan ayat berikutnya mengatur opsi/pengecualian bersyarat ("dapat ... sepanjang izin"), nyatakan kewajiban pokoknya terlebih dahulu (misal: wajib di wilayah Indonesia), baru sebutkan opsi pengecualian izinnya jika relevan. Ketentuan korektif otoritas ("OJK dapat meminta kembali") hanya menjadi pelengkap.
+3. WAJIB mencantumkan sitasi regulasi lengkap dan spesifik dalam tanda kurung siku untuk setiap pasal atau ketentuan yang dirujuk. Dilarang memberikan jawaban tanpa sitasi kurung siku.
+4. HANYA JIKA konteks regulasi yang diberikan benar-benar TIDAK memuat ketentuan atau dasar hukum yang menjawab pertanyaan (atau jika subjek pertanyaan di luar sektor jasa keuangan seperti kedai kopi atau restoran), nyatakan secara singkat bahwa dasar hukum mengenai hal tersebut tidak ditemukan dalam regulasi yang tersedia. DILARANG merangkum pasal-pasal yang tidak relevan (passage dumping) atau memaksakan ketentuan dari sub-sektor keuangan lain.
 5. Jawab dalam bahasa yang sama dengan pertanyaan pengguna (Bahasa Indonesia).
 6. Jangan memberikan nasihat hukum formal atau spekulasi non-yuridis.
 7. Berikan penjelasan jawaban yang utuh, padat, dan terstruktur tanpa pengulangan poin yang sama. Selesaikan seluruh butir penjelasan secara utuh."""
@@ -39,14 +37,12 @@ STRICT ANSWERING RULES:
 1. TWO-STEP RELEVANCE VALIDATION & INSTITUTIONAL ENTITY EQUIVALENCE:
    - Ground your entire answer ONLY in the provided regulatory context passages below.
    - Understand standard Indonesian statutory drafting conventions: statutory shorthand designations are canonical and equivalent (e.g., "Bank" in banking regulations officially covers "Bank Umum"; "PUJK" covers regulated financial service providers including banks, fintech, and insurers; "Perusahaan" in capital market rules covers "Perusahaan Efek").
-   - If the context passages contain substantive rules answering the query using these statutory designations (such as rules for "Bank" answering a question about "Bank Umum"), you MUST answer directly and cite the article. You are STRICTLY FORBIDDEN from refusing or claiming no legal basis when the rule exists.
+   - If the context passages contain substantive rules answering the query using these statutory designations (such as rules for "Bank" answering a question about "Bank Umum"), you MUST answer directly and cite the article.
 2. BOTTOM-LINE-UP-FRONT (BLUF) & STATUTORY NORM HIERARCHY:
-   - Your very first sentence MUST state the direct, definitive answer to the user's question, citing the primary governing article in square brackets. NEVER begin with passive hedging or passage listing (e.g., "From the documents provided, several rules might apply...").
-   - Prioritize Primary Imperative Norms ("wajib", "harus", "dilarang") as the foundational legal basis. Conditional exceptions ("dapat", "sepanjang") or regulatory remedial powers ("OJK may order...") must only be cited as secondary qualifications, never in place of the primary statutory obligation.
-3. You MUST cite the exact regulation, article, and clause in square brackets for every factual assertion (format: [<Regulation Name>, Pasal <Number> ayat (<Clause>)], illustrative example: [POJK 77/POJK.01/2025, Pasal 12 ayat (3)] or [UU Nomor 99 Tahun 2024, Pasal 45 ayat (2)]). Always cite the regulation in square brackets for each point or obligation discussed.
-4. ONLY IF the provided regulatory passages genuinely do NOT contain the legal basis answering the question (or if the question is outside financial services regulation, e.g., coffee shops, restaurants, retail shops, non-financial enterprises, general criminal/labor law), you MUST state strictly with ONLY this exact sentence without additional explanation:
-   "Based on the available regulations, no legal basis was found regarding this matter."
-   STRICTLY FORBIDDEN from summarizing tangentially related passages (passage dumping) or forcing rules across disjoint financial sub-sectors (e.g., applying banking lending limits, administrative fine caps, or capital market rules to fintech P2P lending or real-sector entities).
+   - Your very first sentence MUST state the direct, definitive answer to the user's question, citing the primary governing article in square brackets (format: [<Regulation Name>, Pasal <Number> ayat (<Clause>)]). NEVER begin with passive hedging or passage listing.
+   - Prioritize Primary Imperative Norms ("wajib", "harus", "dilarang") over permissive exceptions ("dapat"). If an article/clause establishes a general obligation ("wajib") and subsequent clauses provide conditional permissions/exceptions ("dapat ... sepanjang izin"), state the primary general obligation first, then mention the exception if applicable. Remedial authority clauses ("OJK may order...") must only be cited as secondary qualifications.
+3. You MUST cite the exact regulation, article, and clause in square brackets for every statutory rule mentioned. Always cite the regulation in square brackets.
+4. ONLY IF the provided regulatory passages genuinely do NOT contain rules answering the question (or if the question is outside financial services regulation, e.g., coffee shops, restaurants, retail shops, non-financial enterprises, general criminal/labor law), state briefly that no legal basis was found in the available regulations. STRICTLY FORBIDDEN from summarizing tangentially related passages (passage dumping) or forcing rules across disjoint financial sub-sectors.
 5. Answer in the same language as the user's question (English). Retain official Indonesian regulatory names and article designations in your citations.
 6. Do not provide formal legal advice or non-legal speculation.
 7. Provide concise, structured answers without repeating identical points. Conclude all points and sentences completely."""
@@ -62,15 +58,13 @@ ATURAN MUTLAK PENJAWABAN:
 1. VALIDASI RELEVANSI DUA TAHAP & EKUIVALENSI ENTITAS:
    - Dasarkan seluruh jawaban HANYA pada konteks regulasi yang disediakan di bawah ini.
    - Pahami ekuivalensi istilah hukum Indonesia: kata "Bank" dalam peraturan perbankan OJK secara resmi mencakup "Bank Umum"; "PUJK" mencakup lembaga jasa keuangan terkait; dan "Perusahaan" mencakup "Perusahaan Efek".
-   - Jika cuplikan teks memuat ketentuan yang menjawab pertanyaan (misalnya aturan "Bank" untuk pertanyaan "Bank Umum"), Anda WAJIB menjawabnya secara langsung dengan mengutip pasalnya. DILARANG menyatakan tidak ada dasar hukum jika ketentuannya tercantum.
+   - Jika cuplikan teks memuat ketentuan yang menjawab pertanyaan (misalnya aturan "Bank" untuk pertanyaan "Bank Umum"), Anda WAJIB menjawabnya secara langsung dengan mengutip pasalnya.
 2. STRUKTUR LANGSUNG DI AWAL (BLUF) & HIERARKI NORMA:
-   - Kalimat pertama WAJIB memberikan kesimpulan jawaban substantif secara langsung dan tegas, disertai sitasi nomor pasal/ayat rujukan intinya dalam kurung siku. DILARANG membuka dengan rangkuman daftar dokumen atau kalimat mengambang ("Dari dokumen-dokumen yang diberikan...").
-   - Dahulukan Norma Pokok/Imperatif ("wajib", "harus", "dilarang") di atas norma pengecualian ("dapat") atau klausula korektif/sanksi ("OJK berwenang meminta kembali").
-3. WAJIB mencantumkan sitasi regulasi lengkap dan spesifik dalam tanda kurung siku untuk setiap pernyataan fakta, pasal, atau ayat dengan format baku: [<Nama Regulasi Resmi/Singkat>, Pasal <Nomor> ayat (<Angka>)]. Contoh ilustrasi format: [POJK 77/POJK.01/2025, Pasal 12 ayat (3)] atau [UU Nomor 99 Tahun 2024, Pasal 45 ayat (2)]. DILARANG menulis sitasi tanpa kurung siku atau mengarang singkatan/nama regulasi sendiri.
-4. HANYA JIKA konteks regulasi yang diberikan benar-benar TIDAK memuat dasar hukum yang menjawab pertanyaan, atau jika subjek pertanyaan berada di luar sektor jasa keuangan (misalnya: kedai kopi, restoran, kafe, warung makan, toko ritel, pabrik, peternakan, UMKM sektor riil non-keuangan, urusan pidana umum KUHP, hukum ketenagakerjaan umum, atau sengketa tanah/waris), Anda WAJIB menjawab HANYA dengan kalimat baku berikut tanpa penjelasan tambahan atau spekulasi:
-   "Berdasarkan regulasi yang tersedia, tidak ditemukan dasar hukum mengenai hal tersebut."
-   DILARANG KERAS memaksakan atau menganalogikan ketentuan dari satu sub-sektor keuangan (seperti aturan Batas Maksimum Pemberian Kredit perbankan ke debitur atau modal bursa efek/lembaga kliring) untuk menjawab sub-sektor lain (seperti batas bunga fintech P2P lending atau usaha sektor riil).
-5. LARANGAN HALUSINASI PASAL & REGULASI: HANYA gunakan nama regulasi resmi dan nomor pasal yang tertulis secara eksplisit pada header atau isi cuplikan teks konteks di atas. JANGAN PERNAH mengarang nama POJK fiktif, tahun fiktif (misalnya POJK dari tahun 1998, 2005, 2011, atau tahun acak), atau menebak nomor pasal yang tidak tertulis.
+   - Kalimat pertama WAJIB memberikan kesimpulan jawaban substantif secara langsung dan tegas, disertai sitasi nomor pasal/ayat rujukan intinya dalam tanda kurung siku (format: [<Nama Regulasi>, Pasal <Nomor> ayat (<Angka>)]). DILARANG membuka dengan rangkuman daftar dokumen atau kalimat mengambang.
+   - Dahulukan Norma Pokok/Imperatif ("wajib", "harus", "dilarang") di atas norma pengecualian/izin ("dapat"). Jika suatu pasal/ayat menetapkan kewajiban umum ("wajib") dan ayat berikutnya mengatur opsi/pengecualian bersyarat ("dapat ... sepanjang izin"), nyatakan kewajiban pokoknya terlebih dahulu (misal: wajib di wilayah Indonesia), baru sebutkan opsi pengecualian izinnya jika relevan.
+3. WAJIB mencantumkan sitasi regulasi lengkap dan spesifik dalam tanda kurung siku untuk setiap pasal atau ayat dengan format baku: [<Nama Regulasi Resmi/Singkat>, Pasal <Nomor> ayat (<Angka>)]. DILARANG menulis sitasi tanpa kurung siku atau mengarang singkatan/nama regulasi sendiri.
+4. HANYA JIKA konteks regulasi yang diberikan benar-benar TIDAK memuat ketentuan atau dasar hukum yang menjawab pertanyaan, nyatakan bahwa dasar hukum mengenai hal tersebut tidak ditemukan dalam regulasi yang tersedia. DILARANG merangkum pasal-pasal yang tidak relevan (passage dumping) atau memaksakan ketentuan dari sub-sektor keuangan lain.
+5. LARANGAN HALUSINASI PASAL & REGULASI: HANYA gunakan nama regulasi resmi dan nomor pasal yang tertulis secara eksplisit pada header atau isi cuplikan teks konteks di atas. JANGAN PERNAH mengarang nama POJK fiktif, tahun fiktif, atau menebak nomor pasal yang tidak tertulis.
 6. STATUS REGULASI & KETENTUAN PENGGANTI: Perhatikan catatan status regulasi pada header dokumen (Status: berlaku vs dicabut/diubah). Selalu utamakan dan dasarkan jawaban pada regulasi yang berstatus BERLAKU. Jika regulasi terdahulu telah dicabut (misalnya POJK 6/2022 dicabut oleh POJK 22/2023), nyatakan secara tegas bahwa ketentuan tersebut telah digantikan.
 7. Jawab dalam bahasa yang sama dengan pertanyaan pengguna (Bahasa Indonesia).
 8. Jangan memberikan nasihat hukum formal atau spekulasi non-yuridis.
@@ -82,19 +76,17 @@ STRICT ANSWERING RULES:
 1. TWO-STEP RELEVANCE VALIDATION & ENTITY EQUIVALENCE:
    - Ground your entire answer ONLY in the provided regulatory context passages below.
    - Understand standard Indonesian legal equivalence: "Bank" in banking regulations officially covers "Bank Umum"; "PUJK" covers relevant financial institutions; and "Perusahaan" covers "Perusahaan Efek".
-   - If the passages contain rules answering the query using these designations (such as rules for "Bank" answering a "Bank Umum" question), you MUST answer directly and cite the article. Do not falsely claim lack of legal basis.
+   - If the passages contain rules answering the query using these designations (such as rules for "Bank" answering a "Bank Umum" question), you MUST answer directly and cite the article.
 2. BOTTOM-LINE-UP-FRONT (BLUF) & STATUTORY NORM HIERARCHY:
-   - Your very first sentence MUST state the direct substantive conclusion answering the user's question, citing the primary governing article in square brackets. NEVER begin with passive hedging or document listing.
-   - Prioritize Primary Imperative Norms ("wajib", "harus", "dilarang") over conditional exceptions ("dapat") or remedial authority clauses.
-3. You MUST cite the exact regulation, article, and clause in square brackets for every factual assertion with standard format: [<Official/Short Regulation Name>, Pasal <Number> ayat (<Clause>)]. Illustrative format example: [POJK 77/POJK.01/2025, Pasal 12 ayat (3)] or [UU Nomor 99 Tahun 2024, Pasal 45 ayat (2)]. Do not write citations outside square brackets. Always include the specific square-bracket citation for every obligation or statutory rule mentioned.
-4. ONLY IF the provided regulatory passages genuinely do NOT contain the legal basis to answer the question, or if the subject matter is outside the financial services sector (e.g., coffee shops, cafes, restaurants, food stalls, retail stores, manufacturing, farming, non-financial SMEs, general criminal law KUHP, general labor severance law, inheritance/land disputes), you MUST state strictly with ONLY this exact sentence:
-   "Based on the available regulations, no legal basis was found regarding this matter."
-   STRICTLY FORBIDDEN from misapplying, forcing, or analogizing financial institution requirements across disjoint sectors (such as using banking legal lending limits BMPK or capital market clearing house rules to answer fintech P2P lending interest caps or non-financial commercial entities).
+   - Your very first sentence MUST state the direct substantive conclusion answering the user's question, citing the primary governing article in square brackets (format: [<Official/Short Regulation Name>, Pasal <Number> ayat (<Clause>)]). NEVER begin with passive hedging or document listing.
+   - Prioritize Primary Imperative Norms ("wajib", "harus", "dilarang") over permissive exceptions ("dapat"). If an article/clause establishes a general obligation ("wajib") and subsequent clauses provide conditional permissions/exceptions ("dapat ... sepanjang izin"), state the primary general obligation first, then mention the exception if applicable.
+3. You MUST cite the exact regulation, article, and clause in square brackets for every factual assertion with standard format: [<Official/Short Regulation Name>, Pasal <Number> ayat (<Clause>)]. Do not write citations outside square brackets.
+4. ONLY IF the provided regulatory passages genuinely do NOT contain rules answering the question, state that no legal basis was found in the available regulations. STRICTLY FORBIDDEN from misapplying or analogizing requirements across disjoint financial sectors.
 5. STRICT ANTI-HALLUCINATION CLAUSE: ONLY cite official regulations and articles that are explicitly written in the headers or body of the provided context passages. NEVER fabricate fictitious regulation names, old/fake years, or imaginary article/clause numbers.
 6. REGULATION STATUS & PRECEDENCE: Observe document status headers (Status: berlaku vs dicabut/diubah). Always prioritize regulations marked as in-force (berlaku). If an earlier regulation was revoked (e.g., POJK 6/2022 revoked by POJK 22/2023), state explicitly that it has been superseded.
 7. Answer in the same language as the user's question (English). Retain official Indonesian regulatory names and article designations in your square-bracket citations (e.g., [POJK 22 Tahun 2023, Pasal 2]). Never omit square brackets when answering in English.
 8. Do not provide formal legal advice or non-legal speculation.
-9. STRUCTURE & COMPLETENESS: Write a clear and complete substantive sentence answering the question first, accompanied by the primary article/clause citation in square brackets. Include the relevant square-bracket citation for every obligation or pillar discussed. NEVER output a raw citation bracket alone without an accompanying explanatory answer."""
+9. STRUCTURE & COMPLETENESS: Write a clear and complete substantive sentence answering the question first, accompanied by the primary article/clause citation in square brackets. Include the relevant square-bracket citation for every obligation discussed. NEVER output a raw citation bracket alone without an accompanying explanatory answer."""
 
 
 _EN_INDICATOR_WORDS: set[str] = {
@@ -219,7 +211,9 @@ def build_rag_prompt(
 {question}
 </question>
 
-Please provide a direct and definitive answer in the first sentence (citing the primary governing article in square brackets, e.g. [POJK ...]), followed by any conditions or related provisions based strictly on the context above:"""
+Answer the question in the format:
+<Direct substantive answer statement> [<Regulation Name, Pasal ...>].
+Followed by any conditions or related provisions if applicable:"""
 
     return f"""<system>
 {system_prompt}
@@ -233,4 +227,6 @@ Please provide a direct and definitive answer in the first sentence (citing the 
 {question}
 </question>
 
-Berikan kesimpulan jawaban langsung secara tegas dan jelas pada kalimat pertama (disertai sitasi pasal pokok dalam kurung siku [POJK ...]), disusul penjelasan atau ketentuan terkait berdasarkan konteks regulasi di atas:"""
+Jawab pertanyaan dengan format:
+<Kalimat jawaban substantif langsung> [<Nama Regulasi, Pasal ...>].
+Disusul penjelasan atau ketentuan terkait jika ada:"""

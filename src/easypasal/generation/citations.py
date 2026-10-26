@@ -114,20 +114,23 @@ def check_abstention(text: str, language: str = "id") -> bool:
     """
     clean_lower = text.strip().lower()
 
-    # If the response cites official regulations, it is overwhelmingly likely a substantive answer,
-    # not an abstention refusal. Only flag as abstention if it contains an explicit canonical refusal phrase.
+    # If the response cites official regulations, it is overwhelmingly likely a substantive answer.
+    # Only flag as abstention if the opening sentence / primary thesis is an explicit refusal.
     citations = extract_citations(text)
     if citations:
+        opening_segment = re.split(r"(?<=[.!?\n])\s+", clean_lower)[0]
         canonical_refusals = [
             "tidak ditemukan dasar hukum",
             "tidak terdapat dasar hukum",
             "tidak ada dasar hukum",
             "tidak ditemukan dalam regulasi",
+            "tidak diatur dalam regulasi",
+            "tidak terdapat informasi",
             "no legal basis was found",
             "not found in the available regulations",
             "not found in the provided regulations",
         ]
-        return any(phrase in clean_lower for phrase in canonical_refusals)
+        return any(phrase in opening_segment for phrase in canonical_refusals)
 
     if language == "en":
         return any(phrase in clean_lower for phrase in _ABSTAIN_PHRASES_EN)

@@ -361,9 +361,13 @@ class RAGPipeline:
                 },
             )
 
+        # Context Budgeting: Cap generation prompt context to top-3 highest-relevance passages
+        # to prevent small-model attention dilution ("lost-in-the-middle") and context window overflows.
+        budgeted_chunks = chunks[:3] if len(chunks) > 3 else chunks
+
         prompt = build_rag_prompt(
             question=clean_question,
-            chunks=chunks,
+            chunks=budgeted_chunks,
             language=lang,
             system_prompt_override=system_prompt_override,
             prompt_variant=eff_prompt_variant,
