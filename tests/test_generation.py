@@ -148,6 +148,17 @@ def test_detect_statutory_role() -> None:
     assert _detect_statutory_role("") == ""
 
 
+def test_extract_query_subject() -> None:
+    """Verify extraction of primary financial institutional entity from user query."""
+    from easypasal.generation.prompts import extract_query_subject
+
+    assert extract_query_subject("Di mana Bank Umum wajib menempatkan Pusat Data?") == "Bank Umum"
+    assert extract_query_subject("Apa syarat izin Penyelenggara LPBBTI?") == "Penyelenggara LPBBTI"
+    assert extract_query_subject("Berapa batas waktu penanganan pengaduan PUJK?") == "PUJK"
+    assert extract_query_subject("Bagaimana tata kelola bagi Bank?") == "Bank"
+    assert extract_query_subject("Pertanyaan tanpa subjek?") is None
+
+
 def test_format_passages_and_prompt_assembly() -> None:
     """Verify context formatting and prompt assembly for Indonesian and English."""
     c1 = _make_dummy_chunk(
@@ -178,16 +189,24 @@ def test_format_passages_and_prompt_assembly() -> None:
 
     # Test Indonesian prompt
     id_prompt = build_rag_prompt(
-        question="Berapa hari penanganan pengaduan?",
+        question="Berapa hari penanganan pengaduan PUJK?",
         chunks=[c1, c2],
         language="id",
     )
     assert "<system>" in id_prompt
     assert "ATURAN MUTLAK PENJAWABAN" in id_prompt
     assert "POJK 22 Tahun 2023, Pasal 72" in id_prompt
-    assert "Berapa hari penanganan pengaduan?" in id_prompt
-    assert "PUJK wajib melayani pengaduan konsumen" in id_prompt
+    assert "Berapa hari penanganan pengaduan PUJK?" in id_prompt
+    assert "PUJK wajib memenuhi ketentuan terkait" in id_prompt
     assert "<Kalimat jawaban" not in id_prompt
+
+    # Test dynamic subject mirroring
+    bank_prompt = build_rag_prompt(
+        question="Di mana Bank Umum wajib menempatkan Pusat Data?",
+        chunks=[c1, c2],
+        language="id",
+    )
+    assert "Bank Umum wajib memenuhi ketentuan terkait" in bank_prompt
 
     # Test English prompt
     en_prompt = build_rag_prompt(
@@ -197,12 +216,51 @@ def test_format_passages_and_prompt_assembly() -> None:
     )
     assert "STRICT ANSWERING RULES" in en_prompt
     assert "How many days are allowed for complaint handling?" in en_prompt
-    assert "Financial institutions must provide consumer complaint services" in en_prompt
+    assert "Financial institutions must comply with regulatory requirements" in en_prompt
     assert "<Direct substantive" not in en_prompt
 
     # Test empty passages
     empty_prompt = build_rag_prompt(question="Pertanyaan?", chunks=[])
     assert "TIDAK ADA KONTEKS REGULASI YANG DITEMUKAN" in empty_prompt
+
+
+def test_prune_remedial_distractors() -> None:
+    """Verify upstream pruning of secondary remedial/exception clauses when primary obligation is present."""
+    from easypasal.generation.pipeline import prune_remedial_distractors
+
+    c_primary = _make_dummy_chunk(
+        "c_primary",
+        "POJK 11/POJK.03/2022, Pasal 35 ayat (1)",
+        "Bank wajib menempatkan Sistem Elektronik pada Pusat Data di wilayah Indonesia.",
+        doc_number="POJK 11/POJK.03/2022",
+    )
+    c_exception = _make_dummy_chunk(
+        "c_exception",
+        "POJK 11/POJK.03/2022, Pasal 36 ayat (1)",
+        "Bank dapat menempatkan Sistem Elektronik di luar wilayah Indonesia sepanjang memperoleh izin OJK.",
+        doc_number="POJK 11/POJK.03/2022",
+    )
+    c_remedial = _make_dummy_chunk(
+        "c_remedial",
+        "POJK 11/POJK.03/2022, Pasal 36 ayat (4)",
+        "Otoritas Jasa Keuangan dapat meminta Bank untuk menempatkan Sistem Elektronik di wilayah Indonesia.",
+        doc_number="POJK 11/POJK.03/2022",
+    )
+    c_other = _make_dummy_chunk(
+        "c_other",
+        "POJK 11/POJK.03/2022, Pasal 37",
+        "Bank wajib menyelenggarakan tata kelola TI secara efektif.",
+        doc_number="POJK 11/POJK.03/2022",
+    )
+
+    q_obligation = "Di mana Bank Umum wajib menempatkan Pusat Data?"
+    pruned = prune_remedial_distractors([c_primary, c_exception, c_remedial, c_other], q_obligation)
+
+    pruned_labels = [c.citation_label for c in pruned]
+    assert "POJK 11/POJK.03/2022, Pasal 35 ayat (1)" in pruned_labels
+    assert "POJK 11/POJK.03/2022, Pasal 37" in pruned_labels
+    assert "POJK 11/POJK.03/2022, Pasal 36 ayat (1)" not in pruned_labels
+    assert "POJK 11/POJK.03/2022, Pasal 36 ayat (4)" not in pruned_labels
 
 
 def test_extract_citations() -> None:

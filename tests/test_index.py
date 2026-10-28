@@ -5,6 +5,7 @@ from __future__ import annotations
 import json
 from pathlib import Path
 from typing import Any
+from unittest.mock import patch
 
 from easypasal.index.bm25 import (
     BM25Index,
@@ -295,13 +296,14 @@ def test_get_model_slug() -> None:
 
 def test_fastembed_e5_prefix_detection_and_formatting() -> None:
     """Test that FastEmbedBackend detects E5 models and applies task prefixes."""
-    backend_e5 = FastEmbedBackend(model_name="intfloat/multilingual-e5-large")
-    assert backend_e5.is_e5_model is True
+    with patch("fastembed.TextEmbedding"):
+        backend_e5 = FastEmbedBackend(model_name="intfloat/multilingual-e5-large")
+        assert backend_e5.is_e5_model is True
 
-    backend_standard = FastEmbedBackend(
-        model_name="sentence-transformers/paraphrase-multilingual-MiniLM-L12-v2"
-    )
-    assert backend_standard.is_e5_model is False
+        backend_standard = FastEmbedBackend(
+            model_name="sentence-transformers/paraphrase-multilingual-MiniLM-L12-v2"
+        )
+        assert backend_standard.is_e5_model is False
 
 
 def test_build_indices_custom_collection_name(tmp_path: Path) -> None:

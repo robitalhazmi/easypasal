@@ -5,6 +5,7 @@ from __future__ import annotations
 import argparse
 import logging
 import os
+import re
 import time
 from pathlib import Path
 
@@ -23,6 +24,64 @@ logging.basicConfig(
     datefmt="%H:%M:%S",
 )
 logger = logging.getLogger("easypasal.generation.pipeline")
+
+
+def prune_remedial_distractors(
+    chunks: list[RetrievedChunk],
+    query: str,
+) -> list[RetrievedChunk]:
+    """Filter out supervisory remedial/sanction and conditional exception clauses when
+
+    primary entity obligation clauses for the same regulation are already present in
+    the candidate pool for an obligation query.
+    """
+    if not chunks or not query:
+        return chunks
+
+    from easypasal.generation.prompts import _detect_statutory_role
+    from easypasal.retrieval.fusion import detect_normative_intent
+
+    intent = detect_normative_intent(query)
+    if intent != "obligation":
+        return chunks
+
+    # Find regulations with at least one in-force primary entity obligation chunk
+    regs_with_primary_obligation: set[str] = set()
+    for c in chunks:
+        if c.status and c.status != "berlaku":
+            continue
+        role = _detect_statutory_role(c.text)
+        if role == "[Peran: Kewajiban Pokok Entitas]":
+            digits = tuple(sorted(re.findall(r"\d+", c.doc_number or c.doc_id or "")))
+            if digits:
+                regs_with_primary_obligation.add(f"{digits}")
+            elif c.doc_number:
+                regs_with_primary_obligation.add(c.doc_number.lower().strip())
+
+    if not regs_with_primary_obligation:
+        return chunks
+
+    pruned: list[RetrievedChunk] = []
+    for c in chunks:
+        digits = tuple(sorted(re.findall(r"\d+", c.doc_number or c.doc_id or "")))
+        doc_key = f"{digits}" if digits else (c.doc_number or "").lower().strip()
+        role = _detect_statutory_role(c.text)
+
+        # If this regulation has a primary obligation, prune secondary remedial / exception chunks
+        if doc_key in regs_with_primary_obligation and role in (
+            "[Peran: Wewenang Korektif Otoritas / Sanksi]",
+            "[Peran: Opsi Pengecualian / Izin Bersyarat]",
+        ):
+            logger.info(
+                "Pruning distracting non-primary clause %s (%s, %s) from obligation query context",
+                c.citation_label,
+                c.chunk_id,
+                role,
+            )
+            continue
+        pruned.append(c)
+
+    return pruned if pruned else chunks
 
 
 class RAGPipeline:
@@ -361,9 +420,11 @@ class RAGPipeline:
                 },
             )
 
-        # Context Budgeting: Cap generation prompt context to top-3 highest-relevance passages
-        # to prevent small-model attention dilution ("lost-in-the-middle") and context window overflows.
-        budgeted_chunks = chunks[:3] if len(chunks) > 3 else chunks
+        # Context Budgeting & Distractor Pruning:
+        # Prune distracting remedial / exception clauses for obligation queries when primary obligations exist,
+        # then cap generation prompt context to top-3 highest-relevance passages.
+        gated_chunks = prune_remedial_distractors(chunks, clean_question)
+        budgeted_chunks = gated_chunks[:3] if len(gated_chunks) > 3 else gated_chunks
 
         prompt = build_rag_prompt(
             question=clean_question,
@@ -385,8 +446,10 @@ class RAGPipeline:
             sanitize_prompt_artifacts,
             trim_incomplete_sentence,
         )
+        from easypasal.guardrails.citation_verifier import realign_answer_subject
 
-        answer_text = sanitize_prompt_artifacts(trim_incomplete_sentence(gen_res.text))
+        sanitized_text = sanitize_prompt_artifacts(trim_incomplete_sentence(gen_res.text))
+        answer_text = realign_answer_subject(sanitized_text, clean_question)
         citations = extract_citations(answer_text)
         abstained = check_abstention(answer_text, language=lang)
 

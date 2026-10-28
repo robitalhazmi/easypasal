@@ -978,3 +978,23 @@ def test_detect_and_realign_inverted_citations() -> None:
     )
     assert "Pasal 36 ayat (4)" in text_auth
     assert len(repl_auth) == 0
+
+
+def test_realign_answer_subject() -> None:
+    """Verify that leading subject bleed (e.g. PUJK instead of Bank Umum) is realigned."""
+    from easypasal.guardrails.citation_verifier import realign_answer_subject
+
+    # 1. Subject bleed from PUJK exemplar to Bank Umum query
+    q_bank = "Di mana Bank Umum wajib menempatkan Pusat Data dan Pusat Pemulihan Bencana menurut regulasi OJK?"
+    bleed_ans = "PUJK wajib menempatkan Pusat Data dan Pusat Pemulihan Bencana di wilayah Indonesia [POJK 11/2022, Pasal 35 ayat (1)]."
+    fixed_ans = realign_answer_subject(bleed_ans, q_bank)
+    assert fixed_ans.startswith("Bank Umum wajib menempatkan")
+
+    # 2. Bank and Bank Umum are equivalent, no change needed
+    ans_bank = "Bank wajib menempatkan Pusat Data di Indonesia [POJK 11/2022, Pasal 35 ayat (1)]."
+    assert realign_answer_subject(ans_bank, q_bank) == ans_bank
+
+    # 3. Correct matching subject remains unchanged
+    q_pujk = "Apa kewajiban PUJK dalam melayani pengaduan?"
+    ans_pujk = "PUJK wajib melayani pengaduan konsumen [POJK 22/2023, Pasal 71]."
+    assert realign_answer_subject(ans_pujk, q_pujk) == ans_pujk

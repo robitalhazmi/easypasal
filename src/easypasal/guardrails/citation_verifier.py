@@ -396,6 +396,57 @@ def verify_citations(
     )
 
 
+def realign_answer_subject(answer: str, question: str) -> str:
+    """Ensure the leading legal subject of the answer matches the institutional entity queried.
+
+    Fixes few-shot subject bleed (e.g. LLM copying 'PUJK' from an exemplar when the question
+    is about 'Bank Umum' or 'Bank').
+    """
+    if not answer or not question:
+        return answer
+
+    from easypasal.generation.prompts import (
+        _KNOWN_INSTITUTIONAL_SUBJECTS,
+        extract_query_subject,
+    )
+
+    q_subject = extract_query_subject(question)
+    if not q_subject:
+        return answer
+
+    clean_ans = answer.strip()
+
+    for entity in _KNOWN_INSTITUTIONAL_SUBJECTS:
+        if entity.lower() != q_subject.lower():
+            # If q_subject is "Bank Umum" and entity is "Bank", they are legally equivalent, don't replace
+            if q_subject.lower() in ("bank umum", "bank") and entity.lower() in (
+                "bank umum",
+                "bank",
+            ):
+                continue
+
+            # Check if answer starts with this competing entity (e.g. "PUJK wajib...")
+            pattern = rf"^({re.escape(entity)})(\s+(?:wajib|harus|dilarang|dapat|memiliki|menyediakan|menempatkan)\b)"
+            match = re.match(pattern, clean_ans, re.IGNORECASE)
+            if match:
+                replaced = re.sub(
+                    pattern,
+                    rf"{q_subject}\2",
+                    clean_ans,
+                    count=1,
+                    flags=re.IGNORECASE,
+                )
+                logger.warning(
+                    "Subject consistency guardrail: realigned leading entity %r -> %r for query %r",
+                    match.group(1),
+                    q_subject,
+                    question[:50],
+                )
+                return replaced
+
+    return answer
+
+
 def detect_and_realign_inverted_citations(
     answer: str,
     retrieved_chunks: list[RetrievedChunk],
@@ -439,50 +490,72 @@ def detect_and_realign_inverted_citations(
 
     for cite in current_cites:
         parsed = parse_citation_details(cite)
+
+        # 1. Search among all retrieved chunks in the SAME regulation for a primary entity obligation chunk
+        candidate_primaries = [
+            c
+            for c in retrieved_chunks
+            if _is_doc_matched(parsed, c)
+            and _detect_statutory_role(c.text) == "[Peran: Kewajiban Pokok Entitas]"
+            and (not c.status or c.status == "berlaku")
+        ]
+        if not candidate_primaries:
+            continue
+
+        primary_chunk = candidate_primaries[0]
+        primary_label = primary_chunk.citation_label
+        if not primary_label or primary_label == cite:
+            continue
+
+        primary_parsed = parse_citation_details(primary_label)
+
+        # Check if the cited clause is different from the primary clause
+        is_different_clause = bool(
+            (
+                parsed.pasal
+                and primary_parsed.pasal
+                and parsed.pasal.lower() != primary_parsed.pasal.lower()
+            )
+            or (parsed.ayat and primary_parsed.ayat and parsed.ayat != primary_parsed.ayat)
+        )
+
         matching_chunks = [
             c
             for c in retrieved_chunks
             if _is_doc_matched(parsed, c) and _is_pasal_matched(parsed, c)
         ]
-        if not matching_chunks:
-            continue
 
-        matched_chunk = matching_chunks[0]
-        chunk_role = _detect_statutory_role(matched_chunk.text)
+        should_realign = False
+        if matching_chunks:
+            chunk_role = _detect_statutory_role(matching_chunks[0].text)
+            if chunk_role in (
+                "[Peran: Wewenang Korektif Otoritas / Sanksi]",
+                "[Peran: Opsi Pengecualian / Izin Bersyarat]",
+            ):
+                should_realign = True
+        elif is_different_clause:
+            should_realign = True
 
-        # If cited chunk is an authority remedial / sanction power clause:
-        if chunk_role == "[Peran: Wewenang Korektif Otoritas / Sanksi]":
-            # Search among all retrieved chunks in the SAME regulation for a primary entity obligation chunk
-            candidate_primaries = [
-                c
-                for c in retrieved_chunks
-                if _is_doc_matched(parsed, c)
-                and _detect_statutory_role(c.text) == "[Peran: Kewajiban Pokok Entitas]"
-                and (not c.status or c.status == "berlaku")
-            ]
-            if candidate_primaries:
-                primary_chunk = candidate_primaries[0]
-                new_label = primary_chunk.citation_label
-                if new_label and new_label != cite:
-                    clean_cite = cite.strip("[]")
-                    clean_new = new_label.strip("[]")
-                    realigned_text = re.sub(
-                        rf"\[\s*{re.escape(clean_cite)}\s*\]",
-                        f"[{clean_new}]",
-                        realigned_text,
-                    )
-                    realigned_text = re.sub(
-                        rf"\b{re.escape(clean_cite)}\b",
-                        clean_new,
-                        realigned_text,
-                    )
-                    replacements[cite] = f"[{clean_new}]"
-                    logger.warning(
-                        "Inverted legal reasoning detected for query %r: realigned remedial citation %s -> %s",
-                        question[:50],
-                        cite,
-                        new_label,
-                    )
+        if should_realign:
+            clean_cite = cite.strip("[]")
+            clean_new = primary_label.strip("[]")
+            realigned_text = re.sub(
+                rf"\[\s*{re.escape(clean_cite)}\s*\]",
+                f"[{clean_new}]",
+                realigned_text,
+            )
+            realigned_text = re.sub(
+                rf"\b{re.escape(clean_cite)}\b",
+                clean_new,
+                realigned_text,
+            )
+            replacements[cite] = f"[{clean_new}]"
+            logger.warning(
+                "Inverted legal reasoning detected for query %r: realigned non-primary citation %s -> %s",
+                question[:50],
+                cite,
+                primary_label,
+            )
 
     new_citations = extract_citations(realigned_text)
     return realigned_text, new_citations, replacements
