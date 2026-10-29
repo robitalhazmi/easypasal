@@ -166,68 +166,191 @@ def _detect_statutory_role(text: str) -> str:
     """Classify the primary normative role of a regulatory passage chunk.
 
     Tags help smaller LLMs prioritize primary substantive duties of regulated entities
-    over discretionary supervisory actions or conditional exceptions.
+    over discretionary supervisory actions, conditional exceptions, or elucidations.
     """
     if not text:
         return ""
 
-    lower = text.lower()
+    stripped = text.strip()
+    header_match = re.match(r"^\[([^\]]+)\]\s*", stripped)
+    header_low = header_match.group(1).lower() if header_match else ""
+    body = stripped[header_match.end() :] if header_match else stripped
+    norm = re.sub(r"\s+", " ", body.lower()).strip()
 
-    # 1. Primary imperative duties of entities: "Bank wajib", "PUJK wajib", "Perusahaan dilarang"
-    # Matches entity subject followed by imperative verb or verb starting with imperative action
-    has_entity_duty = bool(
-        re.search(
-            r"\b(?:bank|pujk|perusahaan|penyelenggara|ljk|pihak)\s+(?:wajib|harus|dilarang)\b",
-            lower,
-        )
-        or re.search(
-            r"\bwajib\s+(?:menempatkan|memiliki|menerapkan|menyediakan|menyampaikan|memenuhi|menggunakan|menjaga|melakukan)\b",
-            lower,
-        )
-    )
+    if not norm:
+        return ""
 
-    # 2. Authority corrective / discretionary supervisory / sanction powers
-    # e.g., "OJK dapat meminta", "Otoritas Jasa Keuangan berwenang", "dikenai sanksi"
-    has_authority = bool(
-        re.search(
-            r"\b(?:ojk|otoritas jasa keuangan|bank indonesia|bi)\s+(?:dapat|berwenang|meminta|memerintahkan|mengenakan|menjatuhkan)\b",
-            lower,
-        )
-        or re.search(r"\b(?:dikenai|pengenaan)\s+sanksi\b", lower)
-    )
+    # 0. Elucidation (Penjelasan) passages are explanatory notes, not primary norms
+    if header_low.startswith("penjelasan") or re.match(
+        r"^(?:ayat\s+\(\d+\)|pasal\s+\d+|huruf\s+[a-z])\s+cukup\s+jelas\b", norm
+    ):
+        return "[Peran: Penjelasan / Keterangan Tambahan]"
 
-    # 3. Conditional permission / exceptions: "Bank dapat menempatkan ... sepanjang izin"
-    has_permission = bool(
-        re.search(
-            r"\b(?:bank|pujk|perusahaan|penyelenggara|ljk)\s+dapat\b",
-            lower,
-        )
-        or re.search(r"\bdapat\b.*\b(?:sepanjang|setelah|dengan persetujuan|izin)\b", lower)
+    # 1. Authority corrective / discretionary supervisory / licensing / sanction powers
+    # e.g., "OJK dapat meminta", "Otoritas Jasa Keuangan memberikan izin", "dikenai sanksi"
+    auth_pattern = (
+        r"\b(?:ojk|otoritas\s+jasa\s+keuangan|bank\s+indonesia|bi|ppatk)\s+"
+        r"(?:dapat|berwenang|meminta|memerintahkan|mengenakan|menjatuhkan|"
+        r"memberikan\s+izin|menolak\s+permohonan|menentukan|menetapkan|melakukan\s+pemeriksaan)\b"
+        r"|\bdalam\s+hal\s+berdasarkan\s+penilaian\s+(?:ojk|otoritas\s+jasa\s+keuangan|bank\s+indonesia)\b"
+        r"|\b(?:dikenai|pengenaan)\s+sanksi\b"
     )
+    auth_match = re.search(auth_pattern, norm)
+    has_authority = auth_match is not None
+
+    # 2. Conditional permission / licensing exceptions: "Bank dapat menempatkan ... sepanjang izin"
+    perm_pattern = (
+        r"\b(?:bank\s+umum|bank|bpr|pujk|pjk|perusahaan\s+efek|perusahaan|penyelenggara|ljk|emiten)\s+"
+        r"dapat\s+(?:menempatkan|mengajukan\s+permohonan|melakukan|menggunakan|menunjuk|memilih)\b"
+        r"|\bdapat\b[^.]{0,140}\b(?:sepanjang|setelah\s+memperoleh|dengan\s+persetujuan|izin)\b"
+        r"|\bmengajukan\s+permohonan\s+izin\b"
+    )
+    perm_match = re.search(perm_pattern, norm)
+    has_permission = perm_match is not None
+
+    # 3. Primary imperative duties of entities: "Bank wajib", "PUJK wajib", "Perusahaan dilarang"
+    duty_pattern = (
+        r"\b(?:bank\s+umum|bank|bpr|pujk|pjk|perusahaan\s+efek|perusahaan|penyelenggara|ljk|emiten|"
+        r"pihak|direksi|dewan\s+komisaris|pelaku\s+usaha)\s+(?:wajib|harus|dilarang)\b"
+        r"|\bwajib\s+(?:menempatkan|memiliki|menerapkan|menyediakan|menyampaikan|memenuhi|"
+        r"menggunakan|menjaga|melakukan|memastikan|melaksanakan|menyusun|menindaklanjuti)\b"
+    )
+    duty_match = re.search(duty_pattern, norm)
+    has_entity_duty = duty_match is not None
+
+    # Leading conditional supervisory assessment ("Dalam hal berdasarkan penilaian OJK...")
+    if (
+        re.match(
+            r"^(?:\(\d+\)\s*)?dalam\s+hal\s+(?:berdasarkan\s+penilaian|terdapat\s+kondisi)\b",
+            norm,
+        )
+        and has_authority
+    ):
+        return "[Peran: Wewenang Korektif Otoritas / Sanksi]"
+
+    # Leading permissive / licensing application clause ("(1) Bank dapat mengajukan permohonan izin...")
+    if (
+        perm_match
+        and perm_match.start() < 35
+        and (not duty_match or perm_match.start() < duty_match.start())
+    ):
+        return "[Peran: Opsi Pengecualian / Izin Bersyarat]"
 
     if has_entity_duty and has_authority:
-        duty_match = re.search(
-            r"\b(?:bank|pujk|perusahaan|penyelenggara|ljk|pihak)\s+(?:wajib|harus|dilarang)\b|\bwajib\b",
-            lower,
-        )
-        auth_match = re.search(
-            r"\b(?:ojk|otoritas jasa keuangan|bank indonesia|bi)\s+(?:dapat|berwenang|meminta|memerintahkan|mengenakan|menjatuhkan)\b|\bsanksi\b",
-            lower,
-        )
         pos_duty = duty_match.start() if duty_match else 999999
         pos_auth = auth_match.start() if auth_match else 999999
         if pos_duty < pos_auth:
             return "[Peran: Kewajiban Pokok Entitas]"
-        else:
-            return "[Peran: Wewenang Korektif Otoritas / Sanksi]"
-    elif has_entity_duty:
-        return "[Peran: Kewajiban Pokok Entitas]"
-    elif has_authority:
         return "[Peran: Wewenang Korektif Otoritas / Sanksi]"
-    elif has_permission:
+    if has_entity_duty:
+        return "[Peran: Kewajiban Pokok Entitas]"
+    if has_authority:
+        return "[Peran: Wewenang Korektif Otoritas / Sanksi]"
+    if has_permission:
         return "[Peran: Opsi Pengecualian / Izin Bersyarat]"
 
     return ""
+
+
+def score_primary_obligation_alignment(chunk: RetrievedChunk, query: str) -> float:
+    """Score how strongly a chunk serves as the primary imperative obligation answering an obligation query.
+
+    Distinguishes standalone root obligations (e.g., Pasal 35 ayat (1) 'Bank wajib menempatkan...')
+    from derivative/cross-referencing clauses (e.g., Pasal 36 ayat (3) or Pasal 37 'Bank wajib memastikan
+    ... sebagaimana dimaksud dalam Pasal 35') and non-obligation clauses.
+    """
+    if not chunk or not chunk.text:
+        return 0.0
+
+    role = _detect_statutory_role(chunk.text)
+    if role != "[Peran: Kewajiban Pokok Entitas]":
+        return 0.0
+
+    stripped = chunk.text.strip()
+    header_match = re.match(r"^\[([^\]]+)\]\s*", stripped)
+    body = stripped[header_match.end() :] if header_match else stripped
+    norm_body = re.sub(r"\s+", " ", body.lower()).strip()
+    norm_query = re.sub(r"\s+", " ", (query or "").lower()).strip()
+
+    score = 1.0
+
+    # 1. Direct Imperative Action Predicate Concordance ("wajib <verb>")
+    m_action = re.search(r"\b(?:wajib|harus|dilarang)\s+(\w+)", norm_query)
+    if m_action:
+        action_verb = m_action.group(1)
+        if len(action_verb) >= 4 and re.search(
+            rf"\b(?:wajib|harus|dilarang)\s+(?:\w+\s+)?{re.escape(action_verb)}\b",
+            norm_body,
+        ):
+            score += 2.5
+
+    # 2. Standalone Root Norm vs. Dependent Cross-Referencing Clause
+    has_cross_ref = bool(
+        re.search(
+            r"\bsebagaimana\s+dimaksud\s+(?:dalam\s+pasal|pada\s+ayat)\b",
+            norm_body,
+        )
+    )
+    if not has_cross_ref:
+        score += 1.2
+    else:
+        score -= 0.6
+
+    # 3. Root Clause Structural Priority (ayat (1) or un-numbered single-clause Pasal)
+    if str(chunk.ayat) == "1" or chunk.ayat is None:
+        score += 0.5
+
+    # 4. Interrogative Target Concordance ("di mana" -> domestic placement vs overseas exception)
+    if ("di mana" in norm_query or "dimana" in norm_query) and (
+        "di wilayah indonesia" in norm_body or "di indonesia" in norm_body
+    ):
+        if "di luar wilayah indonesia" not in norm_body:
+            score += 0.8
+        else:
+            score += 0.2
+
+    # 5. Topical Content Keyword Overlap
+    stop_tokens = {
+        "apa",
+        "apakah",
+        "bagaimana",
+        "berapa",
+        "kapan",
+        "dimana",
+        "di",
+        "mana",
+        "siapa",
+        "mengapa",
+        "yang",
+        "dan",
+        "atau",
+        "dari",
+        "pada",
+        "untuk",
+        "dalam",
+        "menurut",
+        "berdasarkan",
+        "regulasi",
+        "peraturan",
+        "ketentuan",
+        "ojk",
+        "otoritas",
+        "jasa",
+        "keuangan",
+        "wajib",
+        "harus",
+        "dilarang",
+        "bank",
+        "umum",
+        "pujk",
+    }
+    q_tokens = {t for t in re.findall(r"\b[a-z0-9]{4,}\b", norm_query) if t not in stop_tokens}
+    if q_tokens:
+        b_tokens = set(re.findall(r"\b[a-z0-9]{4,}\b", norm_body))
+        overlap = len(q_tokens & b_tokens) / len(q_tokens)
+        score += overlap * 1.0
+
+    return round(score, 4)
 
 
 def format_passages(chunks: list[RetrievedChunk]) -> str:
@@ -322,10 +445,11 @@ def build_rag_prompt(
 {question}
 </question>
 
-Provide a direct answer citing the official regulation in square brackets.
+Provide a direct, concise answer citing the primary official regulation in square brackets.
 Format example:
 {subj_en} must comply with regulatory requirements [POJK 22/2023, Pasal 71].
-Followed by any related provisions or conditions if applicable:"""
+
+Answer:"""
 
     return f"""<system>
 {system_prompt}
@@ -339,7 +463,8 @@ Followed by any related provisions or conditions if applicable:"""
 {question}
 </question>
 
-Jawab secara langsung dengan mencantumkan sitasi resmi dalam tanda kurung siku.
+Jawab secara langsung dan ringkas dengan mencantumkan sitasi pasal utama dalam tanda kurung siku.
 Contoh format:
 {subj_id} wajib memenuhi ketentuan terkait [POJK 22/2023, Pasal 71].
-Disusul penjelasan atau ketentuan terkait jika ada:"""
+
+Jawaban:"""

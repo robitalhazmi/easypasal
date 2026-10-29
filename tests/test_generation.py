@@ -830,3 +830,52 @@ def test_deduplicate_repeated_blocks() -> None:
     cleaned_bullets = deduplicate_repeated_blocks(repeated_bullets)
     assert cleaned_bullets.count("menerima pengaduan") == 1
     assert "menyelesaikan pengaduan" in cleaned_bullets
+
+
+def test_score_primary_obligation_alignment_and_inverted_prose_citations() -> None:
+    """Verify primary obligation scoring distinguishes standalone root duties from derivative clauses and extracts inverted prose citations."""
+    from easypasal.generation.prompts import (
+        _detect_statutory_role,
+        score_primary_obligation_alignment,
+    )
+
+    q = "Di mana Bank Umum wajib menempatkan Pusat Data dan Pusat Pemulihan Bencana menurut regulasi OJK?"
+
+    c_primary = _make_dummy_chunk(
+        "c_35_1",
+        "POJK 11/POJK.03/2022, Pasal 35 ayat (1)",
+        "[POJK 11/POJK.03/2022 | Pasal 35 ayat (1)]\n(1) Bank wajib menempatkan Sistem Elektronik pada\nPusat Data dan Pusat Pemulihan Bencana di wilayah\nIndonesia.",
+        doc_number="POJK 11/POJK.03/2022",
+    )
+    c_primary.pasal = "35"
+    c_primary.ayat = "1"
+
+    c_derivative = _make_dummy_chunk(
+        "c_36_3",
+        "POJK 11/POJK.03/2022, Pasal 36 ayat (3)",
+        "[POJK 11/POJK.03/2022 | Pasal 36 ayat (3)]\n(3) Bank wajib memastikan bahwa data yang digunakan dalam Sistem Elektronik di luar wilayah Indonesia tidak digunakan untuk tujuan selain sebagaimana dimaksud dalam Pasal 35 ayat (3).",
+        doc_number="POJK 11/POJK.03/2022",
+    )
+    c_derivative.pasal = "36"
+    c_derivative.ayat = "3"
+
+    c_penjelasan = _make_dummy_chunk(
+        "c_penj_37",
+        "Penjelasan POJK 11/POJK.03/2022, Pasal 37",
+        "[Penjelasan POJK 11/POJK.03/2022 | Pasal 37]\nYang dimaksud dengan menjamin kelangsungan usaha adalah Bank wajib memastikan kesiapan Pusat Data.",
+        doc_number="POJK 11/POJK.03/2022",
+    )
+
+    assert _detect_statutory_role(c_penjelasan.text) == "[Peran: Penjelasan / Keterangan Tambahan]"
+    sc_primary = score_primary_obligation_alignment(c_primary, q)
+    sc_deriv = score_primary_obligation_alignment(c_derivative, q)
+    sc_penj = score_primary_obligation_alignment(c_penjelasan, q)
+
+    assert sc_primary > 4.0
+    assert sc_primary > sc_deriv + 2.0
+    assert sc_penj == 0.0
+
+    # Verify inverted inline prose citation extraction
+    prose_text = "Dalam Pasal 36 ayat (4) dari POJK 11/POJK.03/2022, Otoritas Jasa Keuangan dapat meminta Bank."
+    extracted = extract_citations(prose_text)
+    assert "POJK 11/POJK.03/2022, Pasal 36 ayat (4)" in extracted

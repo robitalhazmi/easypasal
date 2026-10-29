@@ -600,3 +600,73 @@ def test_hybrid_retriever_hybrid_rerank_fallback_when_none() -> None:
     res = retriever.retrieve(query="perlindungan konsumen", top_k=1, mode="hybrid+rerank")
     assert len(res.chunks) == 1
     assert res.chunks[0].score > 0.0
+
+
+def test_expand_primary_statutory_norms() -> None:
+    """Verify structural and cross-reference primary obligation expansion when only remedial/exception chunks were retrieved."""
+    from easypasal.retrieval.retriever import _expand_primary_statutory_norms
+
+    corpus_payloads = [
+        {
+            "chunk_id": "pojk11_35_1",
+            "citation_label": "POJK 11/POJK.03/2022, Pasal 35 ayat (1)",
+            "doc_id": "POJK_11_POJK.03_2022",
+            "doc_number": "POJK 11/POJK.03/2022",
+            "pasal": "35",
+            "ayat": "1",
+            "status": "berlaku",
+            "text": (
+                "[POJK 11/POJK.03/2022 | Pasal 35 ayat (1)]\n"
+                "(1) Bank wajib menempatkan Sistem Elektronik pada Pusat Data dan Pusat Pemulihan Bencana di wilayah Indonesia."
+            ),
+        },
+        {
+            "chunk_id": "pojk11_36_4",
+            "citation_label": "POJK 11/POJK.03/2022, Pasal 36 ayat (4)",
+            "doc_id": "POJK_11_POJK.03_2022",
+            "doc_number": "POJK 11/POJK.03/2022",
+            "pasal": "36",
+            "ayat": "4",
+            "status": "berlaku",
+            "text": (
+                "[POJK 11/POJK.03/2022 | Pasal 36 ayat (4)]\n"
+                "(4) Dalam hal berdasarkan penilaian Otoritas Jasa\nKeuangan penempatan Sistem Elektronik di luar wilayah Indonesia berisiko, "
+                "Otoritas Jasa Keuangan dapat meminta Bank untuk menempatkan Sistem Elektronik pada Pusat Data di wilayah Indonesia."
+            ),
+        },
+        {
+            "chunk_id": "pojk11_36_3",
+            "citation_label": "POJK 11/POJK.03/2022, Pasal 36 ayat (3)",
+            "doc_id": "POJK_11_POJK.03_2022",
+            "doc_number": "POJK 11/POJK.03/2022",
+            "pasal": "36",
+            "ayat": "3",
+            "status": "berlaku",
+            "text": (
+                "[POJK 11/POJK.03/2022 | Pasal 36 ayat (3)]\n"
+                "(3) Bank wajib memastikan bahwa data yang digunakan dalam Sistem Elektronik di luar wilayah Indonesia "
+                "tidak digunakan selain sebagaimana dimaksud dalam Pasal 35 ayat (3)."
+            ),
+        },
+    ]
+
+    bm25 = BM25Index.build_from_chunks(corpus_payloads)
+
+    # Simulate a retrieval result that missed Pasal 35 ayat (1) and only returned Pasal 36 ayat (4) and Pasal 36 ayat (3)
+    initial_chunks = [
+        RetrievedChunk.from_payload("pojk11_36_4", 0.88, corpus_payloads[1]),
+        RetrievedChunk.from_payload("pojk11_36_3", 0.86, corpus_payloads[2]),
+    ]
+
+    query = "Di mana Bank Umum wajib menempatkan Pusat Data dan Pusat Pemulihan Bencana menurut regulasi OJK?"
+    expanded = _expand_primary_statutory_norms(
+        query=query,
+        chunks=initial_chunks,
+        bm25_index=bm25,
+        status_filter="berlaku",
+        top_k=5,
+    )
+
+    assert expanded[0].chunk_id == "pojk11_35_1"
+    assert expanded[0].citation_label == "POJK 11/POJK.03/2022, Pasal 35 ayat (1)"
+    assert expanded[0].score > 0.88

@@ -998,3 +998,159 @@ def test_realign_answer_subject() -> None:
     q_pujk = "Apa kewajiban PUJK dalam melayani pengaduan?"
     ans_pujk = "PUJK wajib melayani pengaduan konsumen [POJK 22/2023, Pasal 71]."
     assert realign_answer_subject(ans_pujk, q_pujk) == ans_pujk
+
+
+def test_realign_inverted_inline_prose_and_remedial_dump() -> None:
+    """Verify baseline_v0.1 inline prose citation + Pasal 36 ayat (4) item a-d dump is cleaned and realigned to Pasal 35 ayat (1)."""
+    from easypasal.guardrails.citation_verifier import detect_and_realign_inverted_citations
+
+    question = "Di mana Bank Umum wajib menempatkan Pusat Data dan Pusat Pemulihan Bencana menurut regulasi OJK?"
+    chunk_primary = _make_chunk(
+        "c_35_1",
+        "POJK 11/POJK.03/2022",
+        "POJK 11/POJK.03/2022, Pasal 35 ayat (1)",
+        pasal="35",
+        ayat="1",
+        text="(1) Bank wajib menempatkan Sistem Elektronik pada Pusat Data dan Pusat Pemulihan Bencana di wilayah Indonesia.",
+    )
+    chunk_derivative = _make_chunk(
+        "c_36_3",
+        "POJK 11/POJK.03/2022",
+        "POJK 11/POJK.03/2022, Pasal 36 ayat (3)",
+        pasal="36",
+        ayat="3",
+        text="(3) Bank wajib memastikan bahwa data yang digunakan di luar wilayah Indonesia tidak digunakan selain sebagaimana dimaksud dalam Pasal 35 ayat (3).",
+    )
+    chunk_remedial = _make_chunk(
+        "c_36_4",
+        "POJK 11/POJK.03/2022",
+        "POJK 11/POJK.03/2022, Pasal 36 ayat (4)",
+        pasal="36",
+        ayat="4",
+        text=(
+            "(4) Dalam hal berdasarkan penilaian Otoritas Jasa Keuangan penempatan di luar wilayah Indonesia berisiko, "
+            "Otoritas Jasa Keuangan dapat meminta Bank untuk menempatkan Sistem Elektronik pada Pusat Data di wilayah Indonesia."
+        ),
+    )
+
+    # Exact baseline_v0.1 failure output with uncited opening sentence + inline prose remedial dump a-d
+    baseline_dump = (
+        "Bank Umum wajib menempatkan Pusat Data dan Pusat Pemulihan Bencana di wilayah Indonesia menurut regulasi OJK.\n\n"
+        "Dalam Pasal 36 ayat (4) dari POJK 11/POJK.03/2022, Otoritas Jasa Keuangan (OJK) dapat meminta Bank untuk "
+        "menempatkan Sistem Elektronik pada Pusat Data dan/atau Pusat Pemulihan Bencana di wilayah Indonesia jika "
+        "berdasarkan penilaian OJK penempatan Sistem Elektronik pada Pusat Data dan/atau Pusat Pemulihan Bencana di luar wilayah Indonesia:\n\n"
+        "a. tidak sesuai dengan permohonan izin penempatan Sistem Elektronik pada Pusat Data dan/atau Pusat Pemulihan Bencana di luar wilayah Indonesia yang disampaikan kepada OJK;\n\n"
+        "b. berpotensi mengurangi efektivitas pengawasan OJK;\n\n"
+        "c. berpotensi berdampak negatif terhadap kinerja Bank; dan/atau\n\n"
+        "d. tidak sesuai dengan ketentuan peraturan perundang-undangan."
+    )
+
+    # Even if chunk_derivative (Pasal 36 ayat (3)) appears before chunk_primary in the list,
+    # score_primary_obligation_alignment must select Pasal 35 ayat (1)!
+    realigned_text, new_cites, replacements = detect_and_realign_inverted_citations(
+        answer=baseline_dump,
+        retrieved_chunks=[chunk_derivative, chunk_remedial, chunk_primary],
+        question=question,
+    )
+
+    assert (
+        realigned_text
+        == "Bank Umum wajib menempatkan Pusat Data dan Pusat Pemulihan Bencana di wilayah Indonesia [POJK 11/POJK.03/2022, Pasal 35 ayat (1)]."
+    )
+    assert new_cites == ["POJK 11/POJK.03/2022, Pasal 35 ayat (1)"]
+    assert "Pasal 36" not in realigned_text
+    assert "tidak sesuai dengan permohonan izin" not in realigned_text
+    assert len(replacements) == 1
+
+
+def test_multi_sector_obligation_realignment_regression_suite() -> None:
+    """Verify primary norm alignment across multiple financial sectors (Banking, Consumer Protection, Capital Markets, AML)."""
+    from easypasal.guardrails.citation_verifier import (
+        detect_and_realign_inverted_citations,
+        realign_answer_subject,
+    )
+
+    scenarios = [
+        # 1. Consumer Protection: PUJK complaint handling obligation vs administrative sanction clause
+        {
+            "question": "Bagaimana kewajiban PUJK dalam menerima dan menindaklanjuti pengaduan konsumen?",
+            "primary_chunk": _make_chunk(
+                "cp_1",
+                "POJK 22 Tahun 2023",
+                "POJK 22 Tahun 2023, Pasal 71 ayat (1)",
+                pasal="71",
+                ayat="1",
+                text="(1) PUJK wajib menerima, mencatat, dan menindaklanjuti setiap Pengaduan yang diajukan oleh Konsumen.",
+            ),
+            "remedial_chunk": _make_chunk(
+                "cp_2",
+                "POJK 22 Tahun 2023",
+                "POJK 22 Tahun 2023, Pasal 85 ayat (1)",
+                pasal="85",
+                ayat="1",
+                text="(1) PUJK yang melanggar ketentuan dikenai sanksi administratif oleh Otoritas Jasa Keuangan.",
+            ),
+            "raw_answer": "Bank wajib menerima dan menindaklanjuti setiap pengaduan konsumen [POJK 22 Tahun 2023, Pasal 85 ayat (1)].",
+            "expected_subject": "PUJK",
+            "expected_citation": "POJK 22 Tahun 2023, Pasal 71 ayat (1)",
+        },
+        # 2. Capital Markets: Emiten periodic reporting obligation vs OJK enforcement authority
+        {
+            "question": "Apa kewajiban Emiten dalam menyampaikan laporan tahunan kepada OJK?",
+            "primary_chunk": _make_chunk(
+                "cm_1",
+                "POJK 29/POJK.04/2016",
+                "POJK 29/POJK.04/2016, Pasal 7 ayat (1)",
+                pasal="7",
+                ayat="1",
+                text="(1) Emiten atau Perusahaan Publik wajib menyampaikan Laporan Tahunan kepada Otoritas Jasa Keuangan paling lambat pada akhir bulan keempat.",
+            ),
+            "remedial_chunk": _make_chunk(
+                "cm_2",
+                "POJK 29/POJK.04/2016",
+                "POJK 29/POJK.04/2016, Pasal 19 ayat (1)",
+                pasal="19",
+                ayat="1",
+                text="(1) Otoritas Jasa Keuangan berwenang mengenakan sanksi administratif terhadap setiap pihak yang melanggar ketentuan Peraturan OJK ini.",
+            ),
+            "raw_answer": "PUJK wajib menyampaikan Laporan Tahunan kepada OJK paling lambat akhir bulan keempat [POJK 29/POJK.04/2016, Pasal 19 ayat (1)].",
+            "expected_subject": "Emiten",
+            "expected_citation": "POJK 29/POJK.04/2016, Pasal 7 ayat (1)",
+        },
+        # 3. AML / APU-PPT: Bank CDD obligation vs supervisory order
+        {
+            "question": "Kapan Bank Umum wajib melakukan prosedur Customer Due Diligence (CDD) terhadap calon nasabah?",
+            "primary_chunk": _make_chunk(
+                "aml_1",
+                "POJK 8 Tahun 2023",
+                "POJK 8 Tahun 2023, Pasal 18 ayat (1)",
+                pasal="18",
+                ayat="1",
+                text="(1) PJK wajib melakukan prosedur CDD pada saat melakukan hubungan usaha dengan Calon Nasabah.",
+            ),
+            "remedial_chunk": _make_chunk(
+                "aml_2",
+                "POJK 8 Tahun 2023",
+                "POJK 8 Tahun 2023, Pasal 70 ayat (2)",
+                pasal="70",
+                ayat="2",
+                text="(2) Otoritas Jasa Keuangan dapat memerintahkan PJK untuk menghentikan hubungan usaha.",
+            ),
+            "raw_answer": "PUJK wajib melakukan prosedur CDD pada saat melakukan hubungan usaha dengan Calon Nasabah [POJK 8 Tahun 2023, Pasal 70 ayat (2)].",
+            "expected_subject": "Bank Umum",
+            "expected_citation": "POJK 8 Tahun 2023, Pasal 18 ayat (1)",
+        },
+    ]
+
+    for sc in scenarios:
+        subj_aligned = realign_answer_subject(sc["raw_answer"], sc["question"])
+        final_ans, final_cites, _ = detect_and_realign_inverted_citations(
+            answer=subj_aligned,
+            retrieved_chunks=[sc["remedial_chunk"], sc["primary_chunk"]],
+            question=sc["question"],
+        )
+        assert final_ans.startswith(f"{sc['expected_subject']} wajib"), (
+            f"Subject mismatch: {final_ans}"
+        )
+        assert sc["expected_citation"] in final_cites, f"Citation mismatch: {final_cites}"
+        assert f"[{sc['expected_citation']}]" in final_ans

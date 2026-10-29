@@ -136,6 +136,128 @@ def _is_sector_mismatch(query_lower: str, chunk: RetrievedChunk) -> bool:
     return False
 
 
+def _expand_primary_statutory_norms(
+    query: str,
+    chunks: list[RetrievedChunk],
+    bm25_index: BM25Index | None,
+    status_filter: str | None = None,
+    top_k: int = 5,
+) -> list[RetrievedChunk]:
+    """Expand cross-referenced or neighboring primary obligation articles when an obligation query
+
+    retrieves secondary remedial, conditional exception, or dependent cross-referencing clauses.
+    Ensures the standalone root obligation (e.g., Pasal N ayat (1)) is present and ranked first.
+    """
+    if not chunks or not query:
+        return chunks
+
+    from easypasal.generation.prompts import (
+        _detect_statutory_role,
+        score_primary_obligation_alignment,
+    )
+    from easypasal.retrieval.fusion import detect_normative_intent
+
+    if detect_normative_intent(query) != "obligation":
+        return chunks
+
+    # 1. Collect target (doc_identifier, target_pasal) pairs from cross-references and neighbors
+    target_pasals_by_doc: dict[str, set[str]] = {}
+    for c in chunks:
+        doc_key = (c.doc_id or c.doc_number or "").lower().strip()
+        if not doc_key:
+            continue
+        targets = target_pasals_by_doc.setdefault(doc_key, set())
+
+        # A. Explicit cross-references: "sebagaimana dimaksud dalam Pasal 35"
+        for ref_match in re.finditer(
+            r"sebagaimana\s+dimaksud\s+dalam\s+Pasal\s+(\d+[a-z]?)",
+            c.text,
+            re.IGNORECASE,
+        ):
+            targets.add(ref_match.group(1).lower())
+
+        # B. Root clause of the same article if current chunk is ayat > 1 or Penjelasan
+        if c.pasal:
+            p_str = str(c.pasal).lower()
+            if str(c.ayat) != "1" or "penjelasan" in (c.citation_label or "").lower():
+                targets.add(p_str)
+
+            # C. Preceding article(s) in the same regulation if current chunk is remedial/exception/dependent
+            role = _detect_statutory_role(c.text)
+            has_cross_ref = "sebagaimana dimaksud dalam pasal" in re.sub(
+                r"\s+", " ", c.text.lower()
+            )
+            if p_str.isdigit() and (role != "[Peran: Kewajiban Pokok Entitas]" or has_cross_ref):
+                p_num = int(p_str)
+                if p_num > 1:
+                    targets.add(str(p_num - 1))
+                if p_num > 2:
+                    targets.add(str(p_num - 2))
+
+    expanded_pool = list(chunks)
+    existing_ids = {c.chunk_id for c in expanded_pool}
+
+    # 2. Look up candidate primary obligation chunks in BM25 corpus payloads if available
+    corpus_payloads = getattr(bm25_index, "corpus_payloads", None) if bm25_index else None
+    if corpus_payloads and isinstance(corpus_payloads, list) and target_pasals_by_doc:
+        for payload in corpus_payloads:
+            if not isinstance(payload, dict):
+                continue
+            cid = str(payload.get("chunk_id", ""))
+            if not cid or cid in existing_ids:
+                continue
+            if (
+                "penjelasan" in cid.lower()
+                or "penjelasan" in str(payload.get("citation_label", "")).lower()
+            ):
+                continue
+
+            p_status = str(payload.get("status", "berlaku")).lower()
+            if status_filter and p_status != status_filter.lower():
+                continue
+
+            p_doc_id = str(payload.get("doc_id", "")).lower().strip()
+            p_doc_num = str(payload.get("doc_number", "")).lower().strip()
+            matched_targets: set[str] | None = None
+            for d_key, t_set in target_pasals_by_doc.items():
+                if d_key and d_key in (p_doc_id, p_doc_num):
+                    matched_targets = t_set
+                    break
+            if not matched_targets:
+                continue
+
+            p_pasal = str(payload.get("pasal", "")).lower()
+            p_ayat = payload.get("ayat")
+            if p_pasal not in matched_targets:
+                continue
+            if p_ayat is not None and str(p_ayat) != "1":
+                continue
+
+            cand_chunk = RetrievedChunk.from_payload(
+                chunk_id=cid,
+                score=chunks[0].score,
+                payload=payload,
+            )
+            if score_primary_obligation_alignment(cand_chunk, query) >= 2.2:
+                expanded_pool.append(cand_chunk)
+                existing_ids.add(cid)
+
+    # 3. Promote the highest-scoring primary obligation chunk to Rank 1
+    scored_primaries = [
+        (score_primary_obligation_alignment(c, query), idx, c)
+        for idx, c in enumerate(expanded_pool)
+    ]
+    best_score, _best_idx, best_chunk = max(scored_primaries, key=lambda item: (item[0], -item[1]))
+    if best_score >= 2.2 and best_chunk.chunk_id != expanded_pool[0].chunk_id:
+        top_score = max(c.score for c in chunks)
+        best_chunk.score = round(top_score + 0.01, 6)
+        reordered = [best_chunk] + [c for c in expanded_pool if c.chunk_id != best_chunk.chunk_id]
+        limit = max(len(chunks), top_k)
+        return reordered[:limit]
+
+    return chunks
+
+
 class HybridRetriever:
     """Hybrid retrieval engine with Reciprocal Rank Fusion (RRF) and optional cross-encoder reranking."""
 
@@ -320,14 +442,22 @@ class HybridRetriever:
                 )
                 final_chunks = fused_candidates[:top_k]
         elif mode == "dense":
-            for rank, dense_item in enumerate(dense_candidates[:top_k], start=1):
+            from easypasal.retrieval.fusion import _compute_normative_salience_boost
+
+            scored_dense = []
+            for orig_rank, dense_item in enumerate(dense_candidates, start=1):
+                n_boost = _compute_normative_salience_boost(query_clean, dense_item.payload or {})
+                adj_score = round(dense_item.score * (1.0 + 0.25 * n_boost), 6)
+                scored_dense.append((adj_score, -orig_rank, orig_rank, dense_item))
+            scored_dense.sort(key=lambda x: (x[0], x[1]), reverse=True)
+            for adj_sc, _neg_r, orig_rank, dense_item in scored_dense[:top_k]:
                 final_chunks.append(
                     RetrievedChunk.from_payload(
                         chunk_id=dense_item.chunk_id,
-                        score=dense_item.score,
+                        score=adj_sc,
                         payload=dense_item.payload,
                         dense_score=dense_item.score,
-                        dense_rank=rank,
+                        dense_rank=orig_rank,
                     )
                 )
         elif mode == "bm25":
@@ -350,6 +480,16 @@ class HybridRetriever:
         if final_chunks:
             q_low = query_clean.lower()
             final_chunks = [c for c in final_chunks if not _is_sector_mismatch(q_low, c)]
+
+        # Structural & Cross-Reference Primary Norm Expansion for Obligation Queries
+        if final_chunks:
+            final_chunks = _expand_primary_statutory_norms(
+                query=query_clean,
+                chunks=final_chunks,
+                bm25_index=self.bm25_index,
+                status_filter=status_filter,
+                top_k=top_k,
+            )
 
         # Apply score threshold filter if specified
         eff_min_score = min_score if min_score is not None else self.score_threshold

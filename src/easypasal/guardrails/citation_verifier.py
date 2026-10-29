@@ -310,6 +310,28 @@ def verify_single_citation(
                 reason=f"Ketidaksesuaian sektor/konteks: sitasi {citation_text} tidak mengatur subjek yang ditanyakan.",
             )
 
+        # 6. Verify Normative Role & Modality Entailment for Obligation Queries
+        from easypasal.generation.prompts import _detect_statutory_role
+        from easypasal.retrieval.fusion import detect_normative_intent
+
+        if detect_normative_intent(question) == "obligation":
+            chunk_role = _detect_statutory_role(matched_chunk.text)
+            has_primary_in_pool = any(
+                _is_doc_matched(parsed, c)
+                and _detect_statutory_role(c.text) == "[Peran: Kewajiban Pokok Entitas]"
+                for c in retrieved_chunks
+            )
+            if chunk_role == "[Peran: Wewenang Korektif Otoritas / Sanksi]" and has_primary_in_pool:
+                return CitationCheck(
+                    citation=citation_text,
+                    is_grounded=False,
+                    doc_match=True,
+                    pasal_match=True,
+                    ayat_match=ayat_matched,
+                    matched_chunk_id=matched_chunk.chunk_id,
+                    reason=f"Ketidaksesuaian hierarki norma: sitasi {citation_text} mengatur wewenang korektif/sanksi otoritas, bukan kewajiban pokok entitas.",
+                )
+
     return CitationCheck(
         citation=citation_text,
         is_grounded=True,
@@ -447,6 +469,85 @@ def realign_answer_subject(answer: str, question: str) -> str:
     return answer
 
 
+def _attach_bracket_citation_to_opening(text: str, citation_label: str) -> str:
+    """Ensure the opening sentence of an answer carries the primary bracketed citation."""
+    clean_label = citation_label.strip("[]").strip()
+    if not text or not clean_label:
+        return text
+
+    paragraphs = [p.strip() for p in text.split("\n\n") if p.strip()]
+    if not paragraphs:
+        return text
+
+    first_para = paragraphs[0]
+    if f"[{clean_label}]" in first_para or re.search(r"\[[^\]]+\]", first_para):
+        return text
+
+    # Strip trailing redundant " menurut regulasi OJK" if immediately before terminal punctuation
+    first_para = re.sub(
+        r"\s+menurut\s+regulasi\s+(?:OJK|Otoritas\s+Jasa\s+Keuangan|BI|Bank\s+Indonesia)(?=[.!?]?$)",
+        "",
+        first_para,
+        flags=re.IGNORECASE,
+    )
+
+    if first_para.endswith((".", "!", "?")):
+        first_para = f"{first_para[:-1].rstrip()} [{clean_label}]{first_para[-1]}"
+    else:
+        first_para = f"{first_para} [{clean_label}]."
+
+    paragraphs[0] = first_para
+    return "\n\n".join(paragraphs)
+
+
+def _strip_remedial_dump_paragraphs(text: str, inverted_pasal: str | None = None) -> str:
+    """Strip trailing paragraphs that dump supervisory/remedial clauses after a valid BLUF opening."""
+    paragraphs = [p.strip() for p in text.split("\n\n") if p.strip()]
+    if len(paragraphs) <= 1:
+        return text
+
+    first_para = paragraphs[0]
+    if not re.search(
+        r"\b(?:wajib|harus|dilarang|must|shall|required|prohibited)\b",
+        first_para,
+        re.IGNORECASE,
+    ):
+        return text
+
+    kept: list[str] = [first_para]
+    dropping_remedial_list = False
+
+    for para in paragraphs[1:]:
+        p_norm = re.sub(r"\s+", " ", para.lower()).strip()
+
+        # Check if this paragraph is a continuation item (a., b., c., d.) of a dropped remedial block
+        if dropping_remedial_list and re.match(r"^(?:[a-z][\.\)]|\(\d+\)|\d+[\.\)])\s+", p_norm):
+            continue
+
+        is_remedial_dump = bool(
+            re.search(
+                r"\b(?:ojk|otoritas\s+jasa\s+keuangan|bank\s+indonesia)\s*(?:\([a-z]+\)\s*)?"
+                r"(?:dapat\s+meminta|memiliki\s+kebijakan\s+untuk\s+meminta|berwenang\s+meminta)\b",
+                p_norm,
+            )
+            or (
+                inverted_pasal
+                and re.search(rf"\bpasal\s+{re.escape(inverted_pasal.lower())}\b", p_norm)
+                and re.search(
+                    r"\b(?:dapat\s+meminta|penilaian\s+ojk|penilaian\s+otoritas)\b", p_norm
+                )
+            )
+        )
+        if is_remedial_dump:
+            dropping_remedial_list = True
+            continue
+
+        dropping_remedial_list = False
+        kept.append(para)
+
+    return "\n\n".join(kept)
+
+
 def detect_and_realign_inverted_citations(
     answer: str,
     retrieved_chunks: list[RetrievedChunk],
@@ -462,6 +563,9 @@ def detect_and_realign_inverted_citations(
     if not answer or not retrieved_chunks or not question:
         cites = extract_citations(answer)
         return answer, cites, {}
+
+    if check_abstention(answer):
+        return answer, [], {}
 
     q_low = question.lower()
     is_obligation_query = bool(
@@ -479,26 +583,51 @@ def detect_and_realign_inverted_citations(
         cites = extract_citations(answer)
         return answer, cites, {}
 
-    current_cites = extract_citations(answer)
-    if not current_cites:
-        return answer, [], {}
+    from easypasal.generation.prompts import (
+        _detect_statutory_role,
+        score_primary_obligation_alignment,
+    )
 
+    current_cites = extract_citations(answer)
     realigned_text = answer
     replacements: dict[str, str] = {}
 
-    from easypasal.generation.prompts import _detect_statutory_role
+    # If no citations were extracted at all, attach the top primary obligation chunk if strongly aligned
+    if not current_cites:
+        primaries = sorted(
+            [
+                c
+                for c in retrieved_chunks
+                if _detect_statutory_role(c.text) == "[Peran: Kewajiban Pokok Entitas]"
+                and (not c.status or c.status == "berlaku")
+                and c.citation_label
+            ],
+            key=lambda ch: score_primary_obligation_alignment(ch, question),
+            reverse=True,
+        )
+        if primaries and score_primary_obligation_alignment(primaries[0], question) >= 2.5:
+            best_label = primaries[0].citation_label
+            realigned_text = _attach_bracket_citation_to_opening(realigned_text, best_label)
+            replacements["<uncited>"] = f"[{best_label}]"
+            return realigned_text, extract_citations(realigned_text), replacements
+        return answer, [], {}
 
     for cite in current_cites:
         parsed = parse_citation_details(cite)
 
-        # 1. Search among all retrieved chunks in the SAME regulation for a primary entity obligation chunk
-        candidate_primaries = [
-            c
-            for c in retrieved_chunks
-            if _is_doc_matched(parsed, c)
-            and _detect_statutory_role(c.text) == "[Peran: Kewajiban Pokok Entitas]"
-            and (not c.status or c.status == "berlaku")
-        ]
+        # 1. Search among all retrieved chunks in the SAME regulation for primary entity obligation chunks,
+        # ranked by primary obligation alignment score
+        candidate_primaries = sorted(
+            [
+                c
+                for c in retrieved_chunks
+                if _is_doc_matched(parsed, c)
+                and _detect_statutory_role(c.text) == "[Peran: Kewajiban Pokok Entitas]"
+                and (not c.status or c.status == "berlaku")
+            ],
+            key=lambda ch: score_primary_obligation_alignment(ch, question),
+            reverse=True,
+        )
         if not candidate_primaries:
             continue
 
@@ -509,9 +638,10 @@ def detect_and_realign_inverted_citations(
 
         primary_parsed = parse_citation_details(primary_label)
 
-        # Check if the cited clause is different from the primary clause
+        # Check if the cited clause is different from the primary clause (or missing pasal/ayat)
         is_different_clause = bool(
-            (
+            not parsed.pasal
+            or (
                 parsed.pasal
                 and primary_parsed.pasal
                 and parsed.pasal.lower() != primary_parsed.pasal.lower()
@@ -522,15 +652,25 @@ def detect_and_realign_inverted_citations(
         matching_chunks = [
             c
             for c in retrieved_chunks
-            if _is_doc_matched(parsed, c) and _is_pasal_matched(parsed, c)
+            if _is_doc_matched(parsed, c)
+            and _is_pasal_matched(parsed, c)
+            and _is_ayat_matched(parsed, c)
         ]
 
         should_realign = False
-        if matching_chunks:
-            chunk_role = _detect_statutory_role(matching_chunks[0].text)
+        if not parsed.pasal:
+            should_realign = True
+        elif matching_chunks:
+            matched_c = matching_chunks[0]
+            chunk_role = _detect_statutory_role(matched_c.text)
             if chunk_role in (
                 "[Peran: Wewenang Korektif Otoritas / Sanksi]",
                 "[Peran: Opsi Pengecualian / Izin Bersyarat]",
+                "[Peran: Penjelasan / Keterangan Tambahan]",
+            ) or (
+                is_different_clause
+                and score_primary_obligation_alignment(primary_chunk, question)
+                > score_primary_obligation_alignment(matched_c, question) + 0.5
             ):
                 should_realign = True
         elif is_different_clause:
@@ -539,16 +679,43 @@ def detect_and_realign_inverted_citations(
         if should_realign:
             clean_cite = cite.strip("[]")
             clean_new = primary_label.strip("[]")
+
+            # Strip trailing remedial dump paragraphs before replacing inline text
+            realigned_text = _strip_remedial_dump_paragraphs(
+                realigned_text, inverted_pasal=parsed.pasal
+            )
+
+            # Replace bracketed citation
             realigned_text = re.sub(
                 rf"\[\s*{re.escape(clean_cite)}\s*\]",
                 f"[{clean_new}]",
                 realigned_text,
             )
+            # Replace inverted inline prose ("Pasal X ayat (Y) dari POJK ...")
+            if parsed.pasal:
+                inv_pattern = (
+                    rf"\bPasal\s+{re.escape(parsed.pasal)}"
+                    rf"(?:\s+ayat\s+\(\d+\))?(?:\s+angka\s+\d+)?"
+                    rf"\s+(?:dari\s+|dalam\s+|pada\s+)?"
+                    rf"(?:Undang-Undang|UU|POJK|PBI|PADG|SEOJK|PP|Perpu)\s+"
+                    rf"(?:Nomor\s+)?[\w\.\/\-]+(?:\s+Tahun\s+\d{{4}})?"
+                )
+                realigned_text = re.sub(
+                    inv_pattern,
+                    f"[{clean_new}]",
+                    realigned_text,
+                    flags=re.IGNORECASE,
+                )
+
             realigned_text = re.sub(
                 rf"\b{re.escape(clean_cite)}\b",
                 clean_new,
                 realigned_text,
             )
+
+            # Ensure opening BLUF sentence has a bracketed citation
+            realigned_text = _attach_bracket_citation_to_opening(realigned_text, clean_new)
+
             replacements[cite] = f"[{clean_new}]"
             logger.warning(
                 "Inverted legal reasoning detected for query %r: realigned non-primary citation %s -> %s",

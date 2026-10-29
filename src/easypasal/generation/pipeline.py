@@ -30,15 +30,18 @@ def prune_remedial_distractors(
     chunks: list[RetrievedChunk],
     query: str,
 ) -> list[RetrievedChunk]:
-    """Filter out supervisory remedial/sanction and conditional exception clauses when
+    """Filter out supervisory remedial/sanction, conditional exception, and elucidation clauses when
 
     primary entity obligation clauses for the same regulation are already present in
-    the candidate pool for an obligation query.
+    the candidate pool for an obligation query, and promote the strongest primary obligation to Rank 1.
     """
     if not chunks or not query:
         return chunks
 
-    from easypasal.generation.prompts import _detect_statutory_role
+    from easypasal.generation.prompts import (
+        _detect_statutory_role,
+        score_primary_obligation_alignment,
+    )
     from easypasal.retrieval.fusion import detect_normative_intent
 
     intent = detect_normative_intent(query)
@@ -67,10 +70,11 @@ def prune_remedial_distractors(
         doc_key = f"{digits}" if digits else (c.doc_number or "").lower().strip()
         role = _detect_statutory_role(c.text)
 
-        # If this regulation has a primary obligation, prune secondary remedial / exception chunks
+        # If this regulation has a primary obligation, prune secondary remedial / exception / elucidation chunks
         if doc_key in regs_with_primary_obligation and role in (
             "[Peran: Wewenang Korektif Otoritas / Sanksi]",
             "[Peran: Opsi Pengecualian / Izin Bersyarat]",
+            "[Peran: Penjelasan / Keterangan Tambahan]",
         ):
             logger.info(
                 "Pruning distracting non-primary clause %s (%s, %s) from obligation query context",
@@ -81,7 +85,18 @@ def prune_remedial_distractors(
             continue
         pruned.append(c)
 
-    return pruned if pruned else chunks
+    result = pruned if pruned else list(chunks)
+
+    # Ensure the strongest primary obligation chunk is placed at index 0 (DOKUMEN 1)
+    if len(result) > 1:
+        scored = [
+            (score_primary_obligation_alignment(c, query), -idx, c) for idx, c in enumerate(result)
+        ]
+        best_score, _neg_idx, best_c = max(scored, key=lambda item: (item[0], item[1]))
+        if best_score > 0 and best_c.chunk_id != result[0].chunk_id:
+            result = [best_c] + [c for c in result if c.chunk_id != best_c.chunk_id]
+
+    return result
 
 
 class RAGPipeline:
@@ -465,7 +480,7 @@ class RAGPipeline:
 
         # 5b. Post-Generation Hierarchical Guardrail: Realign Inverted Legal Citations
         realignments: dict[str, str] = {}
-        if not abstained and citations:
+        if not abstained:
             from easypasal.guardrails.citation_verifier import (
                 detect_and_realign_inverted_citations,
             )
@@ -524,13 +539,21 @@ class RAGPipeline:
 
         total_latency_ms = round((time.perf_counter() - start_time) * 1000, 2)
 
+        from easypasal.generation.prompts import extract_query_subject
+        from easypasal.retrieval.fusion import detect_normative_intent
+
+        gated_ids = {c.chunk_id for c in gated_chunks}
+        pruned_labels = [
+            c.citation_label or c.chunk_id for c in chunks if c.chunk_id not in gated_ids
+        ]
+
         return GenerationOutput(
             question=clean_question,
             answer=answer_text,
             language=lang,
             citations=citations,
             abstained=abstained,
-            retrieved_chunks=chunks,
+            retrieved_chunks=gated_chunks,
             prompt_tokens=gen_res.prompt_tokens,
             completion_tokens=gen_res.completion_tokens,
             latency_ms=total_latency_ms,
@@ -542,8 +565,13 @@ class RAGPipeline:
                 "retrieval_ms": retrieval_ms,
                 "generation_ms": gen_res.latency_ms,
                 "tokens_per_second": gen_res.tokens_per_second,
-                "retrieval_mode": mode,
+                "retrieval_mode": eff_mode,
                 "total_candidates": total_candidates,
+                "retrieved_chunk_labels": [c.citation_label or c.chunk_id for c in chunks],
+                "budgeted_chunk_labels": [c.citation_label or c.chunk_id for c in budgeted_chunks],
+                "pruned_chunk_labels": pruned_labels,
+                "normative_intent": detect_normative_intent(clean_question),
+                "query_subject": extract_query_subject(clean_question),
                 "citation_verification": verification_dict,
                 "realigned_citations": realignments,
                 "routed": bool(eff_enable_router and self.router),

@@ -69,9 +69,10 @@ def sanitize_prompt_artifacts(text: str) -> str:
         r"Contoh\s+format\s*:\s*",
         r"Format\s+example\s*:\s*",
         r"</?(?:system|context|question)>\s*",
-        r"(?:Jawab secara langsung dengan mencantumkan|Jawab pertanyaan dengan format|Provide a direct answer citing)[^:\n]*:\s*",
+        r"(?:Jawab secara langsung[^\n]*|Jawab pertanyaan dengan format[^\n]*|Provide a direct[^\n]*)\s*",
         r"Disusul penjelasan atau ketentuan terkait[^:\n]*:\s*",
         r"Followed by any related provisions[^:\n]*:\s*",
+        r"^(?:Jawaban|Answer)\s*:\s*",
     ]
     cleaned = text
     for p in patterns:

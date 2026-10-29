@@ -64,8 +64,13 @@ def _compute_normative_salience_boost(query: str, payload: dict[str, Any]) -> fl
     if not text:
         return 0.0
 
-    q_low = query.lower()
-    t_low = text.lower()
+    from easypasal.generation.prompts import _detect_statutory_role
+
+    q_low = re.sub(r"\s+", " ", query.lower()).strip()
+    t_low = re.sub(r"\s+", " ", text.lower()).strip()
+    header_match = re.match(r"^\[([^\]]+)\]\s*", t_low)
+    body_low = t_low[header_match.end() :] if header_match else t_low
+    role = _detect_statutory_role(text)
     boost = 0.0
 
     intent = detect_normative_intent(query)
@@ -78,52 +83,40 @@ def _compute_normative_salience_boost(query: str, payload: dict[str, Any]) -> fl
         action_verb = m_action.group(1)
         if len(action_verb) >= 4 and re.search(
             rf"\b(?:wajib|harus|dilarang)\s+(?:\w+\s+)?{re.escape(action_verb)}\b",
-            t_low,
+            body_low,
         ):
-            boost += 0.15
+            boost += 0.18
 
     # 2. Intent-Based Normative Primacy Boost / Penalty
-    # Check if chunk represents authority corrective action / sanction vs entity primary obligation
-    has_authority_remedial = bool(
-        re.search(
-            r"\b(?:ojk|otoritas jasa keuangan|bank indonesia|bi)\s+(?:dapat\s+meminta|berwenang|memerintahkan|mengenakan|menjatuhkan)\b",
-            t_low,
-        )
-        or re.search(r"\b(?:dikenai|pengenaan)\s+sanksi\b", t_low)
-    )
-    has_entity_obligation = bool(
-        re.search(
-            r"\b(?:bank|pujk|perusahaan|penyelenggara|ljk|pihak)\s+(?:wajib|harus|dilarang)\b",
-            t_low,
-        )
-        or re.search(
-            r"\bwajib\s+(?:menempatkan|memiliki|menerapkan|menyediakan|menyampaikan|memenuhi|menggunakan|menjaga|melakukan)\b",
-            t_low,
-        )
-    )
+    has_cross_ref = "sebagaimana dimaksud dalam pasal" in body_low
 
     if intent == "obligation":
-        if has_entity_obligation and not has_authority_remedial:
-            boost += 0.15
-        elif has_authority_remedial and not (has_entity_obligation and t_low.startswith("bank")):
-            # Downweight remedial/supervisory clause when user asked about entity obligation
-            boost -= 0.15
+        if role == "[Peran: Kewajiban Pokok Entitas]":
+            if not has_cross_ref:
+                boost += 0.18
+            else:
+                boost += 0.05
+        elif role in (
+            "[Peran: Wewenang Korektif Otoritas / Sanksi]",
+            "[Peran: Opsi Pengecualian / Izin Bersyarat]",
+            "[Peran: Penjelasan / Keterangan Tambahan]",
+        ):
+            # Downweight remedial/supervisory/exception/elucidation clauses when user asked about entity obligation
+            boost -= 0.18
     elif intent == "sanction_enforcement":
-        if has_authority_remedial:
+        if role == "[Peran: Wewenang Korektif Otoritas / Sanksi]":
             boost += 0.20
-        elif has_entity_obligation:
+        elif role == "[Peran: Kewajiban Pokok Entitas]":
             boost -= 0.10
-    elif intent == "permission_exemption" and re.search(
-        r"\b(?:bank|pujk|perusahaan)\s+dapat\b|\bsepanjang\s+memperoleh\s+izin\b", t_low
-    ):
-        boost += 0.15
+    elif intent == "permission_exemption" and role == "[Peran: Opsi Pengecualian / Izin Bersyarat]":
+        boost += 0.18
 
     # 3. Interrogative Target Alignment
     # Where? ("di mana") -> Check for geographical/jurisdictional placement terms
     if (
         ("di mana" in q_low or "dimana" in q_low)
         and any(
-            loc in t_low
+            loc in body_low
             for loc in [
                 "di wilayah indonesia",
                 "di indonesia",
@@ -147,9 +140,9 @@ def _compute_normative_salience_boost(query: str, payload: dict[str, Any]) -> fl
         and (
             re.search(
                 r"\b(?:\d+|satu|dua|tiga|lima|tujuh|sepuluh|empat belas|dua puluh|tiga puluh)\s+(?:hari|bulan|tahun|hari kerja|jam)\b",
-                t_low,
+                body_low,
             )
-            or re.search(r"\brp\s*[\d\.]+", t_low)
+            or re.search(r"\brp\s*[\d\.]+", body_low)
         )
     ):
         boost += 0.05
@@ -240,7 +233,7 @@ def reciprocal_rank_fusion(
     if query:
         for item in candidates.values():
             n_boost = _compute_normative_salience_boost(query, item.get("payload") or {})
-            if n_boost > 0:
+            if n_boost != 0.0:
                 item["rrf_score"] = item["rrf_score"] * (1.0 + n_boost)
 
     # 4. Sort candidates by RRF score descending with deterministic secondary keys

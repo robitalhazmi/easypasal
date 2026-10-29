@@ -22,6 +22,14 @@ _BRACKET_CITATION_REGEX = re.compile(
     re.IGNORECASE,
 )
 
+# Regex matching inverted inline prose citations, e.g. "Pasal 36 ayat (4) dari POJK 11/POJK.03/2022"
+_INVERTED_PROSE_STATUTORY_REGEX = re.compile(
+    r"\b(Pasal\s+\d+[a-z]?(?:\s+ayat\s+\(\d+\))?(?:\s+angka\s+\d+)?)"
+    r"\s+(?:dari\s+|dalam\s+|pada\s+)?((?:Undang-Undang|UU|POJK|PBI|PADG|SEOJK|PP|Perpu)\s+"
+    r"(?:Nomor\s+)?[\w\.\/\-]+(?:\s+Tahun\s+\d{4})?)",
+    re.IGNORECASE,
+)
+
 _ABSTAIN_PHRASES_ID = [
     "tidak ditemukan dalam regulasi",
     "tidak ditemukan dasar hukum",
@@ -95,7 +103,17 @@ def extract_citations(text: str) -> list[str]:
             seen.add(clean.lower())
             citations.append(clean)
 
-    # 2. Inline Statutory Pattern Matches
+    # 2. Inverted Inline Prose Citations (e.g. "Pasal 36 ayat (4) dari POJK 11/POJK.03/2022")
+    for match in _INVERTED_PROSE_STATUTORY_REGEX.finditer(text):
+        pasal_part = match.group(1).strip()
+        reg_part = match.group(2).strip()
+        canonical = f"{reg_part}, {pasal_part}"
+        c_low = canonical.lower()
+        if canonical and c_low not in seen and not any(c_low in c.lower() for c in citations):
+            seen.add(c_low)
+            citations.append(canonical)
+
+    # 3. Inline Statutory Pattern Matches
     for match in _STATUTORY_REGEX.finditer(text):
         raw = match.group(0).strip()
         r_low = raw.lower()
