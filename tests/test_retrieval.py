@@ -670,3 +670,60 @@ def test_expand_primary_statutory_norms() -> None:
     assert expanded[0].chunk_id == "pojk11_35_1"
     assert expanded[0].citation_label == "POJK 11/POJK.03/2022, Pasal 35 ayat (1)"
     assert expanded[0].score > 0.88
+
+
+def test_expand_sibling_statutory_norms() -> None:
+    """Verify sibling proximity expansion bundles complementary modalities (e.g. oral vs written complaints)."""
+    from easypasal.retrieval.retriever import _expand_primary_statutory_norms
+
+    corpus_payloads = [
+        {
+            "chunk_id": "pojk22_74_1",
+            "citation_label": "POJK 22 Tahun 2023, Pasal 74 ayat (1)",
+            "doc_id": "POJK_22_Tahun_2023",
+            "doc_number": "POJK 22 Tahun 2023",
+            "pasal": "74",
+            "ayat": "1",
+            "status": "berlaku",
+            "text": (
+                "[POJK 22 Tahun 2023 | Pasal 74 ayat (1)]\n"
+                "(1) PUJK wajib melakukan tindak lanjut dan menyelesaikan Pengaduan secara lisan paling lama 5 (lima) hari kerja sejak Pengaduan diterima PUJK."
+            ),
+        },
+        {
+            "chunk_id": "pojk22_75_1",
+            "citation_label": "POJK 22 Tahun 2023, Pasal 75 ayat (1)",
+            "doc_id": "POJK_22_Tahun_2023",
+            "doc_number": "POJK 22 Tahun 2023",
+            "pasal": "75",
+            "ayat": "1",
+            "status": "berlaku",
+            "text": (
+                "[POJK 22 Tahun 2023 | Pasal 75 ayat (1)]\n"
+                "(1) PUJK wajib melakukan tindak lanjut dan melakukan penyelesaian Pengaduan secara tertulis paling lama 10 (sepuluh) hari kerja sejak dokumen sebagaimana dimaksud dalam Pasal 71 ayat (2) dan/atau ayat (3) diterima secara lengkap."
+            ),
+        },
+    ]
+
+    bm25 = BM25Index.build_from_chunks(corpus_payloads)
+
+    # Initial retrieval only returned Pasal 74 (oral)
+    initial_chunks = [
+        RetrievedChunk.from_payload("pojk22_74_1", 0.92, corpus_payloads[0]),
+    ]
+
+    query = "Bagaimana kewajiban Lembaga Jasa Keuangan dalam menangani dan menyelesaikan pengaduan konsumen?"
+    expanded = _expand_primary_statutory_norms(
+        query=query,
+        chunks=initial_chunks,
+        bm25_index=bm25,
+        status_filter="berlaku",
+        top_k=5,
+    )
+
+    expanded_ids = [c.chunk_id for c in expanded]
+    assert "pojk22_74_1" in expanded_ids
+    assert "pojk22_75_1" in expanded_ids
+    # Both oral and written complaint resolution primary articles are retained in top ranks
+    assert expanded[0].chunk_id == "pojk22_74_1"
+    assert expanded[1].chunk_id == "pojk22_75_1"

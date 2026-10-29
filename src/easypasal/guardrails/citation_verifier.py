@@ -419,10 +419,12 @@ def verify_citations(
 
 
 def realign_answer_subject(answer: str, question: str) -> str:
-    """Ensure the leading legal subject of the answer matches the institutional entity queried.
+    """Ensure the grammatical subject of the opening sentence matches the query's subject entity.
 
-    Fixes few-shot subject bleed (e.g. LLM copying 'PUJK' from an exemplar when the question
-    is about 'Bank Umum' or 'Bank').
+    Prevents regulatory cross-entity contamination (e.g. answering a "Bank Umum" question
+    with "PUJK wajib..." when the statutory rule applies to Bank).
+    Also harmonizes sentence-wide co-references (e.g. 'diterima PUJK' -> 'diterima Lembaga Jasa Keuangan')
+    while strictly protecting official regulation citations inside bracketed tags.
     """
     if not answer or not question:
         return answer
@@ -437,34 +439,48 @@ def realign_answer_subject(answer: str, question: str) -> str:
         return answer
 
     clean_ans = answer.strip()
+    segments = re.split(r"(\[[^\]]+\])", clean_ans)
+    prep_words = r"(?:sejak|diterima|oleh|kepada|pada|di|terhadap|bagi|untuk|antara|dengan|by|to|for|at|in|with|from|received\s+by)"
+    action_words = r"(?:wajib|harus|dilarang|dapat|memiliki|menyediakan|menempatkan|melakukan|must|shall|should|may|is\s+required\s+to|are\s+required\s+to)"
+
+    modified = False
 
     for entity in _KNOWN_INSTITUTIONAL_SUBJECTS:
-        if entity.lower() != q_subject.lower():
-            # If q_subject is "Bank Umum" and entity is "Bank", they are legally equivalent, don't replace
-            if q_subject.lower() in ("bank umum", "bank") and entity.lower() in (
-                "bank umum",
-                "bank",
-            ):
-                continue
+        if entity.lower() == q_subject.lower():
+            continue
+        # If q_subject is "Bank Umum" and entity is "Bank", they are legally equivalent, don't replace
+        if q_subject.lower() in ("bank umum", "bank") and entity.lower() in (
+            "bank umum",
+            "bank",
+        ):
+            continue
 
-            # Check if answer starts with this competing entity (e.g. "PUJK wajib...")
-            pattern = rf"^({re.escape(entity)})(\s+(?:wajib|harus|dilarang|dapat|memiliki|menyediakan|menempatkan)\b)"
-            match = re.match(pattern, clean_ans, re.IGNORECASE)
-            if match:
-                replaced = re.sub(
-                    pattern,
-                    rf"{q_subject}\2",
-                    clean_ans,
-                    count=1,
-                    flags=re.IGNORECASE,
-                )
-                logger.warning(
-                    "Subject consistency guardrail: realigned leading entity %r -> %r for query %r",
-                    match.group(1),
-                    q_subject,
-                    question[:50],
-                )
-                return replaced
+        e_pattern = re.escape(entity)
+
+        # Process only prose segments (even indices), leaving bracketed citations (odd indices) intact
+        for i in range(0, len(segments), 2):
+            seg = segments[i]
+
+            # 1. Leading entity or list-item entity duty (e.g. '^PUJK wajib...', '^\n- PUJK wajib...')
+            lead_pat = rf"(^|[\r\n]+[-*•\d.]*\s*)({e_pattern})(\s+{action_words}\b)"
+            new_seg = re.sub(lead_pat, rf"\g<1>{q_subject}\g<3>", seg, flags=re.IGNORECASE)
+
+            # 2. Prepositional / relational co-reference: e.g. 'diterima PUJK', 'oleh PUJK'
+            prep_pat = rf"(\b{prep_words}\s+)({e_pattern})\b"
+            new_seg = re.sub(prep_pat, rf"\g<1>{q_subject}", new_seg, flags=re.IGNORECASE)
+
+            if new_seg != seg:
+                segments[i] = new_seg
+                modified = True
+
+    if modified:
+        realigned = "".join(segments)
+        logger.warning(
+            "Subject consistency guardrail: harmonized entity co-reference -> %r for query %r",
+            q_subject,
+            question[:50],
+        )
+        return realigned
 
     return answer
 

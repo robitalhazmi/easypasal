@@ -152,7 +152,6 @@ def _expand_primary_statutory_norms(
         return chunks
 
     from easypasal.generation.prompts import (
-        _detect_statutory_role,
         score_primary_obligation_alignment,
     )
     from easypasal.retrieval.fusion import detect_normative_intent
@@ -160,13 +159,14 @@ def _expand_primary_statutory_norms(
     if detect_normative_intent(query) != "obligation":
         return chunks
 
-    # 1. Collect target (doc_identifier, target_pasal) pairs from cross-references and neighbors
+    # 1. Collect target (doc_identifier, target_pasal) pairs from cross-references, root clauses, and sibling provisions
     target_pasals_by_doc: dict[str, set[str]] = {}
     for c in chunks:
-        doc_key = (c.doc_id or c.doc_number or "").lower().strip()
-        if not doc_key:
+        doc_keys = [k.lower().strip() for k in (c.doc_id, c.doc_number) if k]
+        if not doc_keys:
             continue
-        targets = target_pasals_by_doc.setdefault(doc_key, set())
+
+        chunk_targets: set[str] = set()
 
         # A. Explicit cross-references: "sebagaimana dimaksud dalam Pasal 35"
         for ref_match in re.finditer(
@@ -174,25 +174,22 @@ def _expand_primary_statutory_norms(
             c.text,
             re.IGNORECASE,
         ):
-            targets.add(ref_match.group(1).lower())
+            chunk_targets.add(ref_match.group(1).lower())
 
-        # B. Root clause of the same article if current chunk is ayat > 1 or Penjelasan
+        # B. Root clause of current article and adjacent sibling provisions (e.g. Pasal 74 oral -> Pasal 75 written)
         if c.pasal:
             p_str = str(c.pasal).lower()
-            if str(c.ayat) != "1" or "penjelasan" in (c.citation_label or "").lower():
-                targets.add(p_str)
-
-            # C. Preceding article(s) in the same regulation if current chunk is remedial/exception/dependent
-            role = _detect_statutory_role(c.text)
-            has_cross_ref = "sebagaimana dimaksud dalam pasal" in re.sub(
-                r"\s+", " ", c.text.lower()
-            )
-            if p_str.isdigit() and (role != "[Peran: Kewajiban Pokok Entitas]" or has_cross_ref):
+            chunk_targets.add(p_str)
+            if p_str.isdigit():
                 p_num = int(p_str)
                 if p_num > 1:
-                    targets.add(str(p_num - 1))
+                    chunk_targets.add(str(p_num - 1))
                 if p_num > 2:
-                    targets.add(str(p_num - 2))
+                    chunk_targets.add(str(p_num - 2))
+                chunk_targets.add(str(p_num + 1))
+
+        for k in doc_keys:
+            target_pasals_by_doc.setdefault(k, set()).update(chunk_targets)
 
     expanded_pool = list(chunks)
     existing_ids = {c.chunk_id for c in expanded_pool}
@@ -238,20 +235,33 @@ def _expand_primary_statutory_norms(
                 score=chunks[0].score,
                 payload=payload,
             )
-            if score_primary_obligation_alignment(cand_chunk, query) >= 2.2:
+            if score_primary_obligation_alignment(cand_chunk, query) >= 2.0:
                 expanded_pool.append(cand_chunk)
                 existing_ids.add(cid)
 
-    # 3. Promote the highest-scoring primary obligation chunk to Rank 1
+    # 3. Promote the highest-scoring primary obligation chunk to Rank 1 and retain high-scoring sibling provisions
     scored_primaries = [
         (score_primary_obligation_alignment(c, query), idx, c)
         for idx, c in enumerate(expanded_pool)
     ]
     best_score, _best_idx, best_chunk = max(scored_primaries, key=lambda item: (item[0], -item[1]))
-    if best_score >= 2.2 and best_chunk.chunk_id != expanded_pool[0].chunk_id:
+    if best_score >= 2.0:
         top_score = max(c.score for c in chunks)
         best_chunk.score = round(top_score + 0.01, 6)
-        reordered = [best_chunk] + [c for c in expanded_pool if c.chunk_id != best_chunk.chunk_id]
+        other_primaries = [
+            c
+            for s, idx, c in sorted(
+                scored_primaries, key=lambda item: (item[0], -item[1]), reverse=True
+            )
+            if c.chunk_id != best_chunk.chunk_id and s >= 2.0
+        ]
+        remaining = [
+            c
+            for c in chunks
+            if c.chunk_id != best_chunk.chunk_id
+            and c.chunk_id not in {op.chunk_id for op in other_primaries}
+        ]
+        reordered = [best_chunk] + other_primaries + remaining
         limit = max(len(chunks), top_k)
         return reordered[:limit]
 

@@ -999,6 +999,32 @@ def test_realign_answer_subject() -> None:
     ans_pujk = "PUJK wajib melayani pengaduan konsumen [POJK 22/2023, Pasal 71]."
     assert realign_answer_subject(ans_pujk, q_pujk) == ans_pujk
 
+    # 4. Sentence-wide co-reference harmonization (relational prepositional reference e.g. 'diterima PUJK')
+    q_ljk = "Bagaimana kewajiban Lembaga Jasa Keuangan dalam menangani dan menyelesaikan pengaduan konsumen?"
+    mixed_ans = (
+        "Lembaga Jasa Keuangan wajib melakukan tindak lanjut dan menyelesaikan Pengaduan secara lisan "
+        "paling lama 5 (lima) hari kerja sejak Pengaduan diterima PUJK [POJK 22 Tahun 2023, Pasal 74 ayat (1)]."
+    )
+    harmonized = realign_answer_subject(mixed_ans, q_ljk)
+    assert "diterima Lembaga Jasa Keuangan" in harmonized
+    assert "diterima PUJK" not in harmonized
+    # Strictly protect citation tag
+    assert "[POJK 22 Tahun 2023, Pasal 74 ayat (1)]" in harmonized
+
+    # 5. Harmonize list items and relational references
+    list_ans = (
+        "Lembaga Jasa Keuangan wajib menyelesaikan pengaduan:\n"
+        "1. PUJK wajib menyelesaikan pengaduan lisan paling lama 5 hari sejak diterima PUJK [POJK 22/2023, Pasal 74 ayat (1)].\n"
+        "2. PUJK wajib menyelesaikan pengaduan tertulis paling lama 10 hari sejak diterima PUJK [POJK 22/2023, Pasal 75 ayat (1)]."
+    )
+    harmonized_list = realign_answer_subject(list_ans, q_ljk)
+    assert "1. Lembaga Jasa Keuangan wajib" in harmonized_list
+    assert "2. Lembaga Jasa Keuangan wajib" in harmonized_list
+    assert "diterima Lembaga Jasa Keuangan" in harmonized_list
+    assert "diterima PUJK" not in harmonized_list
+    assert "[POJK 22/2023, Pasal 74 ayat (1)]" in harmonized_list
+    assert "[POJK 22/2023, Pasal 75 ayat (1)]" in harmonized_list
+
 
 def test_realign_inverted_inline_prose_and_remedial_dump() -> None:
     """Verify baseline_v0.1 inline prose citation + Pasal 36 ayat (4) item a-d dump is cleaned and realigned to Pasal 35 ayat (1)."""
@@ -1142,12 +1168,21 @@ def test_multi_sector_obligation_realignment_regression_suite() -> None:
         },
     ]
 
+    from typing import cast
+
+    from easypasal.retrieval.models import RetrievedChunk
+
     for sc in scenarios:
-        subj_aligned = realign_answer_subject(sc["raw_answer"], sc["question"])
+        raw_ans = str(sc["raw_answer"])
+        q_text = str(sc["question"])
+        primary = cast(RetrievedChunk, sc["primary_chunk"])
+        remedial = cast(RetrievedChunk, sc["remedial_chunk"])
+
+        subj_aligned = realign_answer_subject(raw_ans, q_text)
         final_ans, final_cites, _ = detect_and_realign_inverted_citations(
             answer=subj_aligned,
-            retrieved_chunks=[sc["remedial_chunk"], sc["primary_chunk"]],
-            question=sc["question"],
+            retrieved_chunks=[remedial, primary],
+            question=q_text,
         )
         assert final_ans.startswith(f"{sc['expected_subject']} wajib"), (
             f"Subject mismatch: {final_ans}"
