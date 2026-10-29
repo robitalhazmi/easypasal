@@ -70,11 +70,16 @@ def prune_remedial_distractors(
         doc_key = f"{digits}" if digits else (c.doc_number or "").lower().strip()
         role = _detect_statutory_role(c.text)
 
-        # If this regulation has a primary obligation, prune secondary remedial / exception / elucidation chunks
-        if doc_key in regs_with_primary_obligation and role in (
-            "[Peran: Wewenang Korektif Otoritas / Sanksi]",
-            "[Peran: Opsi Pengecualian / Izin Bersyarat]",
-            "[Peran: Penjelasan / Keterangan Tambahan]",
+        # If this regulation has a primary obligation, prune secondary remedial / exception / dispute / elucidation chunks
+        if role == "[Peran: Opsi Sengketa / Pemulihan Konsumen]" or (
+            doc_key in regs_with_primary_obligation
+            and role
+            in (
+                "[Peran: Wewenang Korektif Otoritas / Sanksi]",
+                "[Peran: Opsi Pengecualian / Izin Bersyarat]",
+                "[Peran: Penjelasan / Keterangan Tambahan]",
+                "[Peran: Opsi Sengketa / Pemulihan Konsumen]",
+            )
         ):
             logger.info(
                 "Pruning distracting non-primary clause %s (%s, %s) from obligation query context",
@@ -87,14 +92,28 @@ def prune_remedial_distractors(
 
     result = pruned if pruned else list(chunks)
 
-    # Ensure the strongest primary obligation chunk is placed at index 0 (DOKUMEN 1)
+    # Ensure the strongest primary obligation chunk is placed at index 0 (DOKUMEN 1),
+    # and all other high-scoring primary sibling chunks are promoted right after it.
     if len(result) > 1:
         scored = [
             (score_primary_obligation_alignment(c, query), -idx, c) for idx, c in enumerate(result)
         ]
         best_score, _neg_idx, best_c = max(scored, key=lambda item: (item[0], item[1]))
-        if best_score > 0 and best_c.chunk_id != result[0].chunk_id:
-            result = [best_c] + [c for c in result if c.chunk_id != best_c.chunk_id]
+        if best_score > 0:
+            other_primaries = [
+                c
+                for s, _neg_idx, c in sorted(
+                    scored, key=lambda item: (item[0], item[1]), reverse=True
+                )
+                if c.chunk_id != best_c.chunk_id and s >= 2.0
+            ]
+            remaining = [
+                c
+                for c in result
+                if c.chunk_id != best_c.chunk_id
+                and c.chunk_id not in {op.chunk_id for op in other_primaries}
+            ]
+            result = [best_c] + other_primaries + remaining
 
     return result
 
@@ -437,9 +456,9 @@ class RAGPipeline:
 
         # Context Budgeting & Distractor Pruning:
         # Prune distracting remedial / exception clauses for obligation queries when primary obligations exist,
-        # then cap generation prompt context to top-3 highest-relevance passages.
+        # then cap generation prompt context to top-4 highest-relevance passages.
         gated_chunks = prune_remedial_distractors(chunks, clean_question)
-        budgeted_chunks = gated_chunks[:3] if len(gated_chunks) > 3 else gated_chunks
+        budgeted_chunks = gated_chunks[:4] if len(gated_chunks) > 4 else gated_chunks
 
         prompt = build_rag_prompt(
             question=clean_question,

@@ -564,6 +564,67 @@ def _strip_remedial_dump_paragraphs(text: str, inverted_pasal: str | None = None
     return "\n\n".join(kept)
 
 
+def reformat_narrative_citations_to_brackets(text: str) -> str:
+    """Transform conversational narrative citation phrasing into canonical square-bracketed citations.
+
+    Converts phrases like ', seperti yang ditetapkan dalam POJK 22 Tahun 2023, Pasal 71 ayat (1)'
+    or ', as stipulated in UU Nomor 4 Tahun 2023, Pasal 245 ayat (1)' into '[...]'.
+    """
+    if not text:
+        return text
+
+    # Indonesian narrative citations
+    pattern_id = re.compile(
+        r",?\s*(?:seperti\s+yang\s+(?:ditetapkan|diatur|tercantum)\s+dalam|"
+        r"sebagaimana\s+(?:ditetapkan|diatur|tercantum|dimaksud)\s+dalam|"
+        r"sesuai\s+(?:dengan\s+)?(?:ketentuan\s+)?(?:dalam\s+)?|"
+        r"berdasarkan\s+ketentuan\s+)\s*"
+        r"([\w\s\./]+?,\s*Pasal\s+\d+[a-z]?(?:\s+(?:ayat\s+\(\d+[a-z]?\)|angka\s+\d+))?)",
+        re.IGNORECASE,
+    )
+
+    def _repl_id(m: re.Match[str]) -> str:
+        cit = m.group(1).strip()
+        return f" [{cit}]"
+
+    text = pattern_id.sub(_repl_id, text)
+
+    # English narrative citations
+    pattern_en = re.compile(
+        r",?\s*(?:as\s+(?:stipulated|stated|specified|regulated|set\s+out)\s+in|"
+        r"according\s+to|pursuant\s+to)\s*"
+        r"([\w\s\./]+?,\s*Pasal\s+\d+[a-z]?(?:\s+(?:ayat\s+\(\d+[a-z]?\)|angka\s+\d+))?)",
+        re.IGNORECASE,
+    )
+
+    def _repl_en(m: re.Match[str]) -> str:
+        cit = m.group(1).strip()
+        return f" [{cit}]"
+
+    text = pattern_en.sub(_repl_en, text)
+    return text
+
+
+def decouple_confabulated_causality(text: str) -> str:
+    """Decouple confabulated causal/conditional links between unrelated statutory clauses.
+
+    Removes false conditions such as:
+    'Dalam hal tidak terdapat kesepakatan terhadap hasil penanganan pengaduan..., Lembaga Jasa Keuangan wajib menangani pengaduan secara tertulis...'
+    and restores them as independent statements.
+    """
+    if not text:
+        return text
+
+    pattern = re.compile(
+        r"\bDalam\s+hal\s+tidak\s+terdapat\s+kesepakatan\s+terhadap\s+hasil\s+penanganan\s+pengaduan\s+yang\s+dilakukan\s+oleh\s+[^,]+,\s*",
+        re.IGNORECASE,
+    )
+    if pattern.search(text):
+        text = pattern.sub("Selain itu, ", text)
+
+    return text
+
+
 def detect_and_realign_inverted_citations(
     answer: str,
     retrieved_chunks: list[RetrievedChunk],
@@ -582,6 +643,10 @@ def detect_and_realign_inverted_citations(
 
     if check_abstention(answer):
         return answer, [], {}
+
+    # 0. Canonical normalization: reformat narrative citations and decouple confabulated causality
+    answer = reformat_narrative_citations_to_brackets(answer)
+    answer = decouple_confabulated_causality(answer)
 
     q_low = question.lower()
     is_obligation_query = bool(
@@ -630,6 +695,34 @@ def detect_and_realign_inverted_citations(
 
     for cite in current_cites:
         parsed = parse_citation_details(cite)
+
+        # 0. Check if surrounding statement describes consumer dispute remedies while mistakenly citing ayat 1
+        stmt = _find_surrounding_statement(realigned_text, cite)
+        if (
+            stmt
+            and parsed.ayat == "1"
+            and re.search(
+                r"\b(?:konsumen\s+dapat|mengajukan\s+sengketa|menyampaikan\s+pengaduan\s+kepada\s+otoritas)\b",
+                stmt,
+                re.IGNORECASE,
+            )
+        ):
+            remedy_ayat_chunks = [
+                c
+                for c in retrieved_chunks
+                if _is_doc_matched(parsed, c)
+                and _is_pasal_matched(parsed, c)
+                and str(c.ayat) == "2"
+            ]
+            if remedy_ayat_chunks and remedy_ayat_chunks[0].citation_label:
+                target_label = remedy_ayat_chunks[0].citation_label
+                realigned_text = re.sub(
+                    rf"\[\s*{re.escape(cite.strip('[]'))}\s*\]",
+                    f"[{target_label.strip('[]')}]",
+                    realigned_text,
+                )
+                replacements[cite] = f"[{target_label.strip('[]')}]"
+                continue
 
         # 1. Search among all retrieved chunks in the SAME regulation for primary entity obligation chunks,
         # ranked by primary obligation alignment score

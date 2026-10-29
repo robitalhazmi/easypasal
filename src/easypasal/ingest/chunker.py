@@ -508,6 +508,11 @@ class StructureAwareChunker:
     ) -> list[Chunk]:
         chunks: list[Chunk] = []
 
+        # Normalize OCR clause numbering artifacts:
+        # e.g., missing closing paren '(21 ' -> '(2) ', or clauses preceded by punctuation without newline
+        pasal_body = re.sub(r"(?<=[.;\n])\s*\(([0-9]{1,2})[1l|\]]\s+", r"\n(\1) ", pasal_body)
+        pasal_body = re.sub(r"(?<=[.;])\s*\(([0-9]{1,2}[a-z]?)\)\s+", r"\n(\1) ", pasal_body)
+
         # Check for clauses (1), (2)
         has_clauses = bool(re.search(r"\n\(\d+[a-z]?\)\s+", "\n" + pasal_body))
         if has_clauses:
@@ -728,6 +733,19 @@ class StructureAwareChunker:
             if m_pasal:
                 pasal_num = m_pasal.group(1)
                 body = "\n".join(lines[1:]).strip()
+                # Normalize OCR clause numbering artifacts in explanation sections
+                body = re.sub(
+                    r"(?:^|\n)\s*Ayat\s+\(([0-9]{1,2})[1l|\]]\b",
+                    r"\nAyat (\1)",
+                    body,
+                    flags=re.IGNORECASE,
+                )
+                body = re.sub(
+                    r"(?<=[.;])\s*Ayat\s+\(([0-9]{1,2}[a-z]?)\)",
+                    r"\nAyat (\1)",
+                    body,
+                    flags=re.IGNORECASE,
+                )
                 has_ayats = bool(re.search(r"(?:^|\n)Ayat\s+\((\d+[a-z]?)\)", body, re.IGNORECASE))
                 if has_ayats:
                     ayat_parts = re.split(

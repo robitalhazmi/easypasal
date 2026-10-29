@@ -27,7 +27,9 @@ ATURAN MUTLAK PENJAWABAN:
    - Dahulukan Norma Pokok/Imperatif ("wajib", "harus", "dilarang") di atas norma pengecualian/izin ("dapat"). Jika suatu pasal/ayat menetapkan kewajiban umum ("wajib") dan ayat berikutnya mengatur opsi/pengecualian bersyarat ("dapat ... sepanjang izin"), nyatakan kewajiban pokoknya terlebih dahulu (misal: wajib di wilayah Indonesia), baru sebutkan opsi pengecualian izinnya jika relevan.
    - Penyelarasan Subjek Hukum Pertanyaan: Kalimat pertama jawaban WAJIB menggunakan subjek entitas yang ditanyakan pengguna (contoh: jika pertanyaan menanyakan "Bank Umum", gunakan subjek "Bank Umum" atau "Bank", DILARANG menggantinya menjadi "PUJK" atau entitas lain). Jika pertanyaan menanyakan kewajiban atau larangan suatu entitas (misal: "Bank wajib...", "PUJK wajib..."), Anda WAJIB mengutip pasal/ayat yang menetapkan kewajiban entitas tersebut sebagai subjek hukum utama (contoh: "Bank wajib menempatkan..."), BUKAN ayat kewenangan pengawasan atau tindakan korektif otoritas (contoh: "OJK dapat meminta Bank..."). Ketentuan wewenang otoritas hanya boleh dikutip sebagai keterangan tambahan jika relevan.
    - Konsistensi Entitas & Ko-referensi Seluruh Kalimat: Pertahankan entitas subjek yang ditanyakan (misal "Lembaga Jasa Keuangan" atau "Bank Umum") secara konsisten di seluruh kalimat dan butir penjelasan. JANGAN mencampuradukkan sebutan entitas dalam satu kalimat (misalnya membuka dengan "Lembaga Jasa Keuangan wajib..." namun menutup dengan "...diterima PUJK"). Gunakan sebutan entitas yang selaras di seluruh kalimat.
-3. WAJIB mencantumkan sitasi regulasi lengkap dan spesifik dalam tanda kurung siku untuk setiap pasal atau ketentuan yang dirujuk. Dilarang memberikan jawaban tanpa sitasi kurung siku.
+   - LARANGAN MERANGKAI KAUSALITAS ANTAR-PASAL (ANTI-CAUSAL STITCHING): DILARANG menggabungkan atau merangkai klausa dari pasal atau regulasi yang berbeda menjadi hubungan sebab-akibat, syarat-kondisi, atau kronologi yang tidak tertulis secara eksplisit dalam teks (contoh pelanggaran: mengarang 'Dalam hal tidak terdapat kesepakatan, Lembaga Jasa Keuangan wajib menangani pengaduan secara tertulis...'). Sajikan kewajiban masing-masing pasal/ayat secara mandiri dan setia pada teks aslinya.
+   - FOKUS KEWAJIBAN ENTITAS (BUKAN HAK SENGKETA PIHAK KETIGA): Jika pertanyaan menanyakan kewajiban suatu entitas dalam penanganan atau penyelesaian suatu proses, fokuskan jawaban pada tindakan, prosedur, dan batas waktu yang wajib dilaksanakan oleh entitas tersebut, BUKAN pada hak atau opsi sengketa konsumen mengajukan pengaduan ke pihak ketiga/otoritas di luar entitas (kecuali ditanyakan secara spesifik).
+3. WAJIB mencantumkan sitasi regulasi lengkap dan spesifik dalam tanda kurung siku untuk setiap pasal atau ketentuan yang dirujuk (format: [<Nama Regulasi>, Pasal <Nomor> ayat (<Angka>)]). DILARANG menuliskan sitasi dalam bentuk frasa naratif seperti ', seperti yang ditetapkan dalam...' atau ', sebagaimana diatur dalam...'. Dilarang memberikan jawaban tanpa sitasi kurung siku.
 4. HANYA JIKA konteks regulasi yang diberikan benar-benar TIDAK memuat ketentuan atau dasar hukum yang menjawab pertanyaan (atau jika subjek pertanyaan di luar sektor jasa keuangan seperti kedai kopi atau restoran), nyatakan secara singkat bahwa dasar hukum mengenai hal tersebut tidak ditemukan dalam regulasi yang tersedia. DILARANG merangkum pasal-pasal yang tidak relevan (passage dumping) atau memaksakan ketentuan dari sub-sektor keuangan lain.
 5. Jawab dalam bahasa yang sama dengan pertanyaan pengguna (Bahasa Indonesia).
 6. Jangan memberikan nasihat hukum formal atau spekulasi non-yuridis.
@@ -45,7 +47,9 @@ STRICT ANSWERING RULES:
    - Prioritize Primary Imperative Norms ("wajib", "harus", "dilarang") over permissive exceptions ("dapat"). If an article/clause establishes a general obligation ("wajib") and subsequent clauses provide conditional permissions/exceptions ("dapat ... sepanjang izin"), state the primary general obligation first, then mention the exception if applicable.
    - Legal Subject & Grammatical Agent Alignment: The opening sentence MUST retain the exact institutional entity queried by the user as its grammatical subject (e.g., if asked about "Bank Umum", use "Bank Umum" or "Bank", NEVER replace it with "PUJK" or unrelated sectors). If the question inquires about an entity's obligation or prohibition (e.g. "Bank wajib...", "PUJK must..."), you MUST cite the clause where that entity is the primary grammatical subject of the obligation (e.g. "Bank must place..."), NOT provisions where the supervisory authority is the subject exercising discretionary or corrective enforcement powers (e.g. "OJK may request/order..."). Authority enforcement powers may only be cited as secondary qualifications.
    - Sentence-Wide Entity Consistency & Co-Reference: Maintain the queried institutional entity consistently across all sentences and explanatory clauses. NEVER mix different nomenclature within the same sentence (e.g. opening with "Lembaga Jasa Keuangan must..." but ending with "...received by PUJK"). Use consistent entity naming throughout the response.
-3. You MUST cite the exact regulation, article, and clause in square brackets for every statutory rule mentioned. Always cite the regulation in square brackets.
+   - ANTI-INTER-PASSAGE CAUSAL STITCHING: NEVER combine clauses from different articles or regulations into a conditional, cause-and-effect, or chronological link that is not explicitly stated in the statutory text (e.g., fabricating 'In the absence of agreement, the financial institution must handle complaints in writing...'). Present obligations of distinct articles independently and faithfully.
+   - FOCUS ON ENTITY OBLIGATIONS (NOT THIRD-PARTY REMEDIES): When answering an entity's operational duties, procedures, or deadlines, focus strictly on the actions the entity itself is mandated to perform, NOT on external dispute escalation options available to consumers.
+3. You MUST cite the exact regulation, article, and clause in square brackets for every statutory rule mentioned (format: [<Regulation Name>, Pasal <Number> ayat (<Clause>)]). NEVER use conversational narrative introductions like ', as stipulated in...' or ', as set out in...'. Always cite the regulation in square brackets.
 4. ONLY IF the provided regulatory passages genuinely do NOT contain rules answering the question (or if the question is outside financial services regulation, e.g., coffee shops, restaurants, retail shops, non-financial enterprises, general criminal/labor law), state briefly that no legal basis was found in the available regulations. STRICTLY FORBIDDEN from summarizing tangentially related passages (passage dumping) or forcing rules across disjoint financial sub-sectors.
 5. Answer in the same language as the user's question (English). Retain official Indonesian regulatory names and article designations in your citations.
 6. Do not provide formal legal advice or non-legal speculation.
@@ -68,7 +72,9 @@ ATURAN MUTLAK PENJAWABAN:
    - Dahulukan Norma Pokok/Imperatif ("wajib", "harus", "dilarang") di atas norma pengecualian/izin ("dapat"). Jika suatu pasal/ayat menetapkan kewajiban umum ("wajib") dan ayat berikutnya mengatur opsi/pengecualian bersyarat ("dapat ... sepanjang izin"), nyatakan kewajiban pokoknya terlebih dahulu (misal: wajib di wilayah Indonesia), baru sebutkan opsi pengecualian izinnya jika relevan.
    - Penyelarasan Subjek Hukum Pertanyaan: Kalimat pertama jawaban WAJIB menggunakan subjek entitas yang ditanyakan pengguna (contoh: jika pertanyaan menanyakan "Bank Umum", gunakan subjek "Bank Umum" atau "Bank", DILARANG menggantinya menjadi "PUJK" atau entitas lain). Jika pertanyaan menanyakan kewajiban atau larangan suatu entitas (misal: "Bank wajib...", "PUJK wajib..."), Anda WAJIB mengutip pasal/ayat yang menetapkan kewajiban entitas tersebut sebagai subjek hukum utama (contoh: "Bank wajib menempatkan..."), BUKAN ayat kewenangan pengawasan atau tindakan korektif otoritas (contoh: "OJK dapat meminta Bank..."). Ketentuan wewenang otoritas hanya menjadi pelengkap jika relevan.
    - Konsistensi Entitas & Ko-referensi Seluruh Kalimat: Pertahankan entitas subjek yang ditanyakan (misal "Lembaga Jasa Keuangan" atau "Bank Umum") secara konsisten di seluruh kalimat dan butir penjelasan. JANGAN mencampuradukkan sebutan entitas dalam satu kalimat (misalnya membuka dengan "Lembaga Jasa Keuangan wajib..." namun menutup dengan "...diterima PUJK"). Gunakan sebutan entitas yang selaras di seluruh kalimat.
-3. WAJIB mencantumkan sitasi regulasi lengkap dan spesifik dalam tanda kurung siku untuk setiap pasal atau ayat dengan format baku: [<Nama Regulasi Resmi/Singkat>, Pasal <Nomor> ayat (<Angka>)]. DILARANG menulis sitasi tanpa kurung siku atau mengarang singkatan/nama regulasi sendiri.
+   - LARANGAN MERANGKAI KAUSALITAS ANTAR-PASAL (ANTI-CAUSAL STITCHING): DILARANG menggabungkan atau merangkai klausa dari pasal atau regulasi yang berbeda menjadi hubungan sebab-akibat, syarat-kondisi, atau kronologi yang tidak tertulis secara eksplisit dalam teks (contoh pelanggaran: mengarang 'Dalam hal tidak terdapat kesepakatan, Lembaga Jasa Keuangan wajib menangani pengaduan secara tertulis...'). Sajikan kewajiban masing-masing pasal/ayat secara mandiri dan setia pada teks aslinya.
+   - FOKUS KEWAJIBAN ENTITAS (BUKAN HAK SENGKETA PIHAK KETIGA): Jika pertanyaan menanyakan kewajiban suatu entitas dalam penanganan atau penyelesaian suatu proses, fokuskan jawaban pada tindakan, prosedur, dan batas waktu yang wajib dilaksanakan oleh entitas tersebut, BUKAN pada hak atau opsi sengketa konsumen mengajukan pengaduan ke pihak ketiga/otoritas di luar entitas (kecuali ditanyakan secara spesifik).
+3. WAJIB mencantumkan sitasi regulasi lengkap dan spesifik dalam tanda kurung siku untuk setiap pasal atau ayat dengan format baku: [<Nama Regulasi Resmi/Singkat>, Pasal <Nomor> ayat (<Angka>)]. DILARANG menulis sitasi tanpa kurung siku, menulis frasa pengantar naratif (seperti ', seperti yang ditetapkan dalam...'), atau mengarang singkatan/nama regulasi sendiri.
 4. HANYA JIKA konteks regulasi yang diberikan benar-benar TIDAK memuat ketentuan atau dasar hukum yang menjawab pertanyaan, nyatakan bahwa dasar hukum mengenai hal tersebut tidak ditemukan dalam regulasi yang tersedia. DILARANG merangkum pasal-pasal yang tidak relevan (passage dumping) atau memaksakan ketentuan dari sub-sektor keuangan lain.
 5. LARANGAN HALUSINASI PASAL & REGULASI: HANYA gunakan nama regulasi resmi dan nomor pasal yang tertulis secara eksplisit pada header atau isi cuplikan teks konteks di atas. JANGAN PERNAH mengarang nama POJK fiktif, tahun fiktif, atau menebak nomor pasal yang tidak tertulis.
 6. STATUS REGULASI & KETENTUAN PENGGANTI: Perhatikan catatan status regulasi pada header dokumen (Status: berlaku vs dicabut/diubah). Selalu utamakan dan dasarkan jawaban pada regulasi yang berstatus BERLAKU. Jika regulasi terdahulu telah dicabut (misalnya POJK 6/2022 dicabut oleh POJK 22/2023), nyatakan secara tegas bahwa ketentuan tersebut telah digantikan.
@@ -88,7 +94,9 @@ STRICT ANSWERING RULES:
    - Prioritize Primary Imperative Norms ("wajib", "harus", "dilarang") over permissive exceptions ("dapat"). If an article/clause establishes a general obligation ("wajib") and subsequent clauses provide conditional permissions/exceptions ("dapat ... sepanjang izin"), state the primary general obligation first, then mention the exception if applicable.
    - Legal Subject & Grammatical Agent Alignment: The opening sentence MUST retain the exact institutional entity queried by the user as its grammatical subject (e.g., if asked about "Bank Umum", use "Bank Umum" or "Bank", NEVER replace it with "PUJK" or unrelated sectors). If the question inquires about an entity's obligation or prohibition (e.g. "Bank wajib...", "PUJK must..."), you MUST cite the clause where that entity is the primary grammatical subject of the obligation (e.g. "Bank must place..."), NOT provisions where the supervisory authority is the subject exercising discretionary or corrective enforcement powers (e.g. "OJK may request/order..."). Authority enforcement powers may only be cited as secondary qualifications.
    - Sentence-Wide Entity Consistency & Co-Reference: Maintain the queried institutional entity consistently across all sentences and explanatory clauses. NEVER mix different nomenclature within the same sentence (e.g. opening with "Lembaga Jasa Keuangan must..." but ending with "...received by PUJK"). Use consistent entity naming throughout the response.
-3. You MUST cite the exact regulation, article, and clause in square brackets for every factual assertion with standard format: [<Official/Short Regulation Name>, Pasal <Number> ayat (<Clause>)]. Do not write citations outside square brackets.
+   - ANTI-INTER-PASSAGE CAUSAL STITCHING: NEVER combine clauses from different articles or regulations into a conditional, cause-and-effect, or chronological link that is not explicitly stated in the statutory text (e.g., fabricating 'In the absence of agreement, the financial institution must handle complaints in writing...'). Present obligations of distinct articles independently and faithfully.
+   - FOCUS ON ENTITY OBLIGATIONS (NOT THIRD-PARTY REMEDIES): When answering an entity's operational duties, procedures, or deadlines, focus strictly on the actions the entity itself is mandated to perform, NOT on external dispute escalation options available to consumers.
+3. You MUST cite the exact regulation, article, and clause in square brackets for every factual assertion with standard format: [<Official/Short Regulation Name>, Pasal <Number> ayat (<Clause>)]. Do not write citations outside square brackets and NEVER use narrative introductory phrasing (such as ', as stipulated in...').
 4. ONLY IF the provided regulatory passages genuinely do NOT contain rules answering the question, state that no legal basis was found in the available regulations. STRICTLY FORBIDDEN from misapplying or analogizing requirements across disjoint financial sectors.
 5. STRICT ANTI-HALLUCINATION CLAUSE: ONLY cite official regulations and articles that are explicitly written in the headers or body of the provided context passages. NEVER fabricate fictitious regulation names, old/fake years, or imaginary article/clause numbers.
 6. REGULATION STATUS & PRECEDENCE: Observe document status headers (Status: berlaku vs dicabut/diubah). Always prioritize regulations marked as in-force (berlaku). If an earlier regulation was revoked (e.g., POJK 6/2022 revoked by POJK 22/2023), state explicitly that it has been superseded.
@@ -212,6 +220,17 @@ def _detect_statutory_role(text: str) -> str:
     perm_match = re.search(perm_pattern, norm)
     has_permission = perm_match is not None
 
+    # 2b. Consumer dispute filing & external remedy options:
+    # e.g., "Konsumen dapat: a. menyampaikan pengaduan...", "mengajukan sengketa kepada lembaga atau badan..."
+    remedy_pattern = (
+        r"\b(?:konsumen|nasabah|pengguna)\s+dapat\s*:\s*(?:[a-z]\.|\d+\.)"
+        r"|\b(?:konsumen|nasabah|pengguna)\s+dapat\s+(?:menyampaikan\s+pengaduan|mengajukan\s+sengketa|memilih\s+upaya|mengajukan\s+keberatan)\b"
+        r"|\b(?:mengajukan\s+sengketa\s+kepada\s+lembaga|penyelesaian\s+sengketa\s+(?:di\s+luar\s+pengadilan|melalui\s+pengadilan|ke\s+laps))\b"
+        r"|\bdalam\s+hal\s+tidak\s+terdapat\s+kesepakatan\b[^.]{0,100}\bkonsumen\s+dapat\b"
+    )
+    remedy_match = re.search(remedy_pattern, norm)
+    has_consumer_remedy = remedy_match is not None
+
     # 3. Primary imperative duties of entities: "Bank wajib", "PUJK wajib", "Perusahaan dilarang"
     duty_pattern = (
         r"\b(?:bank\s+umum|bank|bpr|pujk|pjk|perusahaan\s+efek|perusahaan|penyelenggara|ljk|emiten|"
@@ -248,6 +267,8 @@ def _detect_statutory_role(text: str) -> str:
         return "[Peran: Wewenang Korektif Otoritas / Sanksi]"
     if has_entity_duty:
         return "[Peran: Kewajiban Pokok Entitas]"
+    if has_consumer_remedy:
+        return "[Peran: Opsi Sengketa / Pemulihan Konsumen]"
     if has_authority:
         return "[Peran: Wewenang Korektif Otoritas / Sanksi]"
     if has_permission:
@@ -366,7 +387,20 @@ def score_primary_obligation_alignment(chunk: RetrievedChunk, query: str) -> flo
         else:
             score += 0.2
 
-    # 5. Topical Content Keyword Overlap
+    # 5. Concrete Numerical Statutory Deadlines / Time Limits
+    # Specific statutory deadlines ("paling lama 5 (lima) hari kerja", "paling lambat 10 hari")
+    # are the most concrete operational answers for entity obligation queries.
+    if re.search(r"\bpaling\s+(?:lama|lambat)\s+\d+\s*(?:\([a-z\s]+\)\s*)?hari\b", norm_body):
+        score += 1.5
+
+    # 6. Binding Regulatory Precedence (UU, POJK, PBI, PP over SEOJK circulars)
+    doc_id_low = (chunk.doc_id or "").lower()
+    if any(p in doc_id_low for p in ("pojk", "pbi", "uu_", "pp_")):
+        score += 0.5
+    elif any(p in doc_id_low for p in ("seojk", "sebi")):
+        score -= 0.3
+
+    # 7. Topical Content Keyword Overlap
     stop_tokens = {
         "apa",
         "apakah",

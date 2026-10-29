@@ -1189,3 +1189,76 @@ def test_multi_sector_obligation_realignment_regression_suite() -> None:
         )
         assert sc["expected_citation"] in final_cites, f"Citation mismatch: {final_cites}"
         assert f"[{sc['expected_citation']}]" in final_ans
+
+
+def test_reformat_narrative_citations_to_brackets() -> None:
+    """Verify conversion of narrative conversational citations into canonical bracketed citations."""
+    from easypasal.guardrails.citation_verifier import reformat_narrative_citations_to_brackets
+
+    # Indonesian narrative citations
+    s1 = "Lembaga Jasa Keuangan wajib menangani Pengaduan secara tertulis, seperti yang ditetapkan dalam POJK 22 Tahun 2023, Pasal 71 ayat (1)."
+    res1 = reformat_narrative_citations_to_brackets(s1)
+    assert "[POJK 22 Tahun 2023, Pasal 71 ayat (1)]" in res1
+    assert "seperti yang ditetapkan dalam" not in res1
+
+    s2 = "Mekanisme pengaduan wajib dilaksanakan sebagaimana diatur dalam UU Nomor 4 Tahun 2023, Pasal 245 ayat (1)."
+    res2 = reformat_narrative_citations_to_brackets(s2)
+    assert "[UU Nomor 4 Tahun 2023, Pasal 245 ayat (1)]" in res2
+    assert "sebagaimana diatur dalam" not in res2
+
+    # English narrative citations
+    s3 = "Banks must retain customer records as stipulated in POJK 8 Tahun 2023, Pasal 18 ayat (1)."
+    res3 = reformat_narrative_citations_to_brackets(s3)
+    assert "[POJK 8 Tahun 2023, Pasal 18 ayat (1)]" in res3
+    assert "as stipulated in" not in res3
+
+
+def test_decouple_confabulated_causality() -> None:
+    """Verify removal of false causal linkage between dispute deadlock and written complaint duty."""
+    from easypasal.guardrails.citation_verifier import decouple_confabulated_causality
+
+    bad_stmt = (
+        "Dalam hal tidak terdapat kesepakatan terhadap hasil penanganan pengaduan yang dilakukan oleh "
+        "Lembaga Jasa Keuangan, Lembaga Jasa Keuangan wajib menangani pengaduan secara tertulis "
+        "bagi Konsumen yang telah melengkapi dokumen yang dipersyaratkan."
+    )
+    cleaned = decouple_confabulated_causality(bad_stmt)
+    assert "Dalam hal tidak terdapat kesepakatan terhadap hasil" not in cleaned
+    assert "Selain itu, Lembaga Jasa Keuangan wajib menangani pengaduan secara tertulis" in cleaned
+
+
+def test_realign_consumer_dispute_clause_attribution() -> None:
+    """Verify clause attribution realignment when consumer dispute options cite Ayat 1 instead of Ayat 2."""
+    from easypasal.guardrails.citation_verifier import detect_and_realign_inverted_citations
+
+    chunk_ayat1 = _make_chunk(
+        "uu4_245_1",
+        "UU Nomor 4 Tahun 2023",
+        "UU Nomor 4 Tahun 2023, Pasal 245 ayat (1)",
+        pasal="245",
+        ayat="1",
+        text="(1) PUSK wajib memiliki dan melaksanakan mekanisme penanganan pengaduan yang disampaikan oleh Konsumen.",
+    )
+    chunk_ayat2 = _make_chunk(
+        "uu4_245_2",
+        "UU Nomor 4 Tahun 2023",
+        "UU Nomor 4 Tahun 2023, Pasal 245 ayat (2)",
+        pasal="245",
+        ayat="2",
+        text="(2) Dalam hal tidak terdapat kesepakatan terhadap hasil penanganan pengaduan, Konsumen dapat: a. menyampaikan pengaduan kepada otoritas sektor keuangan; atau b. mengajukan sengketa kepada lembaga atau badan penyelesaian sengketa.",
+    )
+
+    ans = (
+        "Konsumen dapat mengajukan sengketa kepada lembaga atau badan penyelesaian sengketa "
+        "jika tidak terdapat kesepakatan [UU Nomor 4 Tahun 2023, Pasal 245 ayat (1)]."
+    )
+    q = "Bagaimana kewajiban penanganan pengaduan konsumen?"
+
+    realigned_text, cites, replacements = detect_and_realign_inverted_citations(
+        answer=ans,
+        retrieved_chunks=[chunk_ayat1, chunk_ayat2],
+        question=q,
+    )
+
+    assert "[UU Nomor 4 Tahun 2023, Pasal 245 ayat (2)]" in realigned_text
+    assert "UU Nomor 4 Tahun 2023, Pasal 245 ayat (2)" in cites

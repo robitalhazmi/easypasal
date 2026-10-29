@@ -879,3 +879,94 @@ def test_score_primary_obligation_alignment_and_inverted_prose_citations() -> No
     prose_text = "Dalam Pasal 36 ayat (4) dari POJK 11/POJK.03/2022, Otoritas Jasa Keuangan dapat meminta Bank."
     extracted = extract_citations(prose_text)
     assert "POJK 11/POJK.03/2022, Pasal 36 ayat (4)" in extracted
+
+
+def test_detect_consumer_remedy_role_and_deadline_scoring() -> None:
+    """Verify detection of consumer dispute remedy role and statutory deadline boost in scoring."""
+    from easypasal.generation.prompts import (
+        _detect_statutory_role,
+        score_primary_obligation_alignment,
+    )
+
+    t_dispute = (
+        "[UU Nomor 4 Tahun 2023 | Pasal 245 ayat (2)]\n"
+        "(2) Dalam hal tidak terdapat kesepakatan terhadap hasil penanganan pengaduan yang dilakukan oleh PUSK, "
+        "Konsumen dapat: a. menyampaikan pengaduan kepada otoritas sektor keuangan; atau b. mengajukan sengketa kepada lembaga atau badan penyelesaian sengketa."
+    )
+    assert _detect_statutory_role(t_dispute) == "[Peran: Opsi Sengketa / Pemulihan Konsumen]"
+
+    q = "Bagaimana kewajiban Lembaga Jasa Keuangan dalam menangani dan menyelesaikan pengaduan konsumen?"
+
+    c_deadline = _make_dummy_chunk(
+        "c_pojk22_74_1",
+        "POJK 22 Tahun 2023, Pasal 74 ayat (1)",
+        "[POJK 22 Tahun 2023 | Pasal 74 ayat (1)]\n"
+        "(1) PUJK wajib melakukan tindak lanjut dan menyelesaikan Pengaduan secara lisan paling lama 5 (lima) hari kerja sejak Pengaduan diterima.",
+        doc_number="POJK 22 Tahun 2023",
+    )
+    c_deadline.doc_id = "POJK_22_Tahun_2023"
+    c_deadline.pasal = "74"
+    c_deadline.ayat = "1"
+
+    c_general = _make_dummy_chunk(
+        "c_uu4_245_1",
+        "UU Nomor 4 Tahun 2023, Pasal 245 ayat (1)",
+        "[UU Nomor 4 Tahun 2023 | Pasal 245 ayat (1)]\n"
+        "(1) PUSK wajib memiliki dan melaksanakan mekanisme penanganan pengaduan yang disampaikan oleh Konsumen.",
+        doc_number="UU Nomor 4 Tahun 2023",
+    )
+    c_general.doc_id = "UU_Nomor_4_Tahun_2023"
+    c_general.pasal = "245"
+    c_general.ayat = "1"
+
+    sc_deadline = score_primary_obligation_alignment(c_deadline, q)
+    sc_general = score_primary_obligation_alignment(c_general, q)
+
+    # Deadline chunk receives the +1.5 concrete statutory deadline boost
+    assert sc_deadline >= 7.0
+    assert sc_deadline > sc_general
+
+
+def test_prune_remedial_distractors_consumer_remedy() -> None:
+    """Verify prune_remedial_distractors filters out consumer remedy options on obligation queries."""
+    from easypasal.generation.pipeline import prune_remedial_distractors
+
+    q = "Bagaimana kewajiban Lembaga Jasa Keuangan dalam menangani dan menyelesaikan pengaduan konsumen?"
+
+    c_primary1 = _make_dummy_chunk(
+        "c_74",
+        "POJK 22 Tahun 2023, Pasal 74 ayat (1)",
+        "[POJK 22 Tahun 2023 | Pasal 74 ayat (1)]\n(1) PUJK wajib menyelesaikan Pengaduan secara lisan paling lama 5 (lima) hari kerja.",
+        doc_number="POJK 22 Tahun 2023",
+    )
+    c_primary1.doc_id = "POJK_22_Tahun_2023"
+    c_primary1.status = "berlaku"
+    c_primary1.pasal = "74"
+    c_primary1.ayat = "1"
+
+    c_primary2 = _make_dummy_chunk(
+        "c_75",
+        "POJK 22 Tahun 2023, Pasal 75 ayat (1)",
+        "[POJK 22 Tahun 2023 | Pasal 75 ayat (1)]\n(1) PUJK wajib menyelesaikan Pengaduan secara tertulis paling lama 10 (sepuluh) hari kerja.",
+        doc_number="POJK 22 Tahun 2023",
+    )
+    c_primary2.doc_id = "POJK_22_Tahun_2023"
+    c_primary2.status = "berlaku"
+    c_primary2.pasal = "75"
+    c_primary2.ayat = "1"
+
+    c_dispute = _make_dummy_chunk(
+        "c_245_2",
+        "UU Nomor 4 Tahun 2023, Pasal 245 ayat (2)",
+        "[UU Nomor 4 Tahun 2023 | Pasal 245 ayat (2)]\n(2) Dalam hal tidak terdapat kesepakatan, Konsumen dapat: a. menyampaikan pengaduan kepada otoritas...",
+        doc_number="UU Nomor 4 Tahun 2023",
+    )
+    c_dispute.doc_id = "UU_Nomor_4_Tahun_2023"
+    c_dispute.status = "berlaku"
+    c_dispute.pasal = "245"
+    c_dispute.ayat = "2"
+
+    pruned = prune_remedial_distractors([c_dispute, c_primary1, c_primary2], q)
+    chunk_ids = [c.chunk_id for c in pruned]
+    assert "c_245_2" not in chunk_ids
+    assert chunk_ids[0] in ("c_74", "c_75")

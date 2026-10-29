@@ -511,3 +511,42 @@ def test_amendment_quoted_pasal_chunking() -> None:
     assert len(p26_chunks) == 1
     assert p26_chunks[0].chunk_id == "UU_Amend_1998_pasal_26_ayat_1"
     assert "emisi saham" in p26_chunks[0].raw_content
+
+
+def test_ocr_clause_normalization() -> None:
+    """Verify that OCR artifacts like '(21 ' without newline and 'Ayat (21' in explanations are normalized into atomic clauses."""
+    statute_text = (
+        "BAB I\n"
+        "KETENTUAN UMUM\n"
+        "Pasal 245\n"
+        "(1) PUSK wajib memiliki dan melaksanakan mekanisme penanganan pengaduan yang disampaikan oleh Konsumen. "
+        "(21 Dalam hal tidak terdapat kesepakatan terhadap hasil penanganan pengaduan, Konsumen dapat:\n"
+        "a. menyampaikan pengaduan kepada otoritas;\n"
+        "b. mengajukan sengketa kepada badan penyelesaian sengketa.\n"
+        "\nPENJELASAN ATAS UNDANG-UNDANG\n"
+        "Pasal 245\n"
+        "Ayat (1)\n"
+        "Cukup jelas.\n"
+        "Ayat (21\n"
+        "Yang dimaksud dengan sengketa adalah sengketa perdata.\n"
+    )
+    doc = ParsedDocument(
+        doc_id="UU_Test_2023",
+        filename="UU_Test_2023.pdf",
+        total_pages=2,
+        clean_text=statute_text,
+        metadata={"doc_number": "UU Nomor 4 Tahun 2023", "year": 2023},
+    )
+    chunker = StructureAwareChunker()
+    chunks = chunker.chunk(doc)
+
+    c_ayat1 = [c for c in chunks if c.chunk_id == "UU_Test_2023_pasal_245_ayat_1"]
+    c_ayat2 = [c for c in chunks if c.chunk_id == "UU_Test_2023_pasal_245_ayat_2"]
+    assert len(c_ayat1) == 1
+    assert len(c_ayat2) == 1
+    assert "(21" not in c_ayat1[0].raw_content
+    assert c_ayat2[0].raw_content.startswith("(2) Dalam hal tidak terdapat kesepakatan")
+
+    c_penj2 = [c for c in chunks if c.chunk_id == "UU_Test_2023_penjelasan_pasal_245_ayat_2"]
+    assert len(c_penj2) == 1
+    assert "Yang dimaksud dengan sengketa" in c_penj2[0].raw_content
