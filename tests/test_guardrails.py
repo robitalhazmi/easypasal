@@ -1262,3 +1262,86 @@ def test_realign_consumer_dispute_clause_attribution() -> None:
 
     assert "[UU Nomor 4 Tahun 2023, Pasal 245 ayat (2)]" in realigned_text
     assert "UU Nomor 4 Tahun 2023, Pasal 245 ayat (2)" in cites
+
+
+def test_simplify_dangling_cross_references() -> None:
+    """Verify dangling internal statutory cross-references are simplified into self-contained prose."""
+    from easypasal.guardrails.citation_verifier import simplify_dangling_cross_references
+
+    raw = (
+        "PUJK wajib menyelesaikan Pengaduan secara tertulis paling lama 10 (sepuluh) hari kerja "
+        "sejak dokumen sebagaimana dimaksud dalam Pasal 71 ayat (2) dan/atau ayat (3) diterima secara lengkap."
+    )
+    cleaned = simplify_dangling_cross_references(raw)
+    assert "Pasal 71 ayat (2)" not in cleaned
+    assert "sejak dokumen yang dipersyaratkan diterima secara lengkap." in cleaned
+
+    raw2 = "Bank wajib memenuhi persyaratan sebagaimana dimaksud dalam Pasal 14 ayat (1)."
+    cleaned2 = simplify_dangling_cross_references(raw2)
+    assert "persyaratan yang ditetapkan" in cleaned2
+
+
+def test_sentence_level_citation_alignment_and_bridge_sanitization() -> None:
+    """Verify per-sentence citation attribution, sibling realignment, and confabulated conditional removal."""
+    from easypasal.guardrails.citation_verifier import (
+        detect_and_realign_inverted_citations,
+        verify_citations,
+    )
+
+    q = "Bagaimana kewajiban Lembaga Jasa Keuangan dalam menangani dan menyelesaikan pengaduan konsumen?"
+    c_74 = _make_chunk(
+        "POJK_22_2023_p74_a1",
+        "POJK 22 Tahun 2023",
+        "POJK 22 Tahun 2023, Pasal 74 ayat (1)",
+        pasal="74",
+        ayat="1",
+        text="[POJK 22 Tahun 2023, Pasal 74 ayat (1)] (1) PUJK wajib melakukan tindak lanjut dan menyelesaikan Pengaduan secara lisan paling lama 5 (lima) hari kerja sejak Pengaduan diterima PUJK.",
+    )
+    c_75 = _make_chunk(
+        "POJK_22_2023_p75_a1",
+        "POJK 22 Tahun 2023",
+        "POJK 22 Tahun 2023, Pasal 75 ayat (1)",
+        pasal="75",
+        ayat="1",
+        text="[POJK 22 Tahun 2023, Pasal 75 ayat (1)] (1) PUJK wajib melakukan tindak lanjut dan melakukan penyelesaian Pengaduan secara tertulis paling lama 10 (sepuluh) hari kerja sejak dokumen sebagaimana dimaksud dalam Pasal 71 ayat (2) dan/atau ayat (3) diterima secara lengkap.",
+    )
+    c_71 = _make_chunk(
+        "POJK_22_2023_p71_a1",
+        "POJK 22 Tahun 2023",
+        "POJK 22 Tahun 2023, Pasal 71 ayat (1)",
+        pasal="71",
+        ayat="1",
+        text="[POJK 22 Tahun 2023, Pasal 71 ayat (1)] (1) PUJK wajib menangani Pengaduan secara tertulis bagi Konsumen yang telah melengkapi dokumen yang dipersyaratkan.",
+    )
+
+    raw_answer = (
+        "Lembaga Jasa Keuangan wajib melakukan tindak lanjut dan menyelesaikan Pengaduan secara lisan "
+        "paling lama 5 (lima) hari kerja sejak Pengaduan diterima Lembaga Jasa Keuangan. "
+        "Jika dokumen pengaduan belum lengkap, Lembaga Jasa Keuangan juga wajib melakukan tindak lanjut "
+        "dan menyelesaikan Pengaduan secara tertulis paling lama 10 (sepuluh) hari kerja sejak dokumen "
+        "sebagaimana dimaksud dalam Pasal 71 ayat (2) dan/atau ayat (3) diterima secara lengkap "
+        "[POJK 22 Tahun 2023, Pasal 74 ayat (1)]."
+    )
+
+    realigned, cites, _repl = detect_and_realign_inverted_citations(
+        answer=raw_answer,
+        retrieved_chunks=[c_74, c_75, c_71],
+        question=q,
+    )
+
+    # 1. Confabulated conditional bridge "Jika dokumen pengaduan belum lengkap," replaced with "Selain itu,"
+    assert "Jika dokumen pengaduan belum lengkap" not in realigned
+    assert "Selain itu, Lembaga Jasa Keuangan juga wajib" in realigned
+
+    # 2. Dangling internal reference simplified
+    assert "Pasal 71 ayat (2)" not in realigned
+    assert "dokumen yang dipersyaratkan diterima secara lengkap" in realigned
+
+    # 3. Both Pasal 74 ayat (1) and Pasal 75 ayat (1) accurately cited on their respective sentences
+    assert "POJK 22 Tahun 2023, Pasal 74 ayat (1)" in cites
+    assert "POJK 22 Tahun 2023, Pasal 75 ayat (1)" in cites
+    assert "diterima Lembaga Jasa Keuangan [POJK 22 Tahun 2023, Pasal 74 ayat (1)]." in realigned
+    assert "diterima secara lengkap [POJK 22 Tahun 2023, Pasal 75 ayat (1)]." in realigned
+
+    ver = verify_citations(realigned, [c_74, c_75, c_71], cites, question=q)
+    assert ver.is_valid is True

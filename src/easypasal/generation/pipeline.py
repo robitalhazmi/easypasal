@@ -54,7 +54,10 @@ def prune_remedial_distractors(
         if c.status and c.status != "berlaku":
             continue
         role = _detect_statutory_role(c.text)
-        if role == "[Peran: Kewajiban Pokok Entitas]":
+        if (
+            role == "[Peran: Kewajiban Pokok Entitas]"
+            and score_primary_obligation_alignment(c, query) > 0.0
+        ):
             digits = tuple(sorted(re.findall(r"\d+", c.doc_number or c.doc_id or "")))
             if digits:
                 regs_with_primary_obligation.add(f"{digits}")
@@ -69,6 +72,18 @@ def prune_remedial_distractors(
         digits = tuple(sorted(re.findall(r"\d+", c.doc_number or c.doc_id or "")))
         doc_key = f"{digits}" if digits else (c.doc_number or "").lower().strip()
         role = _detect_statutory_role(c.text)
+
+        # Prune off-entity primary obligations (e.g. LAPS duty on an LJK/PUJK query)
+        if (
+            role == "[Peran: Kewajiban Pokok Entitas]"
+            and score_primary_obligation_alignment(c, query) == 0.0
+        ):
+            logger.info(
+                "Pruning off-entity primary clause %s (%s) from obligation query context",
+                c.citation_label,
+                c.chunk_id,
+            )
+            continue
 
         # If this regulation has a primary obligation, prune secondary remedial / exception / dispute / elucidation chunks
         if role == "[Peran: Opsi Sengketa / Pemulihan Konsumen]" or (
@@ -93,20 +108,27 @@ def prune_remedial_distractors(
     result = pruned if pruned else list(chunks)
 
     # Ensure the strongest primary obligation chunk is placed at index 0 (DOKUMEN 1),
-    # and all other high-scoring primary sibling chunks are promoted right after it.
+    # and all other high-scoring primary sibling chunks are promoted right after it (up to 3 per doc).
     if len(result) > 1:
         scored = [
             (score_primary_obligation_alignment(c, query), -idx, c) for idx, c in enumerate(result)
         ]
         best_score, _neg_idx, best_c = max(scored, key=lambda item: (item[0], item[1]))
         if best_score > 0:
-            other_primaries = [
-                c
-                for s, _neg_idx, c in sorted(
-                    scored, key=lambda item: (item[0], item[1]), reverse=True
-                )
-                if c.chunk_id != best_c.chunk_id and s >= 2.0
-            ]
+            doc_primary_counts: dict[str, int] = {}
+            best_doc_key = (best_c.doc_id or best_c.doc_number or "").lower().strip()
+            if best_doc_key:
+                doc_primary_counts[best_doc_key] = 1
+            other_primaries: list[RetrievedChunk] = []
+            for s, _neg_idx, c in sorted(scored, key=lambda item: (item[0], item[1]), reverse=True):
+                if c.chunk_id == best_c.chunk_id or s < 2.0:
+                    continue
+                d_key = (c.doc_id or c.doc_number or "").lower().strip()
+                if d_key and doc_primary_counts.get(d_key, 0) >= 3:
+                    continue
+                if d_key:
+                    doc_primary_counts[d_key] = doc_primary_counts.get(d_key, 0) + 1
+                other_primaries.append(c)
             remaining = [
                 c
                 for c in result

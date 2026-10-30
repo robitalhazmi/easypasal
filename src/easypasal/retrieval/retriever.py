@@ -248,13 +248,22 @@ def _expand_primary_statutory_norms(
     if best_score >= 2.0:
         top_score = max(c.score for c in chunks)
         best_chunk.score = round(top_score + 0.01, 6)
-        other_primaries = [
-            c
-            for s, idx, c in sorted(
-                scored_primaries, key=lambda item: (item[0], -item[1]), reverse=True
-            )
-            if c.chunk_id != best_chunk.chunk_id and s >= 2.0
-        ]
+        doc_primary_counts: dict[str, int] = {}
+        best_doc_key = (best_chunk.doc_id or best_chunk.doc_number or "").lower().strip()
+        if best_doc_key:
+            doc_primary_counts[best_doc_key] = 1
+        other_primaries: list[RetrievedChunk] = []
+        for s, _idx, c in sorted(
+            scored_primaries, key=lambda item: (item[0], -item[1]), reverse=True
+        ):
+            if c.chunk_id == best_chunk.chunk_id or s < 2.0:
+                continue
+            d_key = (c.doc_id or c.doc_number or "").lower().strip()
+            if d_key and doc_primary_counts.get(d_key, 0) >= 3:
+                continue
+            if d_key:
+                doc_primary_counts[d_key] = doc_primary_counts.get(d_key, 0) + 1
+            other_primaries.append(c)
         remaining = [
             c
             for c in chunks

@@ -103,8 +103,20 @@ def extract_citations(text: str) -> list[str]:
             seen.add(clean.lower())
             citations.append(clean)
 
+    # Strip internal statutory cross-references ("sebagaimana dimaksud dalam Pasal 71 ayat (2)")
+    # from non-bracketed prose so they are not extracted as standalone legal citations.
+    prose_without_internal_refs = re.sub(
+        r"\bsebagaimana\s+dimaksud\s+(?:dalam|pada)\s+Pasal\s+\d+[a-z]?"
+        r"(?:\s+ayat\s+\(\d+[a-z]?\))?"
+        r"(?:\s+(?:dan/atau|serta|dan|atau)\s+ayat\s+\(\d+[a-z]?\))*"
+        r"(?:\s+(?:dari\s+|dalam\s+|pada\s+)?(?:Undang-Undang|UU|POJK|PBI|PADG|SEOJK|PP|Perpu)\s+(?:Nomor\s+)?[\w\.\/\-]+(?:\s+Tahun\s+\d{4})?)?",
+        " ",
+        text,
+        flags=re.IGNORECASE,
+    )
+
     # 2. Inverted Inline Prose Citations (e.g. "Pasal 36 ayat (4) dari POJK 11/POJK.03/2022")
-    for match in _INVERTED_PROSE_STATUTORY_REGEX.finditer(text):
+    for match in _INVERTED_PROSE_STATUTORY_REGEX.finditer(prose_without_internal_refs):
         pasal_part = match.group(1).strip()
         reg_part = match.group(2).strip()
         canonical = f"{reg_part}, {pasal_part}"
@@ -114,7 +126,7 @@ def extract_citations(text: str) -> list[str]:
             citations.append(canonical)
 
     # 3. Inline Statutory Pattern Matches
-    for match in _STATUTORY_REGEX.finditer(text):
+    for match in _STATUTORY_REGEX.finditer(prose_without_internal_refs):
         raw = match.group(0).strip()
         r_low = raw.lower()
         if raw and r_low not in seen and not any(r_low in c.lower() for c in citations):

@@ -970,3 +970,56 @@ def test_prune_remedial_distractors_consumer_remedy() -> None:
     chunk_ids = [c.chunk_id for c in pruned]
     assert "c_245_2" not in chunk_ids
     assert chunk_ids[0] in ("c_74", "c_75")
+
+
+def test_laps_subject_excluded_on_ljk_obligation_query() -> None:
+    """Verify LAPS (third-party dispute body) obligations score 0.0 and are pruned on LJK/PUJK queries."""
+    from easypasal.generation.pipeline import prune_remedial_distractors
+    from easypasal.generation.prompts import score_primary_obligation_alignment
+
+    q = "Bagaimana kewajiban Lembaga Jasa Keuangan dalam menangani dan menyelesaikan pengaduan konsumen?"
+
+    c_laps = _make_dummy_chunk(
+        "c_laps_31",
+        "POJK 61/POJK.07/2020, Pasal 31 ayat (1)",
+        "[POJK 61/POJK.07/2020 | Pasal 31 ayat (1)]\n(1) LAPS Sektor Jasa Keuangan wajib memiliki peraturan mengenai mekanisme pelayanan dan penyelesaian sengketa.",
+        doc_number="POJK 61/POJK.07/2020",
+    )
+    c_laps.doc_id = "POJK_61_2020"
+    c_laps.status = "berlaku"
+    c_laps.pasal = "31"
+    c_laps.ayat = "1"
+
+    c_pujk = _make_dummy_chunk(
+        "c_74",
+        "POJK 22 Tahun 2023, Pasal 74 ayat (1)",
+        "[POJK 22 Tahun 2023 | Pasal 74 ayat (1)]\n(1) PUJK wajib melakukan tindak lanjut dan menyelesaikan Pengaduan secara lisan paling lama 5 (lima) hari kerja.",
+        doc_number="POJK 22 Tahun 2023",
+    )
+    c_pujk.doc_id = "POJK_22_2023"
+    c_pujk.status = "berlaku"
+    c_pujk.pasal = "74"
+    c_pujk.ayat = "1"
+
+    assert score_primary_obligation_alignment(c_laps, q) == 0.0
+    assert score_primary_obligation_alignment(c_pujk, q) > 5.0
+
+    # When query explicitly asks about LAPS, it should score positively
+    q_laps = "Apa kewajiban LAPS Sektor Jasa Keuangan dalam penyelesaian sengketa?"
+    assert score_primary_obligation_alignment(c_laps, q_laps) > 2.0
+
+    pruned = prune_remedial_distractors([c_laps, c_pujk], q)
+    assert [c.chunk_id for c in pruned] == ["c_74"]
+
+
+def test_extract_citations_ignores_internal_cross_references() -> None:
+    """Verify extract_citations ignores 'sebagaimana dimaksud dalam Pasal ...' internal cross-references."""
+    from easypasal.generation.citations import extract_citations
+
+    text = (
+        "Lembaga Jasa Keuangan wajib menyelesaikan Pengaduan secara tertulis paling lama 10 (sepuluh) hari kerja "
+        "sejak dokumen sebagaimana dimaksud dalam Pasal 71 ayat (2) dan/atau ayat (3) diterima secara lengkap "
+        "[POJK 22 Tahun 2023, Pasal 75 ayat (1)]."
+    )
+    cites = extract_citations(text)
+    assert cites == ["POJK 22 Tahun 2023, Pasal 75 ayat (1)"]

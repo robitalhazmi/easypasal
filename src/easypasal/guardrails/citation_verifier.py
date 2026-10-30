@@ -605,16 +605,161 @@ def reformat_narrative_citations_to_brackets(text: str) -> str:
     return text
 
 
-def decouple_confabulated_causality(text: str) -> str:
-    """Decouple confabulated causal/conditional links between unrelated statutory clauses.
+def simplify_dangling_cross_references(text: str) -> str:
+    """Replace dangling internal statutory cross-references in generated prose with self-contained descriptions.
 
-    Removes false conditions such as:
-    'Dalam hal tidak terdapat kesepakatan terhadap hasil penanganan pengaduan..., Lembaga Jasa Keuangan wajib menangani pengaduan secara tertulis...'
-    and restores them as independent statements.
+    Converts phrases like 'dokumen sebagaimana dimaksud dalam Pasal 71 ayat (2) dan/atau ayat (3)'
+    into 'dokumen yang dipersyaratkan' so the answer remains self-contained and does not leak
+    unretrieved cross-referenced article numbers.
     """
     if not text:
         return text
 
+    # 1. "dokumen sebagaimana dimaksud dalam Pasal X [ayat (Y) dan/atau ayat (Z)]" -> "dokumen yang dipersyaratkan"
+    text = re.sub(
+        r"\bdokumen\s+sebagaimana\s+dimaksud\s+(?:dalam|pada)\s+Pasal\s+\d+[a-z]?"
+        r"(?:\s+ayat\s+\(\d+[a-z]?\))?"
+        r"(?:\s+(?:dan/atau|serta|dan|atau)\s+ayat\s+\(\d+[a-z]?\))*",
+        "dokumen yang dipersyaratkan",
+        text,
+        flags=re.IGNORECASE,
+    )
+
+    # 2. "persyaratan sebagaimana dimaksud dalam Pasal X..." -> "persyaratan yang ditetapkan"
+    text = re.sub(
+        r"\bpersyaratan\s+sebagaimana\s+dimaksud\s+(?:dalam|pada)\s+Pasal\s+\d+[a-z]?"
+        r"(?:\s+ayat\s+\(\d+[a-z]?\))?"
+        r"(?:\s+(?:dan/atau|serta|dan|atau)\s+ayat\s+\(\d+[a-z]?\))*",
+        "persyaratan yang ditetapkan",
+        text,
+        flags=re.IGNORECASE,
+    )
+
+    return text
+
+
+_SENTENCE_STOPWORDS: set[str] = {
+    "yang",
+    "dalam",
+    "untuk",
+    "pada",
+    "oleh",
+    "dari",
+    "atau",
+    "serta",
+    "dengan",
+    "sejak",
+    "paling",
+    "lama",
+    "hari",
+    "kerja",
+    "wajib",
+    "harus",
+    "melakukan",
+    "lembaga",
+    "jasa",
+    "keuangan",
+    "pelaku",
+    "usaha",
+    "pujk",
+    "bank",
+    "umum",
+    "konsumen",
+    "pasal",
+    "ayat",
+    "angka",
+    "huruf",
+    "tahun",
+    "nomor",
+    "pojk",
+    "sebagaimana",
+    "dimaksud",
+    "tersebut",
+    "apabila",
+    "jika",
+    "juga",
+    "selain",
+}
+
+
+def _score_sentence_chunk_match(sentence: str, chunk: RetrievedChunk) -> float:
+    """Compute fine-grained lexical, numerical, and modality alignment between a single sentence and a chunk."""
+    from easypasal.generation.prompts import _legal_stem
+
+    # Strip bracketed citations and statutory designators before comparing numbers
+    s_clean = re.sub(r"\[[^\]]+\]", " ", sentence.lower())
+    s_no_ref = re.sub(
+        r"\b(?:pasal|ayat|angka|tahun|nomor|pojk|uu|pbi|padg|seojk)\s*\(?\d+[a-z]?\)?",
+        " ",
+        s_clean,
+    )
+    c_body = re.sub(r"^\[[^\]]+\]\s*", "", chunk.text.strip()).lower()
+    c_no_ref = re.sub(
+        r"\b(?:pasal|ayat|angka|tahun|nomor|pojk|uu|pbi|padg|seojk)\s*\(?\d+[a-z]?\)?",
+        " ",
+        c_body,
+    )
+
+    s_nums = set(re.findall(r"\b\d+\b", s_no_ref))
+    c_nums = set(re.findall(r"\b\d+\b", c_no_ref))
+
+    score = 0.0
+    if s_nums:
+        if s_nums <= c_nums:
+            score += 3.5
+        elif s_nums & c_nums:
+            score += 1.5
+        else:
+            score -= 2.5
+
+    # Modality concordance (oral vs written)
+    s_lisan = bool(re.search(r"\blisan\b", s_clean))
+    c_lisan = bool(re.search(r"\blisan\b", c_body))
+    s_tertulis = bool(re.search(r"\btertulis\b", s_clean))
+    c_tertulis = bool(re.search(r"\btertulis\b", c_body))
+
+    if s_lisan:
+        if c_lisan:
+            score += 2.5
+        elif c_tertulis:
+            score -= 2.0
+    if s_tertulis:
+        if c_tertulis:
+            score += 2.5
+        elif c_lisan:
+            score -= 2.0
+
+    s_tokens = {
+        _legal_stem(t) for t in re.findall(r"[a-z]{4,}", s_no_ref) if t not in _SENTENCE_STOPWORDS
+    }
+    c_tokens = {
+        _legal_stem(t) for t in re.findall(r"[a-z]{4,}", c_no_ref) if t not in _SENTENCE_STOPWORDS
+    }
+    s_tokens = {t for t in s_tokens if len(t) >= 3}
+    c_tokens = {t for t in c_tokens if len(t) >= 3}
+
+    if s_tokens and c_tokens:
+        overlap = len(s_tokens & c_tokens)
+        score += (overlap / len(s_tokens)) * 3.0 + min(overlap * 0.25, 1.5)
+
+    return round(score, 4)
+
+
+def decouple_confabulated_causality(
+    text: str,
+    retrieved_chunks: list[RetrievedChunk] | None = None,
+) -> str:
+    """Decouple confabulated causal/conditional links between unrelated statutory clauses.
+
+    Removes false or self-contradictory conditions such as:
+    - 'Dalam hal tidak terdapat kesepakatan terhadap hasil penanganan pengaduan..., Lembaga Jasa Keuangan wajib menangani pengaduan secara tertulis...'
+    - 'Jika dokumen pengaduan belum lengkap, Lembaga Jasa Keuangan juga wajib melakukan tindak lanjut dan menyelesaikan Pengaduan secara tertulis paling lama 10 (sepuluh) hari kerja sejak dokumen ... diterima secara lengkap'
+    and restores them as independent additive statements ('Selain itu, ...').
+    """
+    if not text:
+        return text
+
+    # 1. Explicit disagreement condition falsely attached to written complaint duty
     pattern = re.compile(
         r"\bDalam\s+hal\s+tidak\s+terdapat\s+kesepakatan\s+terhadap\s+hasil\s+penanganan\s+pengaduan\s+yang\s+dilakukan\s+oleh\s+[^,]+,\s*",
         re.IGNORECASE,
@@ -622,7 +767,172 @@ def decouple_confabulated_causality(text: str) -> str:
     if pattern.search(text):
         text = pattern.sub("Selain itu, ", text)
 
+    # 2. Self-contradictory "incomplete document" condition attached to a clause requiring complete documents / written resolution
+    contradictory_pattern = re.compile(
+        r"(?:^|(?<=[.!?]\s))((?:Jika|Apabila|Dalam\s+hal|Bila)\s+[^,.!?]{3,100}?\b(?:belum|tidak)\s+lengkap[^,.!?]*,\s+)"
+        r"([^.!?]*?\b(?:secara\s+lengkap|telah\s+lengkap|melengkapi\s+dokumen|menyelesaikan\s+pengaduan\s+secara\s+tertulis)\b)",
+        re.IGNORECASE,
+    )
+    if contradictory_pattern.search(text):
+        text = contradictory_pattern.sub(r"Selain itu, \2", text)
+
+    # 3. General chunk-verified conditional bridge sanitizer:
+    # If a non-opening sentence begins with a conditional clause ("Jika/Apabila/Dalam hal X, <Subject> wajib..."),
+    # check if the best-matching retrieved chunk for the main obligation is actually unconditional.
+    if retrieved_chunks:
+        cond_sent_pattern = re.compile(
+            r"(?<=[.!?]\s)((?:Jika|Apabila|Dalam\s+hal|Bila)\s+([^,.!?]{5,120}),\s+)([^.!?]+\b(?:wajib|harus|dilarang|must|shall)\b[^.!?]*[.!?])",
+            re.IGNORECASE,
+        )
+
+        def _verify_cond_bridge(m: re.Match[str]) -> str:
+            main_clause = m.group(3)
+            scored = [(_score_sentence_chunk_match(main_clause, c), c) for c in retrieved_chunks]
+            if not scored:
+                return m.group(0)
+            best_score, best_c = max(scored, key=lambda item: item[0])
+            if best_score < 4.5:
+                return m.group(0)
+            c_body = re.sub(r"^\[[^\]]+\]\s*", "", best_c.text.strip()).lower()
+            pre_wajib = re.split(r"\b(?:wajib|harus|dilarang)\b", c_body, maxsplit=1)[0]
+            has_statutory_condition = bool(
+                re.search(r"\b(?:dalam\s+hal|jika|apabila|bila|sepanjang)\b", pre_wajib)
+            )
+            if not has_statutory_condition:
+                return f"Selain itu, {main_clause}"
+            return m.group(0)
+
+        text = cond_sent_pattern.sub(_verify_cond_bridge, text)
+
     return text
+
+
+def align_sentence_level_citations(
+    text: str,
+    retrieved_chunks: list[RetrievedChunk],
+    question: str,
+) -> tuple[str, dict[str, str]]:
+    """Verify and align citations at the individual sentence level for multi-sentence normative answers.
+
+    Ensures that:
+    1. Every distinct normative sentence in a multi-sentence answer carries its own bracketed citation
+       when strongly grounded in a retrieved primary obligation chunk (preventing single-citation collapse).
+    2. If a sentence carries a sibling citation whose chunk does not match the sentence's numerical/modality
+       claims, it is realigned to the chunk that specifically grounds that sentence.
+    """
+    if not text or not retrieved_chunks:
+        return text, {}
+
+    from easypasal.generation.prompts import (
+        _detect_statutory_role,
+        score_primary_obligation_alignment,
+    )
+
+    primary_candidates = [
+        c
+        for c in retrieved_chunks
+        if _detect_statutory_role(c.text) == "[Peran: Kewajiban Pokok Entitas]"
+        and (not c.status or c.status == "berlaku")
+        and c.citation_label
+        and score_primary_obligation_alignment(c, question) > 0.0
+    ]
+    if not primary_candidates:
+        return text, {}
+
+    paragraphs = text.split("\n\n")
+    normative_re = re.compile(
+        r"\b(?:wajib|harus|dilarang|must|shall|required|prohibited)\b",
+        re.IGNORECASE,
+    )
+
+    # Count total normative sentences across the answer
+    all_sentences: list[str] = []
+    for p in paragraphs:
+        if p.strip():
+            all_sentences.extend(re.split(r"(?<=[.!?])\s+(?=[A-Z0-9\[])", p.strip()))
+    normative_count = sum(
+        1 for s in all_sentences if normative_re.search(s) and len(s.split()) >= 5
+    )
+
+    replacements: dict[str, str] = {}
+    new_paragraphs: list[str] = []
+    sent_counter = 0
+
+    for para in paragraphs:
+        if not para.strip():
+            new_paragraphs.append(para)
+            continue
+
+        # Do not split bullet/lettered enumeration items
+        if re.match(r"^(?:[a-z][\.\)]|\(\d+\)|\d+[\.\)]|[-*•])\s+", para.strip(), re.IGNORECASE):
+            new_paragraphs.append(para)
+            continue
+
+        sentences = re.split(r"(?<=[.!?])\s+(?=[A-Z0-9\[])", para.strip())
+        updated_sentences: list[str] = []
+
+        for sent in sentences:
+            sent_counter += 1
+            if not normative_re.search(sent) or len(sent.split()) < 5:
+                updated_sentences.append(sent)
+                continue
+
+            # Score all candidate primary chunks against this specific sentence
+            scored_matches = [
+                (
+                    _score_sentence_chunk_match(sent, c)
+                    + 0.05 * min(score_primary_obligation_alignment(c, question), 6.0),
+                    _score_sentence_chunk_match(sent, c),
+                    c,
+                )
+                for c in primary_candidates
+            ]
+            _combined, best_raw_score, best_c = max(scored_matches, key=lambda item: item[0])
+            best_label = best_c.citation_label.strip("[]").strip()
+
+            bracket_matches = list(re.finditer(r"\[([^\]]+)\]", sent))
+            if not bracket_matches:
+                # Attach missing per-sentence citation if part of a multi-sentence answer and strongly matched
+                if normative_count >= 2 and best_raw_score >= 4.5 and best_label:
+                    if sent.endswith((".", "!", "?")):
+                        sent = f"{sent[:-1].rstrip()} [{best_label}]{sent[-1]}"
+                    else:
+                        sent = f"{sent} [{best_label}]."
+                    replacements[f"<uncited_sentence_{sent_counter}>"] = f"[{best_label}]"
+                updated_sentences.append(sent)
+                continue
+
+            # Sentence already has a bracketed citation; verify whether it matches this sentence or a sibling
+            existing_cite = bracket_matches[-1].group(1).strip()
+            parsed_existing = parse_citation_details(existing_cite)
+            matched_existing = [
+                c
+                for c in retrieved_chunks
+                if _is_doc_matched(parsed_existing, c)
+                and _is_pasal_matched(parsed_existing, c)
+                and _is_ayat_matched(parsed_existing, c)
+            ]
+            existing_raw_score = (
+                _score_sentence_chunk_match(sent, matched_existing[0]) if matched_existing else -5.0
+            )
+
+            if (
+                best_label.lower() != existing_cite.lower()
+                and best_raw_score >= 4.5
+                and best_raw_score > existing_raw_score + 2.5
+            ):
+                sent = re.sub(
+                    rf"\[\s*{re.escape(existing_cite)}\s*\]",
+                    f"[{best_label}]",
+                    sent,
+                )
+                replacements[existing_cite] = f"[{best_label}]"
+
+            updated_sentences.append(sent)
+
+        new_paragraphs.append(" ".join(updated_sentences))
+
+    return "\n\n".join(new_paragraphs), replacements
 
 
 def detect_and_realign_inverted_citations(
@@ -644,9 +954,11 @@ def detect_and_realign_inverted_citations(
     if check_abstention(answer):
         return answer, [], {}
 
-    # 0. Canonical normalization: reformat narrative citations and decouple confabulated causality
+    # 0. Canonical normalization: simplify internal cross-references, reformat narrative citations,
+    # and decouple confabulated causality
+    answer = simplify_dangling_cross_references(answer)
     answer = reformat_narrative_citations_to_brackets(answer)
-    answer = decouple_confabulated_causality(answer)
+    answer = decouple_confabulated_causality(answer, retrieved_chunks=retrieved_chunks)
 
     q_low = question.lower()
     is_obligation_query = bool(
@@ -669,9 +981,12 @@ def detect_and_realign_inverted_citations(
         score_primary_obligation_alignment,
     )
 
+    # 0b. Sentence-level claim-to-chunk citation alignment for multi-sentence answers
+    answer, sent_replacements = align_sentence_level_citations(answer, retrieved_chunks, question)
+
     current_cites = extract_citations(answer)
     realigned_text = answer
-    replacements: dict[str, str] = {}
+    replacements: dict[str, str] = dict(sent_replacements)
 
     # If no citations were extracted at all, attach the top primary obligation chunk if strongly aligned
     if not current_cites:
@@ -776,12 +1091,26 @@ def detect_and_realign_inverted_citations(
                 "[Peran: Wewenang Korektif Otoritas / Sanksi]",
                 "[Peran: Opsi Pengecualian / Izin Bersyarat]",
                 "[Peran: Penjelasan / Keterangan Tambahan]",
-            ) or (
+            ):
+                should_realign = True
+            elif (
                 is_different_clause
                 and score_primary_obligation_alignment(primary_chunk, question)
                 > score_primary_obligation_alignment(matched_c, question) + 0.5
             ):
-                should_realign = True
+                # Do not overwrite a valid sibling primary obligation citation if it specifically grounds its sentence
+                if (
+                    chunk_role == "[Peran: Kewajiban Pokok Entitas]"
+                    and stmt
+                    and (
+                        _score_sentence_chunk_match(stmt, matched_c)
+                        >= _score_sentence_chunk_match(stmt, primary_chunk)
+                        or _score_sentence_chunk_match(stmt, matched_c) >= 4.0
+                    )
+                ):
+                    should_realign = False
+                else:
+                    should_realign = True
         elif is_different_clause:
             should_realign = True
 
