@@ -1345,3 +1345,75 @@ def test_sentence_level_citation_alignment_and_bridge_sanitization() -> None:
 
     ver = verify_citations(realigned, [c_74, c_75, c_71], cites, question=q)
     assert ver.is_valid is True
+
+
+def test_strip_appendix_and_ensure_enumeration_completeness() -> None:
+    """Verify appendix dump stripping, breadcrumb removal, and enumeration completeness synthesis."""
+    from easypasal.guardrails.citation_verifier import (
+        detect_and_realign_inverted_citations,
+        verify_citations,
+    )
+
+    q = "Apa saja pilar ketahanan dan tata kelola siber yang wajib diterapkan oleh perbankan?"
+    c_p21_1 = _make_chunk(
+        "POJK_11_2022_p21_a1",
+        "POJK 11/POJK.03/2022",
+        "POJK 11/POJK.03/2022, Pasal 21 ayat (1)",
+        pasal="21",
+        ayat="1",
+        text="[POJK 11/POJK.03/2022 | BAB V KETAHANAN DAN KEAMANAN SIBER BANK | Pasal 21 ayat (1)]\n(1) Bank wajib menjaga ketahanan siber.",
+    )
+    c_p21_2 = _make_chunk(
+        "POJK_11_2022_p21_a2",
+        "POJK 11/POJK.03/2022",
+        "POJK 11/POJK.03/2022, Pasal 21 ayat (2)",
+        pasal="21",
+        ayat="2",
+        text=(
+            "[POJK 11/POJK.03/2022 | BAB V KETAHANAN DAN KEAMANAN SIBER BANK | Pasal 21 ayat (2)]\n"
+            "(2) Untuk menjaga ketahanan siber sebagaimana dimaksud pada ayat (1), Bank melakukan proses paling sedikit: "
+            "a. identifikasi aset, ancaman, dan kerentanan; b. pelindungan aset; c. deteksi insiden siber; dan "
+            "d. penanggulangan dan pemulihan insiden siber."
+        ),
+    )
+    c_seojk_iii_2 = _make_chunk(
+        "SEOJK_29_2022_romawi_III_angka_2",
+        "SEOJK 29/SEOJK.03/2022",
+        "SEOJK 29/SEOJK.03/2022, Romawi III angka 2",
+        pasal=None,
+        ayat=None,
+        text=(
+            "[SEOJK 29/SEOJK.03/2022 | Romawi III PENERAPAN MANAJEMEN RISIKO TERKAIT KEAMANAN SIBER | Angka 2]\n"
+            "2. Penerapan manajemen risiko terkait keamanan siber mencakup 4 (empat) aspek, yaitu: "
+            "a. tata kelola risiko terkait keamanan siber; b. kerangka manajemen risiko terkait keamanan siber; "
+            "c. proses manajemen risiko, kecukupan SDM, dan kecukupan sistem informasi manajemen risiko terkait keamanan siber; dan "
+            "d. sistem pengendalian risiko terkait keamanan siber."
+        ),
+    )
+
+    corrupted_answer = (
+        "Entitas Jasa Keuangan wajib memenuhi ketentuan terkait: [SEOJK 29/SEOJK.03/2022, Romawi X angka 1 (bagian 19)].\n\n"
+        "Romawi X angka 1 (bagian 19)\n"
+        "SEOJK 29/SEOJK.03/2022 | Romawi X PENUTUP | Angka 1\n"
+        "maupun konsistensi pelaksanaan dengan kebijakan dan prosedur yang ditetapkan. "
+        "3.1.g. Bank menyiapkan suatu sistem dan prosedur backup yang efektif."
+    )
+
+    chunks = [c_p21_1, c_p21_2, c_seojk_iii_2]
+    realigned, cites, _repl = detect_and_realign_inverted_citations(
+        answer=corrupted_answer,
+        retrieved_chunks=chunks,
+        question=q,
+    )
+
+    assert "Romawi X" not in realigned
+    assert "(bagian 19)" not in realigned
+    assert "3.1.g." not in realigned
+    assert "Entitas Jasa Keuangan wajib memenuhi ketentuan terkait" not in realigned
+    assert "identifikasi aset, ancaman, dan kerentanan" in realigned
+    assert "tata kelola risiko terkait keamanan siber" in realigned
+    assert "POJK 11/POJK.03/2022, Pasal 21 ayat (2)" in cites
+    assert "SEOJK 29/SEOJK.03/2022, Romawi III angka 2" in cites
+
+    ver = verify_citations(realigned, chunks, cites, question=q)
+    assert ver.is_valid is True

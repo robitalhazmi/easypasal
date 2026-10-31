@@ -1023,3 +1023,55 @@ def test_extract_citations_ignores_internal_cross_references() -> None:
     )
     cites = extract_citations(text)
     assert cites == ["POJK 22 Tahun 2023, Pasal 75 ayat (1)"]
+
+
+def test_sectoral_subject_extraction_and_appendix_exclusion() -> None:
+    """Verify sectoral noun mapping ('perbankan' -> 'Bank'), enumeration detection, and appendix exclusion."""
+    from easypasal.generation.prompts import (
+        extract_query_subject,
+        is_enumeration_query,
+        score_primary_obligation_alignment,
+    )
+
+    q = "Apa saja pilar ketahanan dan tata kelola siber yang wajib diterapkan oleh perbankan?"
+    assert extract_query_subject(q) == "Bank"
+    assert is_enumeration_query(q) is True
+
+    c_appendix = _make_dummy_chunk(
+        "SEOJK_29_2022_rom_X_19",
+        "SEOJK 29/SEOJK.03/2022, Romawi X angka 1 (bagian 19)",
+        "[SEOJK 29/SEOJK.03/2022 | Romawi X PENUTUP | Angka 1]\n"
+        "maupun konsistensi pelaksanaan dengan kebijakan. 3.1.g. Bank menyiapkan sistem backup. "
+        "Proses pengendalian risiko terkait keamanan siber yang diterapkan Bank harus disesuaikan.",
+        doc_number="SEOJK 29/SEOJK.03/2022",
+    )
+    c_appendix.doc_id = "SEOJK_29_SEOJK.03_2022"
+
+    c_enum_pojk = _make_dummy_chunk(
+        "POJK_11_2022_p21_a2",
+        "POJK 11/POJK.03/2022, Pasal 21 ayat (2)",
+        "[POJK 11/POJK.03/2022 | BAB V KETAHANAN DAN KEAMANAN SIBER BANK | Pasal 21 ayat (2)]\n"
+        "(2) Untuk menjaga ketahanan siber sebagaimana dimaksud pada ayat (1), Bank melakukan proses paling sedikit: "
+        "a. identifikasi aset, ancaman, dan kerentanan; b. pelindungan aset; c. deteksi insiden siber; dan "
+        "d. penanggulangan dan pemulihan insiden siber.",
+        doc_number="POJK 11/POJK.03/2022",
+    )
+    c_enum_pojk.doc_id = "POJK_11_POJK.03_2022"
+    c_enum_pojk.pasal = "21"
+    c_enum_pojk.ayat = "2"
+
+    c_enum_seojk = _make_dummy_chunk(
+        "SEOJK_29_2022_rom_III_2",
+        "SEOJK 29/SEOJK.03/2022, Romawi III angka 2",
+        "[SEOJK 29/SEOJK.03/2022 | Romawi III PENERAPAN MANAJEMEN RISIKO TERKAIT KEAMANAN SIBER | Angka 2]\n"
+        "2. Penerapan manajemen risiko terkait keamanan siber mencakup 4 (empat) aspek, yaitu: "
+        "a. tata kelola risiko terkait keamanan siber; b. kerangka manajemen risiko terkait keamanan siber; "
+        "c. proses manajemen risiko, kecukupan SDM, dan kecukupan sistem informasi; dan "
+        "d. sistem pengendalian risiko terkait keamanan siber.",
+        doc_number="SEOJK 29/SEOJK.03/2022",
+    )
+    c_enum_seojk.doc_id = "SEOJK_29_SEOJK.03_2022"
+
+    assert score_primary_obligation_alignment(c_appendix, q) == 0.0
+    assert score_primary_obligation_alignment(c_enum_pojk, q) >= 6.0
+    assert score_primary_obligation_alignment(c_enum_seojk, q) >= 6.0

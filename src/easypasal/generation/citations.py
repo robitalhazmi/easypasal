@@ -12,19 +12,19 @@ if TYPE_CHECKING:
 _STATUTORY_REGEX = re.compile(
     r"\b(?:Undang-Undang|UU|POJK|PBI|PADG|SEOJK|PP|Perpu)\s+"
     r"(?:Nomor\s+)?[\w\.\/\-]+(?:\s+Tahun\s+\d{4})?"
-    r"(?:,?\s+Pasal\s+\d+[a-z]?(?:\s+ayat\s+\(\d+\))?(?:\s+angka\s+\d+)?)?",
+    r"(?:,?\s+(?:Pasal\s+\d+[a-z]?(?:\s+ayat\s+\(\d+\))?(?:\s+angka\s+\d+)?|Romawi\s+[IVXLCDM]+(?:\s+angka\s+\d+)?))?",
     re.IGNORECASE,
 )
 
 # Regex matching bracket citations, e.g. [POJK 22 Tahun 2023, Pasal 71 ayat (1)]
 _BRACKET_CITATION_REGEX = re.compile(
-    r"\[\s*((?:(?:Undang-Undang|UU|POJK|PBI|PADG|SEOJK|PP|Perpu|Penjelasan)\s+[\w\.\/\-]+|Pasal\s+\d+)[^\]\n]{0,100})\s*\]",
+    r"\[\s*((?:(?:Undang-Undang|UU|POJK|PBI|PADG|SEOJK|PP|Perpu|Penjelasan)\s+[\w\.\/\-]+|Pasal\s+\d+|Romawi\s+[IVXLCDM]+)[^\]\n]{0,100})\s*\]",
     re.IGNORECASE,
 )
 
 # Regex matching inverted inline prose citations, e.g. "Pasal 36 ayat (4) dari POJK 11/POJK.03/2022"
 _INVERTED_PROSE_STATUTORY_REGEX = re.compile(
-    r"\b(Pasal\s+\d+[a-z]?(?:\s+ayat\s+\(\d+\))?(?:\s+angka\s+\d+)?)"
+    r"\b((?:Pasal\s+\d+[a-z]?(?:\s+ayat\s+\(\d+\))?(?:\s+angka\s+\d+)?|Romawi\s+[IVXLCDM]+(?:\s+angka\s+\d+)?))"
     r"\s+(?:dari\s+|dalam\s+|pada\s+)?((?:Undang-Undang|UU|POJK|PBI|PADG|SEOJK|PP|Perpu)\s+"
     r"(?:Nomor\s+)?[\w\.\/\-]+(?:\s+Tahun\s+\d{4})?)",
     re.IGNORECASE,
@@ -97,8 +97,11 @@ def extract_citations(text: str) -> list[str]:
     # 1. Bracket Citations
     for match in _BRACKET_CITATION_REGEX.finditer(text):
         raw = match.group(1).strip()
-        # Clean leading/trailing artifacts
+        # Clean leading/trailing artifacts and internal chunk-splitting suffix "(bagian N)"
         clean = re.sub(r"^(?:DOKUMEN\s+\d+:\s*)?", "", raw).strip()
+        clean = re.sub(r"\s*\(bagian\s+\d+\)", "", clean, flags=re.IGNORECASE).strip()
+        if "|" in clean:
+            continue
         if clean and clean.lower() not in seen:
             seen.add(clean.lower())
             citations.append(clean)

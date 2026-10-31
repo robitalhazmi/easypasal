@@ -25,6 +25,7 @@ class ParsedCitation:
     pasal: str | None = None
     ayat: str | None = None
     angka: str | None = None
+    romawi: str | None = None
 
 
 @dataclass
@@ -89,6 +90,10 @@ def parse_citation_details(citation_text: str) -> ParsedCitation:
     angka_match = re.search(r"\bangka\s+(\d+)", clean, re.IGNORECASE)
     angka = angka_match.group(1) if angka_match else None
 
+    # 6. Romawi (Circular Section, e.g. SEOJK Romawi IV angka 1)
+    romawi_match = re.search(r"\bromawi\s+([ivxlcdm]+|\d+)", clean, re.IGNORECASE)
+    romawi = romawi_match.group(1).upper() if romawi_match else None
+
     return ParsedCitation(
         raw_text=citation_text,
         doc_type=doc_type,
@@ -96,6 +101,7 @@ def parse_citation_details(citation_text: str) -> ParsedCitation:
         pasal=pasal,
         ayat=ayat,
         angka=angka,
+        romawi=romawi,
     )
 
 
@@ -134,9 +140,23 @@ def _is_doc_matched(parsed: ParsedCitation, chunk: RetrievedChunk) -> bool:
 
 
 def _is_pasal_matched(parsed: ParsedCitation, chunk: RetrievedChunk) -> bool:
-    """Check if the cited article (pasal) exists within the retrieved chunk."""
+    """Check if the cited article (pasal or romawi section) exists within the retrieved chunk."""
     if not parsed.pasal:
-        return True  # Document-level citation without specific pasal
+        if parsed.romawi:
+            target_rom = f"romawi {parsed.romawi.lower()}"
+            label_low = (chunk.citation_label or "").lower()
+            id_low = (chunk.chunk_id or "").lower().replace("_", " ")
+            text_low = chunk.text.lower()
+            rom_ok = target_rom in label_low or target_rom in id_low or target_rom in text_low
+            if not rom_ok:
+                return False
+            if parsed.angka:
+                target_angka = f"angka {parsed.angka}"
+                return (
+                    target_angka in label_low or target_angka in id_low or target_angka in text_low
+                )
+            return True
+        return True  # Document-level citation without specific pasal or romawi
 
     target_pasal = parsed.pasal.lower()
 
@@ -635,7 +655,173 @@ def simplify_dangling_cross_references(text: str) -> str:
         flags=re.IGNORECASE,
     )
 
+    # 3. Parent-clause back-reference ("sebagaimana dimaksud pada ayat (1), ") -> ", "
+    text = re.sub(
+        r"\s+sebagaimana\s+dimaksud\s+pada\s+ayat\s+\(\d+[a-z]?\)(?=\s*,)",
+        "",
+        text,
+        flags=re.IGNORECASE,
+    )
+
     return text
+
+
+def strip_appendix_and_header_artifacts(text: str) -> str:
+    """Strip leaked chunk headers, pipe-delimited breadcrumbs, and corrupted appendix fragments."""
+    if not text:
+        return text
+
+    # 1. Strip internal chunk-splitting suffix "(bagian N)"
+    cleaned = re.sub(r"\s*\(bagian\s+\d+\)", "", text, flags=re.IGNORECASE)
+
+    # 2. Strip echoed template prefix ("Entitas Jasa Keuangan wajib memenuhi ketentuan terkait:")
+    cleaned = re.sub(
+        r"^(?:Entitas\s+Jasa\s+Keuangan|Bank(?:\s+Umum)?|PUJK|Lembaga\s+Jasa\s+Keuangan|Financial\s+institutions)\s+"
+        r"(?:wajib\s+memenuhi\s+ketentuan\s+terkait|must\s+comply\s+with\s+regulatory\s+requirements)\s*:\s*(?:\[[^\]]+\]\.?\s*)?",
+        "",
+        cleaned,
+        flags=re.IGNORECASE,
+    )
+
+    # 3. Strip pipe-delimited breadcrumb lines and standalone section-header lines
+    cleaned = re.sub(
+        r"^[ \t]*\[?[A-Za-z0-9\./\s\-]+(?:\|[A-Za-z0-9\./\s\-()]+)+\]?[ \t]*\r?\n?",
+        "",
+        cleaned,
+        flags=re.MULTILINE,
+    )
+    cleaned = re.sub(
+        r"^[ \t]*(?:Romawi\s+[IVXLCDM]+\s+angka\s+\d+(?:\s+dari\s+[\w\./\s]+)?|"
+        r"(?:POJK|SEOJK|UU|PBI|PADG)\s+[\w\./\s]+,\s*(?:Pasal|Romawi)\s+[\w\s()]+):?[ \t]*\r?\n?",
+        "",
+        cleaned,
+        flags=re.IGNORECASE | re.MULTILINE,
+    )
+
+    # 4. Drop paragraphs/lines that are closing-section ("Romawi X") or mid-sentence worksheet fragments ("3.1.g.", "maupun konsistensi")
+    kept_paras: list[str] = []
+    for para in cleaned.split("\n\n"):
+        p_strip = para.strip()
+        if not p_strip:
+            continue
+        p_no_lead_cite = re.sub(r"^\[[^\]]+\]\s*:?\s*", "", p_strip).strip()
+        if (
+            re.search(r"\bRomawi\s+X\b", p_strip, re.IGNORECASE)
+            or re.match(r"^(?:maupun|serta)\s+konsistensi\b", p_no_lead_cite, re.IGNORECASE)
+            or re.search(r"\b3\.[12]\.[a-h]\.", p_strip, re.IGNORECASE)
+        ):
+            continue
+        # Strip leading "(1) " or "(2) " statutory numbering at start of paragraph
+        p_strip = re.sub(r"^\(\d+\)\s+", "", p_strip)
+        kept_paras.append(p_strip)
+
+    return "\n\n".join(kept_paras).strip()
+
+
+def ensure_enumeration_completeness(
+    text: str,
+    retrieved_chunks: list[RetrievedChunk],
+    question: str,
+) -> str:
+    """Ensure enumeration queries ('Apa saja pilar/aspek/komponen...') include grounded enumeration clauses.
+
+    When a root mandate stub (e.g. Pasal 21 ayat (1) 'Bank wajib menjaga ketahanan siber') is generated
+    without its child enumeration clause (e.g. Pasal 21 ayat (2) or SEOJK Romawi III angka 2), or when a
+    corrupted appendix dump was stripped, this function synthesizes the clean enumeration from retrieved chunks.
+    """
+    if not retrieved_chunks or not question:
+        return text
+
+    from easypasal.generation.prompts import (
+        _detect_statutory_role,
+        _legal_stem,
+        is_enumeration_query,
+        score_primary_obligation_alignment,
+    )
+
+    if not is_enumeration_query(question):
+        return text
+
+    # Check if text already contains an explicit multi-item enumeration ("a. ... b. ...")
+    if text and re.search(r"\ba\.\s+[^;.\n]{3,120}[;.\n]\s*(?:dan\s+)?b\.\s+", text, re.IGNORECASE):
+        return text
+
+    scored_primaries = sorted(
+        [
+            (score_primary_obligation_alignment(c, question), c)
+            for c in retrieved_chunks
+            if _detect_statutory_role(c.text) == "[Peran: Kewajiban Pokok Entitas]"
+            and (not c.status or c.status == "berlaku")
+            and score_primary_obligation_alignment(c, question) >= 2.5
+        ],
+        key=lambda item: item[0],
+        reverse=True,
+    )
+    if not scored_primaries:
+        return text
+
+    enum_chunks: list[RetrievedChunk] = []
+    mandate_chunks: list[RetrievedChunk] = []
+    for _sc, c in scored_primaries:
+        c_body = re.sub(r"^\[[^\]]+\]\s*", "", c.text.strip())
+        if re.search(
+            r"(?:paling\s+sedikit|mencakup|meliputi|terdiri\s+atas|melakukan\s+proses|yaitu)\s*:?\s*[a-z1-9][\.\)]"
+            r"|\ba\.\s+[^;]{3,120};\s*(?:dan\s+)?b\.\s+",
+            c_body,
+            re.IGNORECASE,
+        ):
+            enum_chunks.append(c)
+        else:
+            mandate_chunks.append(c)
+
+    if not enum_chunks:
+        return text
+
+    parts: list[str] = []
+    if text and text.strip():
+        parts.append(text.strip())
+    elif mandate_chunks:
+        m_chunk = mandate_chunks[0]
+        m_label = re.sub(
+            r"\s*\(bagian\s+\d+\)", "", m_chunk.citation_label or m_chunk.chunk_id
+        ).strip()
+        m_body = re.sub(r"^\[[^\]]+\]\s*", "", m_chunk.text.strip())
+        m_body = re.sub(r"^\(\d+\)\s*", "", m_body)
+        m_body = re.sub(r"\s+", " ", m_body).strip().rstrip(".")
+        parts.append(f"{m_body} [{m_label}].")
+
+    selected_enums: list[RetrievedChunk] = []
+    covered_stems: set[str] = set()
+    for ec in enum_chunks:
+        ec_body = re.sub(r"^\[[^\]]+\]\s*", "", ec.text.strip())
+        ec_stems = {_legal_stem(w) for w in re.findall(r"\b[a-z]{4,}\b", ec_body.lower())}
+        if not selected_enums or len(ec_stems - covered_stems) >= 4:
+            selected_enums.append(ec)
+            covered_stems.update(ec_stems)
+        if len(selected_enums) >= 2:
+            break
+
+    for idx, ec in enumerate(selected_enums):
+        ec_label = re.sub(r"\s*\(bagian\s+\d+\)", "", ec.citation_label or ec.chunk_id).strip()
+        if ec_label in "\n".join(parts):
+            continue
+        ec_body = re.sub(r"^\[[^\]]+\]\s*", "", ec.text.strip())
+        ec_body = re.sub(r"^(?:\(\d+\)|\d+\.)\s*", "", ec_body)
+        ec_body = re.sub(r"\s+", " ", ec_body).strip().rstrip(".")
+        ec_body = simplify_dangling_cross_references(ec_body)
+        if not parts and idx == 0 and not re.search(r"\b(?:wajib|harus)\b", ec_body, re.IGNORECASE):
+            ec_body = re.sub(
+                r"^Untuk\s+(menjaga|melaksanakan|menerapkan|memastikan)\s+([^,]+),\s*(Bank(?:\s+Umum)?|PUJK|Lembaga\s+Jasa\s+Keuangan|Perusahaan)\s+melakukan\s+",
+                r"\3 wajib \1 \2 dengan melakukan ",
+                ec_body,
+                flags=re.IGNORECASE,
+            )
+        elif idx > 0 and not ec_body.lower().startswith(("selain itu", "sementara itu")):
+            ec_body = f"Selain itu, {ec_body[0].lower()}{ec_body[1:]}"
+        parts.append(f"{ec_body} [{ec_label}].")
+
+    synthesized = " ".join(parts).strip()
+    return realign_answer_subject(synthesized, question)
 
 
 _SENTENCE_STOPWORDS: set[str] = {
@@ -954,11 +1140,13 @@ def detect_and_realign_inverted_citations(
     if check_abstention(answer):
         return answer, [], {}
 
-    # 0. Canonical normalization: simplify internal cross-references, reformat narrative citations,
-    # and decouple confabulated causality
+    # 0. Canonical normalization: strip header/appendix artifacts, simplify internal cross-references,
+    # reformat narrative citations, decouple confabulated causality, and ensure enumeration completeness
+    answer = strip_appendix_and_header_artifacts(answer)
     answer = simplify_dangling_cross_references(answer)
     answer = reformat_narrative_citations_to_brackets(answer)
     answer = decouple_confabulated_causality(answer, retrieved_chunks=retrieved_chunks)
+    answer = ensure_enumeration_completeness(answer, retrieved_chunks, question)
 
     q_low = question.lower()
     is_obligation_query = bool(
@@ -1062,9 +1250,9 @@ def detect_and_realign_inverted_citations(
 
         primary_parsed = parse_citation_details(primary_label)
 
-        # Check if the cited clause is different from the primary clause (or missing pasal/ayat)
+        # Check if the cited clause is different from the primary clause (or missing pasal/romawi/ayat)
         is_different_clause = bool(
-            not parsed.pasal
+            (not parsed.pasal and not parsed.romawi)
             or (
                 parsed.pasal
                 and primary_parsed.pasal
@@ -1082,7 +1270,7 @@ def detect_and_realign_inverted_citations(
         ]
 
         should_realign = False
-        if not parsed.pasal:
+        if not parsed.pasal and not parsed.romawi:
             should_realign = True
         elif matching_chunks:
             matched_c = matching_chunks[0]

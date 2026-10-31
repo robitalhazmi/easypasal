@@ -64,35 +64,69 @@ def _compute_normative_salience_boost(query: str, payload: dict[str, Any]) -> fl
     if not text:
         return 0.0
 
-    from easypasal.generation.prompts import _detect_statutory_role
+    from easypasal.generation.prompts import (
+        _detect_statutory_role,
+        _is_appendix_or_closing_fragment,
+        is_enumeration_query,
+    )
 
     q_low = re.sub(r"\s+", " ", query.lower()).strip()
     t_low = re.sub(r"\s+", " ", text.lower()).strip()
     header_match = re.match(r"^\[([^\]]+)\]\s*", t_low)
     body_low = t_low[header_match.end() :] if header_match else t_low
+    citation_label = str(payload.get("citation_label", ""))
+
+    # 0. Structural Hierarchy Penalty: Downweight closing sections ("PENUTUP") and mid-sentence appendix fragments
+    if _is_appendix_or_closing_fragment(text, citation_label):
+        return -0.22
+
     role = _detect_statutory_role(text)
     boost = 0.0
 
     intent = detect_normative_intent(query)
+    is_enum_q = is_enumeration_query(q_low)
 
     # 1. Direct Imperative Action Predicate Concordance
     # e.g., Query: "... wajib menempatkan ..." -> Action verb: "menempatkan"
     # Chunk: "... wajib menempatkan ..." -> Exact imperative predicate concordance!
+    generic_meta_verbs = {
+        "diterapkan",
+        "menerapkan",
+        "dilakukan",
+        "melakukan",
+        "dipenuhi",
+        "memenuhi",
+        "dilaksanakan",
+        "melaksanakan",
+    }
     m_action = re.search(r"\b(?:wajib|harus|dilarang)\s+(\w+)", q_low)
     if m_action:
         action_verb = m_action.group(1)
-        if len(action_verb) >= 4 and re.search(
-            rf"\b(?:wajib|harus|dilarang)\s+(?:\w+\s+)?{re.escape(action_verb)}\b",
-            body_low,
+        if (
+            len(action_verb) >= 4
+            and action_verb not in generic_meta_verbs
+            and re.search(
+                rf"\b(?:wajib|harus|dilarang)\s+(?:\w+\s+)?{re.escape(action_verb)}\b",
+                body_low,
+            )
         ):
             boost += 0.18
 
     # 2. Intent-Based Normative Primacy Boost / Penalty
     has_cross_ref = "sebagaimana dimaksud dalam pasal" in body_low
+    has_structured_enum = bool(
+        re.search(
+            r"(?:paling\s+sedikit|mencakup|meliputi|terdiri\s+atas|melakukan\s+proses|yaitu)\s*:?\s*[a-z1-9][\.\)]"
+            r"|\ba\.\s+[^;]{3,120};\s*(?:dan\s+)?b\.\s+",
+            body_low,
+        )
+    )
 
     if intent == "obligation":
         if role == "[Peran: Kewajiban Pokok Entitas]":
-            if not has_cross_ref:
+            if is_enum_q and has_structured_enum:
+                boost += 0.25
+            elif not has_cross_ref:
                 boost += 0.18
             else:
                 boost += 0.05

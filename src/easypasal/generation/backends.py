@@ -78,6 +78,35 @@ def sanitize_prompt_artifacts(text: str) -> str:
     for p in patterns:
         cleaned = re.sub(p, "", cleaned, flags=re.IGNORECASE)
 
+    # Strip internal chunk-splitting suffix "(bagian N)"
+    cleaned = re.sub(r"\s*\(bagian\s+\d+\)", "", cleaned, flags=re.IGNORECASE)
+
+    # Strip echoed template prefix ("Entitas Jasa Keuangan wajib memenuhi ketentuan terkait:")
+    cleaned = re.sub(
+        r"^(?:Entitas\s+Jasa\s+Keuangan|Bank(?:\s+Umum)?|PUJK|Lembaga\s+Jasa\s+Keuangan|Financial\s+institutions)\s+"
+        r"(?:wajib\s+memenuhi\s+ketentuan\s+terkait|must\s+comply\s+with\s+regulatory\s+requirements)\s*:\s*(?:\[[^\]]+\]\.?\s*)?",
+        "",
+        cleaned,
+        flags=re.IGNORECASE,
+    )
+
+    # Strip leaked pipe-delimited breadcrumb lines (e.g. "SEOJK 29/SEOJK.03/2022 | Romawi X PENUTUP | Angka 1")
+    cleaned = re.sub(
+        r"^[ \t]*\[?[A-Za-z0-9\./\s\-]+(?:\|[A-Za-z0-9\./\s\-()]+)+\]?[ \t]*\r?\n?",
+        "",
+        cleaned,
+        flags=re.MULTILINE,
+    )
+
+    # Strip standalone echoed section-header lines (e.g. "Romawi X angka 1 dari SEOJK 29/SEOJK.03/2022:")
+    cleaned = re.sub(
+        r"^[ \t]*(?:Romawi\s+[IVXLCDM]+\s+angka\s+\d+(?:\s+dari\s+[\w\./\s]+)?|"
+        r"(?:POJK|SEOJK|UU|PBI|PADG)\s+[\w\./\s]+,\s*(?:Pasal|Romawi)\s+[\w\s()]+):?[ \t]*\r?\n",
+        "",
+        cleaned,
+        flags=re.IGNORECASE | re.MULTILINE,
+    )
+
     return cleaned.strip()
 
 

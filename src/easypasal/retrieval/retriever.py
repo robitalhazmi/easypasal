@@ -152,6 +152,7 @@ def _expand_primary_statutory_norms(
         return chunks
 
     from easypasal.generation.prompts import (
+        is_enumeration_query,
         score_primary_obligation_alignment,
     )
     from easypasal.retrieval.fusion import detect_normative_intent
@@ -159,12 +160,18 @@ def _expand_primary_statutory_norms(
     if detect_normative_intent(query) != "obligation":
         return chunks
 
+    is_enum_q = is_enumeration_query(query)
+
     # 1. Collect target (doc_identifier, target_pasal) pairs from cross-references, root clauses, and sibling provisions
     target_pasals_by_doc: dict[str, set[str]] = {}
+    target_docs_for_enum: set[str] = set()
     for c in chunks:
         doc_keys = [k.lower().strip() for k in (c.doc_id, c.doc_number) if k]
         if not doc_keys:
             continue
+
+        if is_enum_q:
+            target_docs_for_enum.update(doc_keys)
 
         chunk_targets: set[str] = set()
 
@@ -189,14 +196,19 @@ def _expand_primary_statutory_norms(
                 chunk_targets.add(str(p_num + 1))
 
         for k in doc_keys:
-            target_pasals_by_doc.setdefault(k, set()).update(chunk_targets)
+            if chunk_targets:
+                target_pasals_by_doc.setdefault(k, set()).update(chunk_targets)
 
     expanded_pool = list(chunks)
     existing_ids = {c.chunk_id for c in expanded_pool}
 
     # 2. Look up candidate primary obligation chunks in BM25 corpus payloads if available
     corpus_payloads = getattr(bm25_index, "corpus_payloads", None) if bm25_index else None
-    if corpus_payloads and isinstance(corpus_payloads, list) and target_pasals_by_doc:
+    if (
+        corpus_payloads
+        and isinstance(corpus_payloads, list)
+        and (target_pasals_by_doc or target_docs_for_enum)
+    ):
         for payload in corpus_payloads:
             if not isinstance(payload, dict):
                 continue
@@ -220,14 +232,22 @@ def _expand_primary_statutory_norms(
                 if d_key and d_key in (p_doc_id, p_doc_num):
                     matched_targets = t_set
                     break
-            if not matched_targets:
+            is_enum_doc_match = is_enum_q and bool({p_doc_id, p_doc_num} & target_docs_for_enum)
+            if not matched_targets and not is_enum_doc_match:
                 continue
 
-            p_pasal = str(payload.get("pasal", "")).lower()
+            p_pasal = str(payload.get("pasal", "") or "").lower()
             p_ayat = payload.get("ayat")
-            if p_pasal not in matched_targets:
-                continue
-            if p_ayat is not None and str(p_ayat) != "1":
+            if matched_targets and p_pasal in matched_targets:
+                allowed_ayats = ("1", "2", "3") if is_enum_q else ("1",)
+                if p_ayat is not None and str(p_ayat) not in allowed_ayats:
+                    continue
+                min_align = 2.0
+            elif is_enum_doc_match:
+                # For enumeration queries on circulars (SEOJK) or sibling governance chapters,
+                # require strong enumeration alignment (>= 4.5)
+                min_align = 4.5
+            else:
                 continue
 
             cand_chunk = RetrievedChunk.from_payload(
@@ -235,7 +255,7 @@ def _expand_primary_statutory_norms(
                 score=chunks[0].score,
                 payload=payload,
             )
-            if score_primary_obligation_alignment(cand_chunk, query) >= 2.0:
+            if score_primary_obligation_alignment(cand_chunk, query) >= min_align:
                 expanded_pool.append(cand_chunk)
                 existing_ids.add(cid)
 

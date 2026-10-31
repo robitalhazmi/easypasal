@@ -174,6 +174,50 @@ def detect_language(text: str) -> str:
     return "id"
 
 
+def is_enumeration_query(query: str) -> bool:
+    """Detect whether the query asks for a taxonomic list, pillars, components, aspects, or stages."""
+    if not query:
+        return False
+    return bool(
+        re.search(
+            r"\b(?:apa\s+saja|sebutkan|meliputi\s+apa|mencakup\s+apa|terdiri\s+(?:dari|atas)\s+apa|"
+            r"pilar|tahapan|komponen|faktor|aspek|prinsip|unsur|kriteria|jenis-jenis|"
+            r"what\s+are\s+the\s+(?:pillars|components|factors|aspects|stages|principles|elements|processes))\b",
+            query,
+            re.IGNORECASE,
+        )
+    )
+
+
+def _is_appendix_or_closing_fragment(text: str, citation_label: str = "") -> bool:
+    """Detect closing-section ('PENUTUP') or multi-part appendix table continuation fragments."""
+    if not text:
+        return False
+    stripped = text.strip()
+    header_match = re.match(r"^\[([^\]]+)\]\s*", stripped)
+    header_low = header_match.group(1).lower() if header_match else ""
+    body = stripped[header_match.end() :].strip() if header_match else stripped
+    label_low = (citation_label or "").lower()
+
+    # 1. Closing / transitional headers ("Romawi X PENUTUP", "BAB XIV KETENTUAN PENUTUP")
+    if re.search(
+        r"\b(?:penutup|ketentuan\s+penutup|ketentuan\s+peralihan|romawi\s+x\b)",
+        f"{header_low} {label_low}",
+    ):
+        return True
+
+    # 2. Multi-part split continuation chunks ("(bagian 2)" .. "(bagian 19)")
+    if re.search(r"\(bagian\s+(?:[2-9]|\d{2,})\)", label_low):
+        return True
+
+    # 3. Mid-sentence continuation fragment (starts with lowercase conjunction/word or deep worksheet numbering "3.1.g.")
+    return bool(
+        re.match(r"^(?:maupun|serta|atau|dan|yang|dengan)\b", body, re.IGNORECASE)
+        or (body and body[0].islower() and not re.match(r"^[a-z][\.\)]\s", body))
+        or re.match(r"^\d+\.\d+\.[a-z][\.\)]\s", body, re.IGNORECASE)
+    )
+
+
 def _detect_statutory_role(text: str) -> str:
     """Classify the primary normative role of a regulatory passage chunk.
 
@@ -192,10 +236,13 @@ def _detect_statutory_role(text: str) -> str:
     if not norm:
         return ""
 
-    # 0. Elucidation (Penjelasan) passages are explanatory notes, not primary norms
+    # 0. Elucidation (Penjelasan) or Closing/Appendix matrix fragments are not primary norms
     if header_low.startswith("penjelasan") or re.match(
         r"^(?:ayat\s+\(\d+\)|pasal\s+\d+|huruf\s+[a-z])\s+cukup\s+jelas\b", norm
     ):
+        return "[Peran: Penjelasan / Keterangan Tambahan]"
+
+    if _is_appendix_or_closing_fragment(text):
         return "[Peran: Penjelasan / Keterangan Tambahan]"
 
     # 1. Authority corrective / discretionary supervisory / licensing / sanction powers
@@ -232,14 +279,32 @@ def _detect_statutory_role(text: str) -> str:
     has_consumer_remedy = remedy_match is not None
 
     # 3. Primary imperative duties of entities: "Bank wajib", "PUJK wajib", "Perusahaan dilarang"
+    # Exclude passive relative clauses like "yang diterapkan Bank harus disesuaikan"
+    norm_for_duty = re.sub(
+        r"\byang\s+(?:diterapkan|dilakukan|dilaksanakan|disusun|ditetapkan)\s+(?:oleh\s+)?(?:bank\s+umum|bank|bpr|pujk|ljk|perusahaan|penyelenggara)\s+(?:wajib|harus)\b",
+        " ",
+        norm,
+    )
     duty_pattern = (
         r"\b(?:bank\s+umum|bank|bpr|pujk|pjk|perusahaan\s+efek|perusahaan|penyelenggara|ljk|emiten|"
         r"pihak|direksi|dewan\s+komisaris|pelaku\s+usaha)\s+(?:wajib|harus|dilarang)\b"
         r"|\bwajib\s+(?:menempatkan|memiliki|menerapkan|menyediakan|menyampaikan|memenuhi|"
         r"menggunakan|menjaga|melakukan|memastikan|melaksanakan|menyusun|menindaklanjuti)\b"
     )
-    duty_match = re.search(duty_pattern, norm)
+    duty_match = re.search(duty_pattern, norm_for_duty)
     has_entity_duty = duty_match is not None
+
+    # 3b. Statutory Enumeration / Pillar Elaboration Clauses:
+    # e.g., "(2) Untuk menjaga ketahanan siber sebagaimana dimaksud pada ayat (1), Bank melakukan proses paling sedikit: a. ..."
+    # or "2. Penerapan manajemen risiko terkait keamanan siber mencakup 4 (empat) aspek, yaitu: a. ..."
+    enum_duty_pattern = (
+        r"(?:untuk\s+(?:menjaga|melaksanakan|menerapkan|memastikan|memenuhi)|dalam\s+(?:menerapkan|melaksanakan|menyelenggarakan))\s+"
+        r"[^:]{3,140}?\b(?:bank\s+umum|bank|bpr|pujk|ljk|perusahaan|penyelenggara)\s+"
+        r"(?:melakukan|mempertimbangkan|menerapkan|menetapkan|menjaga)\s+[^:]{0,60}:\s*[a-z1-9][\.\)]"
+        r"|\b(?:penerapan|pelaksanaan|penyelenggaraan)\s+[^:]{3,120}?\b(?:mencakup|meliputi|terdiri\s+atas|paling\s+sedikit)\s+"
+        r"(?:\d+\s*\([^)]+\)\s+)?(?:aspek|faktor|pilar|proses|tahap|komponen|prinsip)[^:]*:\s*[a-z1-9][\.\)]"
+    )
+    has_enum_duty = re.search(enum_duty_pattern, norm) is not None
 
     # Leading conditional supervisory assessment ("Dalam hal berdasarkan penilaian OJK...")
     if (
@@ -265,7 +330,7 @@ def _detect_statutory_role(text: str) -> str:
         if pos_duty < pos_auth:
             return "[Peran: Kewajiban Pokok Entitas]"
         return "[Peran: Wewenang Korektif Otoritas / Sanksi]"
-    if has_entity_duty:
+    if has_entity_duty or has_enum_duty:
         return "[Peran: Kewajiban Pokok Entitas]"
     if has_consumer_remedy:
         return "[Peran: Opsi Sengketa / Pemulihan Konsumen]"
@@ -308,6 +373,9 @@ def score_primary_obligation_alignment(chunk: RetrievedChunk, query: str) -> flo
     if not chunk or not chunk.text:
         return 0.0
 
+    if _is_appendix_or_closing_fragment(chunk.text, chunk.citation_label or ""):
+        return 0.0
+
     role = _detect_statutory_role(chunk.text)
     if role != "[Peran: Kewajiban Pokok Entitas]":
         return 0.0
@@ -331,21 +399,38 @@ def score_primary_obligation_alignment(chunk: RetrievedChunk, query: str) -> flo
         return 0.0
 
     score = 1.0
+    is_enum_q = is_enumeration_query(norm_query)
 
     # 1. Action Predicate Concordance ("wajib <verb>", "kewajiban ... dalam <verb>", or stem matching)
+    generic_meta_verbs = {
+        "diterapkan",
+        "menerapkan",
+        "dilakukan",
+        "melakukan",
+        "dipenuhi",
+        "memenuhi",
+        "dilaksanakan",
+        "melaksanakan",
+        "dijalankan",
+        "menjalankan",
+        "dipatuhi",
+        "mematuhi",
+        "ditaati",
+    }
     q_action_verbs = set()
     m_action = re.search(r"\b(?:wajib|harus|dilarang)\s+(\w+)", norm_query)
-    if m_action:
+    if m_action and m_action.group(1) not in generic_meta_verbs:
         q_action_verbs.add(m_action.group(1))
     for m in re.finditer(
         r"\b(?:kewajiban|ketentuan)\s+(?:[\w\s]{1,40}\s+)?(?:dalam|untuk)\s+(\w+)",
         norm_query,
     ):
-        q_action_verbs.add(m.group(1))
-    for m in re.finditer(r"\bdalam\s+(\w+)(?:\s+dan\s+(\w+))?", norm_query):
-        if m.group(1):
+        if m.group(1) not in generic_meta_verbs:
             q_action_verbs.add(m.group(1))
-        if m.group(2):
+    for m in re.finditer(r"\bdalam\s+(\w+)(?:\s+dan\s+(\w+))?", norm_query):
+        if m.group(1) and m.group(1) not in generic_meta_verbs:
+            q_action_verbs.add(m.group(1))
+        if m.group(2) and m.group(2) not in generic_meta_verbs:
             q_action_verbs.add(m.group(2))
 
     action_matched = False
@@ -360,10 +445,10 @@ def score_primary_obligation_alignment(chunk: RetrievedChunk, query: str) -> flo
     if not action_matched and m_action:
         action_verb = m_action.group(1)
         if len(action_verb) >= 4 and re.search(
-            rf"\b(?:wajib|harus|dilarang)\s+(?:\w+\s+)?{re.escape(action_verb)}\b",
+            rf"\b(?:wajib|harus|dilarang)\s+(?:\w+\s+)?{re.escape(_legal_stem(action_verb))}\w*\b",
             norm_body,
         ):
-            score += 2.5
+            score += 1.5 if action_verb in generic_meta_verbs else 2.5
 
     # 2. Standalone Root Norm vs. Dependent Cross-Referencing Clause
     is_dependent_ref = bool(
@@ -376,9 +461,17 @@ def score_primary_obligation_alignment(chunk: RetrievedChunk, query: str) -> flo
             norm_body,
         )
     )
+    has_structured_enum = bool(
+        re.search(
+            r"(?:paling\s+sedikit|mencakup|meliputi|terdiri\s+atas|melakukan\s+proses|yaitu)\s*:?\s*[a-z1-9][\.\)]"
+            r"|\ba\.\s+[^;]{3,120};\s*(?:dan\s+)?b\.\s+",
+            norm_body,
+        )
+    )
     has_explicit_substance = bool(
         re.search(r"\bpaling\s+(?:lama|lambat)\s+\d+", norm_body)
         or ("di wilayah indonesia" in norm_body and "di luar wilayah" not in norm_body)
+        or (is_enum_q and has_structured_enum)
     )
 
     if not is_dependent_ref or has_explicit_substance:
@@ -386,8 +479,8 @@ def score_primary_obligation_alignment(chunk: RetrievedChunk, query: str) -> flo
     else:
         score -= 0.6
 
-    # 3. Root Clause Structural Priority (ayat (1) or un-numbered single-clause Pasal)
-    if str(chunk.ayat) == "1" or chunk.ayat is None:
+    # 3. Root Clause Structural Priority (ayat (1) or un-numbered single-clause Pasal, or enumeration on enum query)
+    if str(chunk.ayat) == "1" or chunk.ayat is None or (is_enum_q and has_structured_enum):
         score += 0.5
 
     # 4. Interrogative Target Concordance ("di mana" -> domestic placement vs overseas exception)
@@ -400,8 +493,6 @@ def score_primary_obligation_alignment(chunk: RetrievedChunk, query: str) -> flo
             score += 0.2
 
     # 5. Concrete Numerical Statutory Deadlines / Time Limits
-    # Specific statutory deadlines ("paling lama 5 (lima) hari kerja", "paling lambat 10 hari")
-    # are the most concrete operational answers for entity obligation queries.
     if re.search(r"\bpaling\s+(?:lama|lambat)\s+\d+\s*(?:\([a-z\s]+\)\s*)?hari\b", norm_body):
         score += 1.5
 
@@ -409,13 +500,16 @@ def score_primary_obligation_alignment(chunk: RetrievedChunk, query: str) -> flo
     doc_id_low = (chunk.doc_id or "").lower()
     if any(p in doc_id_low for p in ("pojk", "pbi", "uu_", "pp_")):
         score += 0.5
-    elif any(p in doc_id_low for p in ("seojk", "sebi")):
+    elif any(p in doc_id_low for p in ("seojk", "sebi")) and not (
+        is_enum_q and has_structured_enum
+    ):
         score -= 0.3
 
-    # 7. Topical Content Keyword Overlap
+    # 7. Topical Content Keyword Overlap & Enumeration Completeness Boost
     stop_tokens = {
         "apa",
         "apakah",
+        "saja",
         "bagaimana",
         "berapa",
         "kapan",
@@ -429,6 +523,7 @@ def score_primary_obligation_alignment(chunk: RetrievedChunk, query: str) -> flo
         "atau",
         "dari",
         "pada",
+        "oleh",
         "untuk",
         "dalam",
         "menurut",
@@ -445,7 +540,11 @@ def score_primary_obligation_alignment(chunk: RetrievedChunk, query: str) -> flo
         "dilarang",
         "bank",
         "umum",
+        "perbankan",
         "pujk",
+        "pilar",
+        "diterapkan",
+        "dilakukan",
     }
     q_tokens = {t for t in re.findall(r"\b[a-z0-9]{4,}\b", norm_query) if t not in stop_tokens}
     if q_tokens:
@@ -453,7 +552,9 @@ def score_primary_obligation_alignment(chunk: RetrievedChunk, query: str) -> flo
         q_stemmed = {_legal_stem(t) for t in q_tokens}
         b_stemmed = {_legal_stem(t) for t in b_tokens}
         overlap = len(q_stemmed & b_stemmed) / len(q_stemmed)
-        score += overlap * 1.0
+        score += overlap * 2.5
+        if is_enum_q and has_structured_enum and overlap > 0:
+            score += 2.5
 
     return round(score, 4)
 
@@ -465,7 +566,8 @@ def format_passages(chunks: list[RetrievedChunk]) -> str:
 
     formatted_blocks: list[str] = []
     for idx, chunk in enumerate(chunks, start=1):
-        label = chunk.citation_label or chunk.chunk_id
+        raw_label = chunk.citation_label or chunk.chunk_id
+        label = re.sub(r"\s*\(bagian\s+\d+\)", "", raw_label, flags=re.IGNORECASE).strip()
         title_note = f"[Tentang: {chunk.doc_title}]" if chunk.doc_title else ""
         role_note = _detect_statutory_role(chunk.text)
         status_note = f"(Status: {chunk.status})" if chunk.status else ""
@@ -478,6 +580,8 @@ def format_passages(chunks: list[RetrievedChunk]) -> str:
             header_parts.append(status_note)
         header = f"{' '.join(header_parts)} ---".strip()
         body = chunk.text.strip()
+        # Strip redundant leading pipe-delimited breadcrumb bracket "[DOC | BAB | Pasal]" from body
+        body = re.sub(r"^\[[^\]]*\|[^\]]*\]\s*", "", body).strip()
         formatted_blocks.append(f"{header}\n{body}")
 
     return "\n\n".join(formatted_blocks)
@@ -505,6 +609,15 @@ _KNOWN_INSTITUTIONAL_SUBJECTS: list[str] = [
     "Emiten",
 ]
 
+_SECTORAL_SUBJECT_MAP: list[tuple[str, str]] = [
+    (r"\bperbankan\s+syariah\b", "Bank Syariah"),
+    (r"\bperbankan\b", "Bank"),
+    (r"\bperasuransian\b", "Perusahaan Asuransi"),
+    (r"\bdana\s+pensiun\b", "Dana Pensiun"),
+    (r"\blemba(?:ga)?\s+pembiayaan\b", "Perusahaan Pembiayaan"),
+    (r"\b(?:pinjaman\s+daring|pendanaan\s+bersama)\b", "Penyelenggara LPBBTI"),
+]
+
 
 def extract_query_subject(question: str) -> str | None:
     """Extract the primary institutional financial entity referenced in a query."""
@@ -513,6 +626,9 @@ def extract_query_subject(question: str) -> str | None:
     for subj in _KNOWN_INSTITUTIONAL_SUBJECTS:
         if re.search(rf"\b{re.escape(subj)}\b", question, re.IGNORECASE):
             return subj
+    for pat, canonical_subj in _SECTORAL_SUBJECT_MAP:
+        if re.search(pat, question, re.IGNORECASE):
+            return canonical_subj
     return None
 
 
