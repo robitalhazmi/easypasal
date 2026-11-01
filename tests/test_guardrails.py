@@ -1417,3 +1417,44 @@ def test_strip_appendix_and_ensure_enumeration_completeness() -> None:
 
     ver = verify_citations(realigned, chunks, cites, question=q)
     assert ver.is_valid is True
+
+    # Test Case 2: Leaked context metadata headers ("[Tentang: ...]", "[Peran: ...]", "(Status: ...)")
+    # and prompt-contaminated outline stub ("Pasal 74 ayat (1)", "POJK 22 Tahun 2023, Pasal 24 ayat (3)")
+    # with only one enumeration clause generated
+    leaked_outline_answer = (
+        "Romawi III angka 2 [Tentang: Ketahanan dan Keamanan Siber bagi Bank Umum] [Peran: Kewajiban Pokok Entitas] (Status: berlaku)\n"
+        "    Pasal 2 [Tentang: Penyelenggaraan Teknologi Informasi oleh Bank Umum] [Peran: Kewajiban Pokok Entitas] (Status: berlaku)\n"
+        "        Pasal 2 ayat (2)\n"
+        "    Pasal 74 ayat (1) [Tentang: Penyelenggaraan Teknologi Informasi oleh Bank Umum] [Peran: Kewajiban Pokok Entitas] (Status: berlaku)\n"
+        "        Pasal 75 ayat (1)\n\n"
+        "Bank juga wajib memenuhi ketentuan terkait:\n\n"
+        "POJK 11/POJK.03/2022, Pasal 21 ayat (2) [Tentang: Penyelenggaraan Teknologi Informasi oleh Bank Umum] [Peran: Kewajiban Pokok Entitas] (Status: berlaku)\n"
+        "    Pasal 21 ayat (2)\n\n"
+        "Bank juga wajib memenuhi ketentuan terkait:\n\n"
+        "POJK 22 Tahun 2023, Pasal 24 ayat (3) [Tentang: Pelindungan Konsumen dan Masyarakat di Sektor Jasa Keuangan] [Peran: Kewajiban Pokok Entitas] "
+        "Penerapan manajemen risiko terkait keamanan siber mencakup 4 (empat) aspek, yaitu: "
+        "a. tata kelola risiko terkait keamanan siber; b. kerangka manajemen risiko terkait keamanan siber; "
+        "c. proses manajemen risiko, kecukupan SDM, dan kecukupan sistem informasi manajemen risiko terkait keamanan siber; dan "
+        "d. sistem pengendalian risiko terkait keamanan siber [SEOJK 29/SEOJK.03/2022, Romawi III angka 2]."
+    )
+
+    realigned2, cites2, _ = detect_and_realign_inverted_citations(
+        answer=leaked_outline_answer,
+        retrieved_chunks=chunks,
+        question=q,
+    )
+    assert "[Tentang:" not in realigned2
+    assert "[Peran:" not in realigned2
+    assert "(Status:" not in realigned2
+    assert "Pasal 74" not in realigned2
+    assert "POJK 22 Tahun 2023" not in realigned2
+    assert "Bank juga wajib memenuhi ketentuan terkait" not in realigned2
+    assert realigned2.startswith(
+        "Bank wajib menjaga ketahanan siber [POJK 11/POJK.03/2022, Pasal 21 ayat (1)]."
+    )
+    assert "identifikasi aset, ancaman, dan kerentanan" in realigned2
+    assert "tata kelola risiko terkait keamanan siber" in realigned2
+    assert "POJK 11/POJK.03/2022, Pasal 21 ayat (2)" in cites2
+    assert "SEOJK 29/SEOJK.03/2022, Romawi III angka 2" in cites2
+    ver2 = verify_citations(realigned2, chunks, cites2, question=q)
+    assert ver2.is_valid is True

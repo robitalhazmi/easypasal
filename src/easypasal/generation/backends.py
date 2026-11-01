@@ -78,16 +78,29 @@ def sanitize_prompt_artifacts(text: str) -> str:
     for p in patterns:
         cleaned = re.sub(p, "", cleaned, flags=re.IGNORECASE)
 
+    # Strip leaked context header metadata tags ("[Tentang: ...]", "[Peran: ...]", "(Status: ...)")
+    metadata_patterns = [
+        r"---\s*DOKUMEN\s+\d+\s*:[^-\n]*---\s*",
+        r"\[\s*Tentang\s*:[^\]]*\]\s*",
+        r"\[\s*Peran\s*:[^\]]*\]\s*",
+        r"\(\s*Status\s*:[^)]*\)\s*",
+    ]
+    for mp in metadata_patterns:
+        cleaned = re.sub(mp, " ", cleaned, flags=re.IGNORECASE)
+
     # Strip internal chunk-splitting suffix "(bagian N)"
     cleaned = re.sub(r"\s*\(bagian\s+\d+\)", "", cleaned, flags=re.IGNORECASE)
 
-    # Strip echoed template prefix ("Entitas Jasa Keuangan wajib memenuhi ketentuan terkait:")
+    # Strip echoed template prefix ("<Entity> [juga] wajib memenuhi ketentuan terkait:")
     cleaned = re.sub(
-        r"^(?:Entitas\s+Jasa\s+Keuangan|Bank(?:\s+Umum)?|PUJK|Lembaga\s+Jasa\s+Keuangan|Financial\s+institutions)\s+"
-        r"(?:wajib\s+memenuhi\s+ketentuan\s+terkait|must\s+comply\s+with\s+regulatory\s+requirements)\s*:\s*(?:\[[^\]]+\]\.?\s*)?",
+        r"^[ \t]*(?:Selain\s+itu,\s*)?(?:Entitas\s+Jasa\s+Keuangan|Bank(?:\s+Umum|\s+Syariah)?|BPR(?:\s+Syariah)?|PUJK|"
+        r"Lembaga\s+Jasa\s+Keuangan|Perusahaan(?:\s+Efek|\s+Asuransi|\s+Pembiayaan)?|Dana\s+Pensiun|"
+        r"Penyelenggara(?:\s+LPBBTI)?|Financial\s+institutions)\s+(?:juga\s+|also\s+)?"
+        r"(?:wajib\s+memenuhi\s+ketentuan\s+terkait|must\s+comply\s+with\s+regulatory\s+requirements)\s*:\s*"
+        r"(?:\[[^\]]+\]\.?\s*)?\r?\n?",
         "",
         cleaned,
-        flags=re.IGNORECASE,
+        flags=re.IGNORECASE | re.MULTILINE,
     )
 
     # Strip leaked pipe-delimited breadcrumb lines (e.g. "SEOJK 29/SEOJK.03/2022 | Romawi X PENUTUP | Angka 1")
@@ -98,11 +111,28 @@ def sanitize_prompt_artifacts(text: str) -> str:
         flags=re.MULTILINE,
     )
 
-    # Strip standalone echoed section-header lines (e.g. "Romawi X angka 1 dari SEOJK 29/SEOJK.03/2022:")
+    # Strip standalone echoed section-header lines and bare section-outline prefixes
+    outline_item = (
+        r"(?:"
+        r"(?:POJK|SEOJK|UU|Undang-Undang|PBI|PADG|PP)\s+(?:Nomor\s+)?[\w\./\-]+(?:\s+Tahun\s+\d{4})?\s*,\s*"
+        r"(?:Pasal\s+\d+[a-z]?(?:\s+ayat\s+\(\d+[a-z]?\))?(?:\s+angka\s+\d+)?|Romawi\s+[IVXLCDM]+(?:\s+angka\s+\d+)?)"
+        r"|Romawi\s+[IVXLCDM]+(?:\s+angka\s+\d+)?(?:\s+dari\s+[\w\./\s]+)?"
+        r"|Pasal\s+\d+[a-z]?(?:\s+ayat\s+\(\d+[a-z]?\))?(?:\s+angka\s+\d+)?(?:\s+dari\s+[\w\./\s]+)?"
+        r"|ayat\s+\(\d+[a-z]?\)"
+        r"|(?:[a-z]{1,3}|\d+)[\.\)]"
+        r")"
+    )
     cleaned = re.sub(
-        r"^[ \t]*(?:Romawi\s+[IVXLCDM]+\s+angka\s+\d+(?:\s+dari\s+[\w\./\s]+)?|"
-        r"(?:POJK|SEOJK|UU|PBI|PADG)\s+[\w\./\s]+,\s*(?:Pasal|Romawi)\s+[\w\s()]+):?[ \t]*\r?\n",
+        rf"^[ \t]*(?:{outline_item}[ \t:,]*)+(?:\r?\n|$)",
         "",
+        cleaned,
+        flags=re.IGNORECASE | re.MULTILINE,
+    )
+    cleaned = re.sub(
+        rf"^[ \t]*((?:{outline_item}[ \t:,]*)+)(?=[A-Z])",
+        lambda m: (
+            "" if re.search(r"\b(?:Pasal|Romawi)\b", m.group(1), re.IGNORECASE) else m.group(0)
+        ),
         cleaned,
         flags=re.IGNORECASE | re.MULTILINE,
     )

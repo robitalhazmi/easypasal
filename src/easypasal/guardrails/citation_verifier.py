@@ -667,42 +667,77 @@ def simplify_dangling_cross_references(text: str) -> str:
 
 
 def strip_appendix_and_header_artifacts(text: str) -> str:
-    """Strip leaked chunk headers, pipe-delimited breadcrumbs, and corrupted appendix fragments."""
+    """Strip leaked chunk headers, metadata tags, bare section outlines, and corrupted appendix fragments."""
     if not text:
         return text
 
-    # 1. Strip internal chunk-splitting suffix "(bagian N)"
-    cleaned = re.sub(r"\s*\(bagian\s+\d+\)", "", text, flags=re.IGNORECASE)
+    # 1. Strip leaked context header metadata tags ("[Tentang: ...]", "[Peran: ...]", "(Status: ...)")
+    cleaned = text
+    for mp in (
+        r"---\s*DOKUMEN\s+\d+\s*:[^-\n]*---\s*",
+        r"\[\s*Tentang\s*:[^\]]*\]\s*",
+        r"\[\s*Peran\s*:[^\]]*\]\s*",
+        r"\(\s*Status\s*:[^)]*\)\s*",
+    ):
+        cleaned = re.sub(mp, " ", cleaned, flags=re.IGNORECASE)
 
-    # 2. Strip echoed template prefix ("Entitas Jasa Keuangan wajib memenuhi ketentuan terkait:")
+    # 2. Strip internal chunk-splitting suffix "(bagian N)"
+    cleaned = re.sub(r"\s*\(bagian\s+\d+\)", "", cleaned, flags=re.IGNORECASE)
+
+    # 3. Strip echoed template prefix ("<Entity> [juga] wajib memenuhi ketentuan terkait:")
     cleaned = re.sub(
-        r"^(?:Entitas\s+Jasa\s+Keuangan|Bank(?:\s+Umum)?|PUJK|Lembaga\s+Jasa\s+Keuangan|Financial\s+institutions)\s+"
-        r"(?:wajib\s+memenuhi\s+ketentuan\s+terkait|must\s+comply\s+with\s+regulatory\s+requirements)\s*:\s*(?:\[[^\]]+\]\.?\s*)?",
+        r"^[ \t]*(?:Selain\s+itu,\s*)?(?:Entitas\s+Jasa\s+Keuangan|Bank(?:\s+Umum|\s+Syariah)?|BPR(?:\s+Syariah)?|PUJK|"
+        r"Lembaga\s+Jasa\s+Keuangan|Perusahaan(?:\s+Efek|\s+Asuransi|\s+Pembiayaan)?|Dana\s+Pensiun|"
+        r"Penyelenggara(?:\s+LPBBTI)?|Financial\s+institutions)\s+(?:juga\s+|also\s+)?"
+        r"(?:wajib\s+memenuhi\s+ketentuan\s+terkait|must\s+comply\s+with\s+regulatory\s+requirements)\s*:\s*"
+        r"(?:\[[^\]]+\]\.?\s*)?\r?\n?",
         "",
         cleaned,
-        flags=re.IGNORECASE,
+        flags=re.IGNORECASE | re.MULTILINE,
     )
 
-    # 3. Strip pipe-delimited breadcrumb lines and standalone section-header lines
+    # 4. Strip pipe-delimited breadcrumb lines
     cleaned = re.sub(
         r"^[ \t]*\[?[A-Za-z0-9\./\s\-]+(?:\|[A-Za-z0-9\./\s\-()]+)+\]?[ \t]*\r?\n?",
         "",
         cleaned,
         flags=re.MULTILINE,
     )
+
+    # 5. Strip standalone section-header lines and bare section-outline prefixes
+    outline_item = (
+        r"(?:"
+        r"(?:POJK|SEOJK|UU|Undang-Undang|PBI|PADG|PP)\s+(?:Nomor\s+)?[\w\./\-]+(?:\s+Tahun\s+\d{4})?\s*,\s*"
+        r"(?:Pasal\s+\d+[a-z]?(?:\s+ayat\s+\(\d+[a-z]?\))?(?:\s+angka\s+\d+)?|Romawi\s+[IVXLCDM]+(?:\s+angka\s+\d+)?)"
+        r"|Romawi\s+[IVXLCDM]+(?:\s+angka\s+\d+)?(?:\s+dari\s+[\w\./\s]+)?"
+        r"|Pasal\s+\d+[a-z]?(?:\s+ayat\s+\(\d+[a-z]?\))?(?:\s+angka\s+\d+)?(?:\s+dari\s+[\w\./\s]+)?"
+        r"|ayat\s+\(\d+[a-z]?\)"
+        r"|(?:[a-z]{1,3}|\d+)[\.\)]"
+        r")"
+    )
     cleaned = re.sub(
-        r"^[ \t]*(?:Romawi\s+[IVXLCDM]+\s+angka\s+\d+(?:\s+dari\s+[\w\./\s]+)?|"
-        r"(?:POJK|SEOJK|UU|PBI|PADG)\s+[\w\./\s]+,\s*(?:Pasal|Romawi)\s+[\w\s()]+):?[ \t]*\r?\n?",
+        rf"^[ \t]*(?:{outline_item}[ \t:,]*)+(?:\r?\n|$)",
         "",
         cleaned,
         flags=re.IGNORECASE | re.MULTILINE,
     )
 
-    # 4. Drop paragraphs/lines that are closing-section ("Romawi X") or mid-sentence worksheet fragments ("3.1.g.", "maupun konsistensi")
+    # 6. Drop paragraphs/lines that are closing-section ("Romawi X"), worksheet fragments, or bare section outlines
     kept_paras: list[str] = []
     for para in cleaned.split("\n\n"):
-        p_strip = para.strip()
+        p_strip = re.sub(r"\s+", " ", para).strip()
         if not p_strip:
+            continue
+        # Strip leading bare section-outline prefix glued before a capitalized sentence
+        p_strip = re.sub(
+            rf"^((?:{outline_item}[ \t:,]*)+)(?=[A-Z])",
+            lambda m: (
+                "" if re.search(r"\b(?:Pasal|Romawi)\b", m.group(1), re.IGNORECASE) else m.group(0)
+            ),
+            p_strip,
+            flags=re.IGNORECASE,
+        ).strip()
+        if not p_strip or re.fullmatch(rf"(?:{outline_item}[ \t:,]*)+", p_strip, re.IGNORECASE):
             continue
         p_no_lead_cite = re.sub(r"^\[[^\]]+\]\s*:?\s*", "", p_strip).strip()
         if (
@@ -725,9 +760,9 @@ def ensure_enumeration_completeness(
 ) -> str:
     """Ensure enumeration queries ('Apa saja pilar/aspek/komponen...') include grounded enumeration clauses.
 
-    When a root mandate stub (e.g. Pasal 21 ayat (1) 'Bank wajib menjaga ketahanan siber') is generated
-    without its child enumeration clause (e.g. Pasal 21 ayat (2) or SEOJK Romawi III angka 2), or when a
-    corrupted appendix dump was stripped, this function synthesizes the clean enumeration from retrieved chunks.
+    Filters pre-existing text through a Normative Sentence & Grounding Gate (discarding ungrounded
+    outline stubs), ensures the primary root mandate opens the answer when available, and uses
+    content-stem coverage deduplication so all complementary statutory enumeration clauses are included.
     """
     if not retrieved_chunks or not question:
         return text
@@ -740,10 +775,6 @@ def ensure_enumeration_completeness(
     )
 
     if not is_enumeration_query(question):
-        return text
-
-    # Check if text already contains an explicit multi-item enumeration ("a. ... b. ...")
-    if text and re.search(r"\ba\.\s+[^;.\n]{3,120}[;.\n]\s*(?:dan\s+)?b\.\s+", text, re.IGNORECASE):
         return text
 
     scored_primaries = sorted(
@@ -777,19 +808,6 @@ def ensure_enumeration_completeness(
     if not enum_chunks:
         return text
 
-    parts: list[str] = []
-    if text and text.strip():
-        parts.append(text.strip())
-    elif mandate_chunks:
-        m_chunk = mandate_chunks[0]
-        m_label = re.sub(
-            r"\s*\(bagian\s+\d+\)", "", m_chunk.citation_label or m_chunk.chunk_id
-        ).strip()
-        m_body = re.sub(r"^\[[^\]]+\]\s*", "", m_chunk.text.strip())
-        m_body = re.sub(r"^\(\d+\)\s*", "", m_body)
-        m_body = re.sub(r"\s+", " ", m_body).strip().rstrip(".")
-        parts.append(f"{m_body} [{m_label}].")
-
     selected_enums: list[RetrievedChunk] = []
     covered_stems: set[str] = set()
     for ec in enum_chunks:
@@ -801,14 +819,65 @@ def ensure_enumeration_completeness(
         if len(selected_enums) >= 2:
             break
 
+    # 1. Normative Sentence & Grounding Gate on pre-existing text
+    parts: list[str] = []
+    if text and text.strip():
+        for para in text.split("\n\n"):
+            p_clean = para.strip()
+            if not p_clean:
+                continue
+            for sent in re.split(r"(?<=[.!?])\s+(?=[A-Z\[])", p_clean):
+                s_clean = sent.strip()
+                if len(s_clean.split()) < 5:
+                    continue
+                best_match = max(
+                    (_score_sentence_chunk_match(s_clean, c) for c in retrieved_chunks),
+                    default=0.0,
+                )
+                if best_match >= 2.0:
+                    parts.append(s_clean if s_clean.endswith((".", "!", "?")) else f"{s_clean}.")
+
+    # 2. Ensure root mandate opens the response if parts is empty or lacks an opening imperative duty
+    if mandate_chunks and (
+        not parts or not re.search(r"\b(?:wajib|harus|dilarang)\b", parts[0], re.IGNORECASE)
+    ):
+        m_chunk = mandate_chunks[0]
+        m_label = re.sub(
+            r"\s*\(bagian\s+\d+\)", "", m_chunk.citation_label or m_chunk.chunk_id
+        ).strip()
+        m_body = re.sub(r"^\[[^\]]+\]\s*", "", m_chunk.text.strip())
+        m_body = re.sub(r"^\(\d+\)\s*", "", m_body)
+        m_body = re.sub(r"\s+", " ", m_body).strip().rstrip(".")
+        mandate_sent = f"{m_body} [{m_label}]."
+        if m_label.lower() not in " ".join(parts).lower():
+            parts.insert(0, mandate_sent)
+
+    # 3. Content-based deduplication across all selected enumeration clauses
     for idx, ec in enumerate(selected_enums):
         ec_label = re.sub(r"\s*\(bagian\s+\d+\)", "", ec.citation_label or ec.chunk_id).strip()
-        if ec_label in "\n".join(parts):
-            continue
         ec_body = re.sub(r"^\[[^\]]+\]\s*", "", ec.text.strip())
         ec_body = re.sub(r"^(?:\(\d+\)|\d+\.)\s*", "", ec_body)
         ec_body = re.sub(r"\s+", " ", ec_body).strip().rstrip(".")
         ec_body = simplify_dangling_cross_references(ec_body)
+
+        ec_content_stems = {
+            _legal_stem(w)
+            for w in re.findall(r"\b[a-z]{4,}\b", ec_body.lower())
+            if w not in _SENTENCE_STOPWORDS
+        }
+        existing_content_stems = {
+            _legal_stem(w)
+            for w in re.findall(r"\b[a-z]{4,}\b", " ".join(parts).lower())
+            if w not in _SENTENCE_STOPWORDS
+        }
+        stem_coverage = (
+            len(ec_content_stems & existing_content_stems) / len(ec_content_stems)
+            if ec_content_stems
+            else 1.0
+        )
+        if stem_coverage >= 0.55:
+            continue
+
         if not parts and idx == 0 and not re.search(r"\b(?:wajib|harus)\b", ec_body, re.IGNORECASE):
             ec_body = re.sub(
                 r"^Untuk\s+(menjaga|melaksanakan|menerapkan|memastikan)\s+([^,]+),\s*(Bank(?:\s+Umum)?|PUJK|Lembaga\s+Jasa\s+Keuangan|Perusahaan)\s+melakukan\s+",
@@ -816,7 +885,13 @@ def ensure_enumeration_completeness(
                 ec_body,
                 flags=re.IGNORECASE,
             )
-        elif idx > 0 and not ec_body.lower().startswith(("selain itu", "sementara itu")):
+        elif (
+            len(parts) >= 2
+            or (
+                parts
+                and re.search(r"\ba\.\s+[^;]{3,120};\s*(?:dan\s+)?b\.\s+", parts[-1], re.IGNORECASE)
+            )
+        ) and not ec_body.lower().startswith(("selain itu", "sementara itu")):
             ec_body = f"Selain itu, {ec_body[0].lower()}{ec_body[1:]}"
         parts.append(f"{ec_body} [{ec_label}].")
 
