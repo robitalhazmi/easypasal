@@ -155,8 +155,10 @@ def trim_incomplete_sentence(text: str) -> str:
     if not stripped:
         return text
 
-    # Strip any trailing orphan list marker (e.g. "\n\n3.", "\n3.", "\n- ", "b.", "a.", "(a)", or hanging "b")
-    orphan_pattern = r"(?:\s+|\A)(?:\(?[a-zA-Z0-9]{1,2}[\.\)]|[-*•]|\b[a-zA-Z]\b)\s*$"
+    # Strip any trailing orphan list marker (e.g. "\n\n3.", "\n3.", "\n- ", "b.", "a.", "(a)", "i.", "ii.", or hanging "b")
+    orphan_pattern = (
+        r"(?:\s+|\A)(?:\(?[a-zA-Z0-9]{1,2}[\.\)]|\b[ivxIVX]{1,4}[\.\)]|[-*•]|\b[a-zA-Z]\b)\s*$"
+    )
     while re.search(orphan_pattern, stripped):
         stripped = re.sub(orphan_pattern, "", stripped).rstrip()
 
@@ -170,21 +172,20 @@ def trim_incomplete_sentence(text: str) -> str:
         '!"',
         '?"',
         "]",
-        ")",
         ".*",
         "._",
         ".**",
         ".)",
     )
 
-    is_terminal = stripped.endswith(terminal_chars) or stripped.rstrip("*_\"'\t\r \n)").endswith(
+    is_terminal = stripped.endswith(terminal_chars) or stripped.rstrip("*_\"'\t\r \n").endswith(
         (".", "!", "?", "]")
     )
-    if is_terminal and not re.search(r"\b(?:[a-zA-Z]|\d+)[\.\)]$", stripped):
+    if is_terminal and not re.search(r"\b(?:[a-zA-Z]|[ivxIVX]{1,4}|\d+)[\.\)]$", stripped):
         return deduplicate_repeated_blocks(stripped)
 
-    # Match genuine sentence endings (excluding list numbers like "3." or decimals like "3.5" or letter items like "b.")
-    pattern = r"(?:(?<!\b\d)(?<!\b[a-zA-Z])[\.!\?]|\])[\'\"\)\*\_]*(?=\s|$)"
+    # Match genuine sentence endings (excluding list numbers like "3." or decimals like "3.5" or letter/roman items like "b.", "i.")
+    pattern = r"(?:(?<!\b\d)(?<!\b[a-zA-Z])(?<!\b[ivxIVX]{2})(?<!\b[ivxIVX]{3})[\.!\?]|\])[\'\"\)\*\_]*(?=\s|$)"
     matches = list(re.finditer(pattern, stripped))
     if matches:
         last_match = matches[-1]

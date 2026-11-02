@@ -587,19 +587,43 @@ def _strip_remedial_dump_paragraphs(text: str, inverted_pasal: str | None = None
 def reformat_narrative_citations_to_brackets(text: str) -> str:
     """Transform conversational narrative citation phrasing into canonical square-bracketed citations.
 
-    Converts phrases like ', seperti yang ditetapkan dalam POJK 22 Tahun 2023, Pasal 71 ayat (1)'
-    or ', as stipulated in UU Nomor 4 Tahun 2023, Pasal 245 ayat (1)' into '[...]'.
+    Converts both trailing phrases (e.g. ', seperti yang ditetapkan dalam POJK 22 Tahun 2023, Pasal 71 ayat (1)')
+    and leading prepositional citations (e.g. 'Dalam POJK 11/POJK.03/2022, Pasal 21 ayat (2), Bank harus...')
+    into canonical end-of-sentence '[...]' tags.
     """
     if not text:
         return text
 
-    # Indonesian narrative citations
+    cit_designator = (
+        r"(?:Pasal\s+\d+[a-z]?(?:\s+(?:ayat\s+\(\d+[a-z]?\)|angka\s+\d+))?|"
+        r"Romawi\s+[IVXLCDM]+(?:\s+angka\s+\d+)?)"
+    )
+
+    # 1. Leading prepositional citation ("Dalam POJK ..., Pasal ..., <body without brackets>.")
+    lead_pattern = re.compile(
+        rf"(?:^|(?<=[.!?]\s))(?:Dalam|Berdasarkan|Menurut|Sesuai\s+dengan|Merujuk\s+pada|In|Under|Pursuant\s+to|According\s+to)\s+"
+        rf"((?:POJK|SEOJK|UU|Undang-Undang|PBI|PADG|PP)\s+[\w\s\./\-]+?,\s*{cit_designator}),\s*"
+        rf"([^.!?\[]+?)([.!?])",
+        re.IGNORECASE,
+    )
+
+    def _repl_lead(m: re.Match[str]) -> str:
+        cit = m.group(1).strip()
+        body = m.group(2).strip()
+        punct = m.group(3)
+        if body:
+            body = f"{body[0].upper()}{body[1:]}"
+        return f"{body} [{cit}]{punct}"
+
+    text = lead_pattern.sub(_repl_lead, text)
+
+    # 2. Trailing Indonesian narrative citations
     pattern_id = re.compile(
-        r",?\s*(?:seperti\s+yang\s+(?:ditetapkan|diatur|tercantum)\s+dalam|"
-        r"sebagaimana\s+(?:ditetapkan|diatur|tercantum|dimaksud)\s+dalam|"
-        r"sesuai\s+(?:dengan\s+)?(?:ketentuan\s+)?(?:dalam\s+)?|"
-        r"berdasarkan\s+ketentuan\s+)\s*"
-        r"([\w\s\./]+?,\s*Pasal\s+\d+[a-z]?(?:\s+(?:ayat\s+\(\d+[a-z]?\)|angka\s+\d+))?)",
+        rf",?\s*(?:seperti\s+yang\s+(?:ditetapkan|diatur|tercantum)\s+dalam|"
+        rf"sebagaimana\s+(?:ditetapkan|diatur|tercantum|dimaksud)\s+dalam|"
+        rf"sesuai\s+(?:dengan\s+)?(?:ketentuan\s+)?(?:dalam\s+)?|"
+        rf"berdasarkan\s+ketentuan\s+)\s*"
+        rf"([\w\s\./]+?,\s*{cit_designator})",
         re.IGNORECASE,
     )
 
@@ -609,11 +633,11 @@ def reformat_narrative_citations_to_brackets(text: str) -> str:
 
     text = pattern_id.sub(_repl_id, text)
 
-    # English narrative citations
+    # 3. Trailing English narrative citations
     pattern_en = re.compile(
-        r",?\s*(?:as\s+(?:stipulated|stated|specified|regulated|set\s+out)\s+in|"
-        r"according\s+to|pursuant\s+to)\s*"
-        r"([\w\s\./]+?,\s*Pasal\s+\d+[a-z]?(?:\s+(?:ayat\s+\(\d+[a-z]?\)|angka\s+\d+))?)",
+        rf",?\s*(?:as\s+(?:stipulated|stated|specified|regulated|set\s+out)\s+in|"
+        rf"according\s+to|pursuant\s+to)\s*"
+        rf"([\w\s\./]+?,\s*{cit_designator})",
         re.IGNORECASE,
     )
 
@@ -819,7 +843,11 @@ def ensure_enumeration_completeness(
         if len(selected_enums) >= 2:
             break
 
-    # 1. Normative Sentence & Grounding Gate on pre-existing text
+    # 1. Normative Sentence, Finite Predicate & Sub-Item Completeness Gate on pre-existing text
+    finite_predicate_re = re.compile(
+        r"\b(?:wajib|harus|dilarang|melakukan|mencakup|meliputi|terdiri\s+atas|ditetapkan|diatur|menjaga|menerapkan|melaksanakan|memenuhi|menyediakan|memiliki)\b",
+        re.IGNORECASE,
+    )
     parts: list[str] = []
     if text and text.strip():
         for para in text.split("\n\n"):
@@ -830,12 +858,39 @@ def ensure_enumeration_completeness(
                 s_clean = sent.strip()
                 if len(s_clean.split()) < 5:
                     continue
-                best_match = max(
-                    (_score_sentence_chunk_match(s_clean, c) for c in retrieved_chunks),
-                    default=0.0,
+                # Reject fragments lacking a finite verb predicate, containing fabricated "(Romawi ..., ayat ...)",
+                # or ending with a dangling sub-item marker ("i.", "ii.", "a.")
+                if (
+                    not finite_predicate_re.search(s_clean)
+                    or re.search(
+                        r"\(\s*Romawi\s+[IVXLCDM]+\s*,\s*ayat\s+\d+\s*\)", s_clean, re.IGNORECASE
+                    )
+                    or re.search(r"\b(?:[a-z]|[ivx]{1,4})\.\s*$", s_clean, re.IGNORECASE)
+                ):
+                    continue
+
+                scored_chunks = [
+                    (_score_sentence_chunk_match(s_clean, c), c) for c in retrieved_chunks
+                ]
+                best_match, best_c = max(
+                    scored_chunks, key=lambda item: item[0], default=(0.0, None)
                 )
-                if best_match >= 2.0:
-                    parts.append(s_clean if s_clean.endswith((".", "!", "?")) else f"{s_clean}.")
+                if best_match < 2.0 or best_c is None:
+                    continue
+
+                # If this sentence matches an enumeration chunk that defines lettered sub-items (a., b., c...),
+                # verify that the sentence preserves all lettered sub-items and carries a bracketed citation
+                best_c_body = re.sub(r"^\[[^\]]+\]\s*", "", best_c.text.strip())
+                expected_markers = re.findall(r"(?:^|[:;\s])([a-f])\.\s+", best_c_body)
+                if len(expected_markers) >= 2:
+                    has_all_markers = all(
+                        re.search(rf"(?:^|[:;\s]){re.escape(m)}\.\s+", s_clean)
+                        for m in expected_markers
+                    )
+                    if not has_all_markers or not re.search(r"\[[^\]]+\]", s_clean):
+                        continue
+
+                parts.append(s_clean if s_clean.endswith((".", "!", "?")) else f"{s_clean}.")
 
     # 2. Ensure root mandate opens the response if parts is empty or lacks an opening imperative duty
     if mandate_chunks and (
@@ -852,8 +907,8 @@ def ensure_enumeration_completeness(
         if m_label.lower() not in " ".join(parts).lower():
             parts.insert(0, mandate_sent)
 
-    # 3. Content-based deduplication across all selected enumeration clauses
-    for idx, ec in enumerate(selected_enums):
+    # 3. Content-based & sub-item completeness deduplication across all selected enumeration clauses
+    for ec in selected_enums:
         ec_label = re.sub(r"\s*\(bagian\s+\d+\)", "", ec.citation_label or ec.chunk_id).strip()
         ec_body = re.sub(r"^\[[^\]]+\]\s*", "", ec.text.strip())
         ec_body = re.sub(r"^(?:\(\d+\)|\d+\.)\s*", "", ec_body)
@@ -865,9 +920,10 @@ def ensure_enumeration_completeness(
             for w in re.findall(r"\b[a-z]{4,}\b", ec_body.lower())
             if w not in _SENTENCE_STOPWORDS
         }
+        existing_joined = " ".join(parts)
         existing_content_stems = {
             _legal_stem(w)
-            for w in re.findall(r"\b[a-z]{4,}\b", " ".join(parts).lower())
+            for w in re.findall(r"\b[a-z]{4,}\b", existing_joined.lower())
             if w not in _SENTENCE_STOPWORDS
         }
         stem_coverage = (
@@ -875,27 +931,56 @@ def ensure_enumeration_completeness(
             if ec_content_stems
             else 1.0
         )
-        if stem_coverage >= 0.55:
+        expected_markers = re.findall(r"(?:^|[:;\s])([a-f])\.\s+", ec_body)
+        has_expected_markers = all(
+            re.search(rf"(?:^|[:;\s]){re.escape(m)}\.\s+", existing_joined)
+            for m in expected_markers
+        )
+        if stem_coverage >= 0.55 and has_expected_markers:
             continue
 
-        if not parts and idx == 0 and not re.search(r"\b(?:wajib|harus)\b", ec_body, re.IGNORECASE):
-            ec_body = re.sub(
-                r"^Untuk\s+(menjaga|melaksanakan|menerapkan|memastikan)\s+([^,]+),\s*(Bank(?:\s+Umum)?|PUJK|Lembaga\s+Jasa\s+Keuangan|Perusahaan)\s+melakukan\s+",
-                r"\3 wajib \1 \2 dengan melakukan ",
-                ec_body,
-                flags=re.IGNORECASE,
+        is_binding_statute = any(
+            p in (ec.doc_id or "").lower() for p in ("pojk", "pbi", "uu_", "pp_")
+        )
+        # If parts currently starts with a circular (SEOJK) and this enumeration is a binding statute (POJK/UU),
+        # insert the binding statutory enumeration before the circular enumeration
+        if (
+            is_binding_statute
+            and parts
+            and re.search(r"\[(?:SEOJK|PADG)\b", parts[-1], re.IGNORECASE)
+            and not any(
+                re.search(r"\[(?:POJK|PBI|UU)\b", p, re.IGNORECASE) and "a." in p for p in parts
             )
-        elif (
-            len(parts) >= 2
-            or (
-                parts
-                and re.search(r"\ba\.\s+[^;]{3,120};\s*(?:dan\s+)?b\.\s+", parts[-1], re.IGNORECASE)
-            )
-        ) and not ec_body.lower().startswith(("selain itu", "sementara itu")):
-            ec_body = f"Selain itu, {ec_body[0].lower()}{ec_body[1:]}"
-        parts.append(f"{ec_body} [{ec_label}].")
+        ):
+            insert_idx = 1 if (mandate_chunks and len(parts) >= 2) else 0
+            parts.insert(insert_idx, f"{ec_body} [{ec_label}].")
+        else:
+            parts.append(f"{ec_body} [{ec_label}].")
 
-    synthesized = " ".join(parts).strip()
+    # 4. Normalize transitions and ensure opening sentence carries explicit obligation modality
+    normalized_parts: list[str] = []
+    for i, p in enumerate(parts):
+        p_norm = p.strip()
+        if i == 0:
+            p_norm = re.sub(
+                r"^(?:Selain\s+itu|Sementara\s+itu),\s*", "", p_norm, flags=re.IGNORECASE
+            )
+            if p_norm:
+                p_norm = f"{p_norm[0].upper()}{p_norm[1:]}"
+            if not re.search(r"\b(?:wajib|harus|dilarang)\b", p_norm, re.IGNORECASE):
+                p_norm = re.sub(
+                    r"^Untuk\s+(menjaga|melaksanakan|menerapkan|memastikan)\s+([^,]+),\s*(Bank(?:\s+Umum)?|PUJK|Lembaga\s+Jasa\s+Keuangan|Perusahaan)\s+melakukan\s+",
+                    r"Untuk \1 \2, \3 wajib melakukan ",
+                    p_norm,
+                    flags=re.IGNORECASE,
+                )
+        elif re.search(
+            r"\ba\.\s+[^;]{3,120};\s*(?:dan\s+)?b\.\s+", p_norm, re.IGNORECASE
+        ) and not p_norm.lower().startswith(("selain itu", "sementara itu", "untuk ")):
+            p_norm = f"Selain itu, {p_norm[0].lower()}{p_norm[1:]}"
+        normalized_parts.append(p_norm)
+
+    synthesized = " ".join(normalized_parts).strip()
     return realign_answer_subject(synthesized, question)
 
 
@@ -1102,7 +1187,7 @@ def align_sentence_level_citations(
 
     paragraphs = text.split("\n\n")
     normative_re = re.compile(
-        r"\b(?:wajib|harus|dilarang|must|shall|required|prohibited)\b",
+        r"\b(?:wajib|harus|dilarang|must|shall|required|prohibited|mencakup|meliputi|terdiri\s+atas|paling\s+sedikit|melakukan\s+proses)\b",
         re.IGNORECASE,
     )
 
@@ -1153,8 +1238,8 @@ def align_sentence_level_citations(
 
             bracket_matches = list(re.finditer(r"\[([^\]]+)\]", sent))
             if not bracket_matches:
-                # Attach missing per-sentence citation if part of a multi-sentence answer and strongly matched
-                if normative_count >= 2 and best_raw_score >= 4.5 and best_label:
+                # Attach missing per-sentence citation if strongly matched
+                if normative_count >= 1 and best_raw_score >= 4.5 and best_label:
                     if sent.endswith((".", "!", "?")):
                         sent = f"{sent[:-1].rstrip()} [{best_label}]{sent[-1]}"
                     else:

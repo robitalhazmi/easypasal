@@ -1458,3 +1458,51 @@ def test_strip_appendix_and_ensure_enumeration_completeness() -> None:
     assert "SEOJK 29/SEOJK.03/2022, Romawi III angka 2" in cites2
     ver2 = verify_citations(realigned2, chunks, cites2, question=q)
     assert ver2.is_valid is True
+
+    # Test Case 3: Truncated outline with fabricated "(Romawi III, ayat 4)" & dangling "i."
+    truncated_outline_answer = (
+        "Manajemen Risiko Terkait Keamanan Siber (Romawi III, ayat 2): "
+        "a. Tata Kelola Risiko Terkait Keamanan Siber (Romawi III, ayat 4) "
+        "i. Cukupan Pengawasan Aktif oleh Direksi dan Dewan Komisaris "
+        "b. Kerangka Manajemen Risiko Terkait Keamanan Siber (Romawi III, ayat 4) "
+        "c. Proses Manajemen Risiko (Romawi III, ayat 4) i. "
+        "Selain itu, untuk menjaga ketahanan siber, Bank melakukan proses paling sedikit: "
+        "a. identifikasi aset, ancaman, dan kerentanan; b. pelindungan aset; "
+        "c. deteksi insiden siber; dan d. penanggulangan dan pemulihan insiden siber "
+        "[POJK 11/POJK.03/2022, Pasal 21 ayat (2)]."
+    )
+    realigned3, cites3, _ = detect_and_realign_inverted_citations(
+        answer=truncated_outline_answer,
+        retrieved_chunks=[c_p21_2, c_seojk_iii_2],
+        question=q,
+    )
+    assert "(Romawi III, ayat 4)" not in realigned3
+    assert "i." not in realigned3
+    assert "sistem pengendalian risiko terkait keamanan siber" in realigned3
+    assert "POJK 11/POJK.03/2022, Pasal 21 ayat (2)" in cites3
+    assert "SEOJK 29/SEOJK.03/2022, Romawi III angka 2" in cites3
+    ver3 = verify_citations(realigned3, [c_p21_2, c_seojk_iii_2], cites3, question=q)
+    assert ver3.is_valid is True
+
+    # Test Case 4: Leading prepositional citation + hyphen bullets with distorted "Pelindung aset"
+    narrative_bullet_answer = (
+        "Dalam POJK 11/POJK.03/2022, Pasal 21 ayat (2), Bank harus: "
+        "- Identifikasi aset, ancaman, dan kerentanan; - Pelindung aset; "
+        "- Deteksi insiden siber; - Penanggulangan dan pemulihan insiden siber. "
+        "Penerapan manajemen risiko terkait keamanan siber mencakup 4 (empat) aspek, yaitu: "
+        "a. tata kelola risiko terkait keamanan siber; b. kerangka manajemen risiko terkait keamanan siber; "
+        "c. proses manajemen risiko, kecukupan SDM, dan kecukupan sistem informasi manajemen risiko terkait keamanan siber; dan "
+        "d. sistem pengendalian risiko terkait keamanan siber [SEOJK 29/SEOJK.03/2022, Romawi III angka 2]."
+    )
+    realigned4, cites4, _ = detect_and_realign_inverted_citations(
+        answer=narrative_bullet_answer,
+        retrieved_chunks=[c_p21_2, c_seojk_iii_2],
+        question=q,
+    )
+    assert "Dalam POJK" not in realigned4
+    assert "Pelindung aset" not in realigned4
+    assert "pelindungan aset" in realigned4
+    assert "[POJK 11/POJK.03/2022, Pasal 21 ayat (2)]" in realigned4
+    assert "[SEOJK 29/SEOJK.03/2022, Romawi III angka 2]" in realigned4
+    ver4 = verify_citations(realigned4, [c_p21_2, c_seojk_iii_2], cites4, question=q)
+    assert ver4.is_valid is True
