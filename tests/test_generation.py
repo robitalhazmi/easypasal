@@ -1075,3 +1075,49 @@ def test_sectoral_subject_extraction_and_appendix_exclusion() -> None:
     assert score_primary_obligation_alignment(c_appendix, q) == 0.0
     assert score_primary_obligation_alignment(c_enum_pojk, q) >= 6.0
     assert score_primary_obligation_alignment(c_enum_seojk, q) >= 6.0
+
+
+def test_cross_lingual_query_expansion_and_alignment() -> None:
+    """Verify English obligation/principle queries expand to Indonesian regulatory terms and align with operative Pasals."""
+    from easypasal.generation.prompts import (
+        expand_cross_lingual_query_terms,
+        is_enumeration_query,
+        score_primary_obligation_alignment,
+    )
+    from easypasal.retrieval.fusion import detect_normative_intent
+
+    q_en = "What are the principal consumer protection obligations for digital financial services under OJK rules?"
+    assert detect_normative_intent(q_en) == "obligation"
+    assert is_enumeration_query(q_en) is True
+
+    expanded = expand_cross_lingual_query_terms(q_en)
+    assert "pelindungan konsumen" in expanded
+    assert "layanan digital" in expanded
+    assert "prinsip" in expanded
+
+    c_preamble = _make_dummy_chunk(
+        "POJK_22_2023_penj_umum",
+        "Penjelasan POJK 22 Tahun 2023, I. Umum",
+        "[Penjelasan POJK 22 Tahun 2023 | I. UMUM]\nPenjelasan umum mengenai penguatan pelindungan konsumen.",
+        doc_number="POJK 22 Tahun 2023",
+    )
+    c_preamble.doc_id = "POJK_22_Tahun_2023"
+
+    c_p3_a2 = _make_dummy_chunk(
+        "POJK_22_2023_p3_a2",
+        "POJK 22 Tahun 2023, Pasal 3 ayat (2)",
+        "[POJK 22 Tahun 2023 | BAB II | Pasal 3 ayat (2)]\n"
+        "(2) Pelindungan Konsumen di sektor jasa keuangan menerapkan prinsip: "
+        "a. edukasi yang memadai; b. keterbukaan dan transparansi informasi produk dan/atau layanan; "
+        "c. perlakuan yang adil dan perilaku bisnis yang bertanggung jawab; "
+        "d. pelindungan aset, privasi, dan data Konsumen; "
+        "e. penanganan Pengaduan dan penyelesaian Sengketa yang efektif dan efisien; "
+        "f. penegakan kepatuhan; dan g. persaingan yang sehat.",
+        doc_number="POJK 22 Tahun 2023",
+    )
+    c_p3_a2.doc_id = "POJK_22_Tahun_2023"
+    c_p3_a2.pasal = "3"
+    c_p3_a2.ayat = "2"
+
+    assert score_primary_obligation_alignment(c_preamble, q_en) == 0.0
+    assert score_primary_obligation_alignment(c_p3_a2, q_en) >= 6.0

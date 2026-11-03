@@ -49,7 +49,7 @@ STRICT ANSWERING RULES:
    - Sentence-Wide Entity Consistency & Co-Reference: Maintain the queried institutional entity consistently across all sentences and explanatory clauses. NEVER mix different nomenclature within the same sentence (e.g. opening with "Lembaga Jasa Keuangan must..." but ending with "...received by PUJK"). Use consistent entity naming throughout the response.
    - ANTI-INTER-PASSAGE CAUSAL STITCHING: NEVER combine clauses from different articles or regulations into a conditional, cause-and-effect, or chronological link that is not explicitly stated in the statutory text (e.g., fabricating 'In the absence of agreement, the financial institution must handle complaints in writing...' or 'If complaint documents are incomplete, the institution must resolve written complaints within 10 working days...'). Use neutral additive transitions ('Furthermore,' or 'Additionally,') when presenting distinct articles.
    - FOCUS ON ENTITY OBLIGATIONS (NOT THIRD-PARTY REMEDIES): When answering an entity's operational duties, procedures, or deadlines, focus strictly on the actions the entity itself is mandated to perform, NOT on external dispute escalation options available to consumers.
-3. You MUST cite the exact regulation, article, and clause in square brackets at the end of EVERY normative sentence (format: [<Regulation Name>, Pasal <Number> ayat (<Clause>)]). When an answer spans multiple sentences covering distinct articles (e.g. Sentence 1 from Pasal X ayat (1) and Sentence 2 from Pasal Y ayat (1)), EVERY sentence MUST end with its own specific bracketed citation. NEVER collapse distinct articles into a single bracketed citation at the end of the paragraph, NEVER use conversational narrative introductions like ', as stipulated in...', and NEVER copy document header metadata tags such as '[Tentang: ...]', '[Peran: ...]', or '(Status: ...)' into your answer.
+3. You MUST cite the exact regulation, article, and clause in square brackets at the end of EVERY normative sentence (format: [<Regulation Name>, Pasal <Number> ayat (<Clause>)]). When an answer spans multiple sentences covering distinct articles (e.g. Sentence 1 from Pasal X ayat (1) and Sentence 2 from Pasal Y ayat (1)), EVERY sentence MUST end with its own specific bracketed citation. NEVER collapse distinct articles into a single bracketed citation at the end of the paragraph, NEVER use parenthetical citations like '(POJK ...)', NEVER invent translated English statute names (such as 'the Financial Institutions Act' or 'the Consumer Protection Law'), NEVER place citations as the grammatical subject of a sentence (e.g. '[POJK ...] mandates that...'), NEVER cite general elucidation preambles ('I. Umum') when operative Pasal articles exist, and NEVER copy document header metadata tags such as '[Tentang: ...]', '[Peran: ...]', or '(Status: ...)' into your answer.
 4. ONLY IF the provided regulatory passages genuinely do NOT contain rules answering the question (or if the question is outside financial services regulation, e.g., coffee shops, restaurants, retail shops, non-financial enterprises, general criminal/labor law), state briefly that no legal basis was found in the available regulations. STRICTLY FORBIDDEN from summarizing tangentially related passages (passage dumping) or forcing rules across disjoint financial sub-sectors.
 5. Answer in the same language as the user's question (English). Retain official Indonesian regulatory names and article designations in your citations.
 6. Do not provide formal legal advice or non-legal speculation.
@@ -96,7 +96,7 @@ STRICT ANSWERING RULES:
    - Sentence-Wide Entity Consistency & Co-Reference: Maintain the queried institutional entity consistently across all sentences and explanatory clauses. NEVER mix different nomenclature within the same sentence (e.g. opening with "Lembaga Jasa Keuangan must..." but ending with "...received by PUJK"). Use consistent entity naming throughout the response.
    - ANTI-INTER-PASSAGE CAUSAL STITCHING: NEVER combine clauses from different articles or regulations into a conditional, cause-and-effect, or chronological link that is not explicitly stated in the statutory text (e.g., fabricating 'In the absence of agreement, the financial institution must handle complaints in writing...' or 'If complaint documents are incomplete, the institution must resolve written complaints within 10 working days...'). Use neutral additive transitions ('Furthermore,' or 'Additionally,') when presenting distinct articles.
    - FOCUS ON ENTITY OBLIGATIONS (NOT THIRD-PARTY REMEDIES): When answering an entity's operational duties, procedures, or deadlines, focus strictly on the actions the entity itself is mandated to perform, NOT on external dispute escalation options available to consumers.
-3. You MUST cite the exact regulation, article, and clause in square brackets at the end of EVERY normative sentence with standard format: [<Official/Short Regulation Name>, Pasal <Number> ayat (<Clause>)]. When an answer spans multiple sentences covering distinct articles (e.g. Sentence 1 from Pasal X ayat (1) and Sentence 2 from Pasal Y ayat (1)), EVERY sentence MUST end with its own specific bracketed citation. Do not write citations outside square brackets, NEVER use narrative introductory phrasing (such as ', as stipulated in...'), and NEVER copy document header metadata tags such as '[Tentang: ...]', '[Peran: ...]', or '(Status: ...)' into your answer.
+3. You MUST cite the exact regulation, article, and clause in square brackets at the end of EVERY normative sentence with standard format: [<Official/Short Regulation Name>, Pasal <Number> ayat (<Clause>)]. When an answer spans multiple sentences covering distinct articles (e.g. Sentence 1 from Pasal X ayat (1) and Sentence 2 from Pasal Y ayat (1)), EVERY sentence MUST end with its own specific bracketed citation. Do not write citations in parentheses '(POJK ...)', NEVER invent English act titles (such as 'the Financial Institutions Act' or 'the Consumer Protection Law'), NEVER use citations as the grammatical subject of a sentence (e.g. '[POJK ...] mandates that...'), NEVER cite general elucidation preambles ('I. Umum') or unretrieved cross-referenced statutes mentioned inside elucidations (e.g. '[Pasal ... UU P2SK]'), and NEVER copy document header metadata tags such as '[Tentang: ...]', '[Peran: ...]', or '(Status: ...)' into your answer.
 4. ONLY IF the provided regulatory passages genuinely do NOT contain rules answering the question, state that no legal basis was found in the available regulations. STRICTLY FORBIDDEN from misapplying or analogizing requirements across disjoint financial sectors.
 5. STRICT ANTI-HALLUCINATION CLAUSE: ONLY cite official regulations and articles that are explicitly written in the headers or body of the provided context passages. NEVER fabricate fictitious regulation names, old/fake years, or imaginary article/clause numbers.
 6. REGULATION STATUS & PRECEDENCE: Observe document status headers (Status: berlaku vs dicabut/diubah). Always prioritize regulations marked as in-force (berlaku). If an earlier regulation was revoked by a newer regulation in force, state explicitly that it has been superseded.
@@ -174,15 +174,72 @@ def detect_language(text: str) -> str:
     return "id"
 
 
+_EN_TO_ID_REGULATORY_LEXICON: list[tuple[str, str]] = [
+    (r"\bconsumer\s+protection\b", "pelindungan konsumen"),
+    (
+        r"\bdigital\s+financial\s+services\b",
+        "layanan digital penyelenggara layanan digital sektor jasa keuangan pujk",
+    ),
+    (
+        r"\bdigital\s+(?:banking|services)\b",
+        "layanan digital bank penyelenggara layanan digital",
+    ),
+    (
+        r"\b(?:data\s+protection|personal\s+data|privacy|confidentiality)\b",
+        "pelindungan data pribadi kerahasiaan keamanan data informasi",
+    ),
+    (r"\b(?:consumers?|customers?)\b", "konsumen nasabah"),
+    (r"\b(?:principal|principles?|core|fundamental)\b", "prinsip pokok"),
+    (
+        r"\b(?:obligations?|mandatory|must|shall|required|duties|duty|requirements?)\b",
+        "wajib harus kewajiban menerapkan memenuhi",
+    ),
+    (
+        r"\b(?:complaints?|grievances?|disputes?|redress)\b",
+        "pengaduan sengketa tindak lanjut penyelesaian",
+    ),
+    (r"\b(?:authentication|education|literacy)\b", "edukasi autentikasi literasi"),
+    (
+        r"\b(?:transparency|disclosure|fair\s+treatment)\b",
+        "keterbukaan transparansi informasi perlakuan adil",
+    ),
+    (r"\b(?:commercial\s+banks?|banks?|banking)\b", "bank umum perbankan"),
+    (r"\b(?:minimum\s+capital|core\s+capital)\b", "modal inti minimum"),
+    (
+        r"\b(?:data\s+centers?|disaster\s+recovery)\b",
+        "pusat data pusat pemulihan bencana wilayah indonesia",
+    ),
+    (
+        r"\b(?:cyber(?:security)?|cyber\s+resilience)\b",
+        "ketahanan keamanan siber insiden siber",
+    ),
+    (r"\b(?:governance|risk\s+management)\b", "tata kelola manajemen risiko"),
+]
+
+
+def expand_cross_lingual_query_terms(text: str) -> str:
+    """Append canonical Indonesian regulatory terms to English or mixed-language text."""
+    if not text:
+        return ""
+    expansions: list[str] = []
+    for pattern, id_terms in _EN_TO_ID_REGULATORY_LEXICON:
+        if re.search(pattern, text, re.IGNORECASE):
+            expansions.append(id_terms)
+    if not expansions:
+        return text
+    return f"{text} {' '.join(expansions)}"
+
+
 def is_enumeration_query(query: str) -> bool:
-    """Detect whether the query asks for a taxonomic list, pillars, components, aspects, or stages."""
+    """Detect whether the query asks for a taxonomic list, pillars, components, aspects, principles, or obligations."""
     if not query:
         return False
     return bool(
         re.search(
             r"\b(?:apa\s+saja|sebutkan|meliputi\s+apa|mencakup\s+apa|terdiri\s+(?:dari|atas)\s+apa|"
             r"pilar|tahapan|komponen|faktor|aspek|prinsip|unsur|kriteria|jenis-jenis|"
-            r"what\s+are\s+the\s+(?:pillars|components|factors|aspects|stages|principles|elements|processes))\b",
+            r"what\s+are\s+the\s+(?:[\w\-]+\s+){0,4}?(?:pillars|components|factors|aspects|stages|principles|elements|processes|obligations|requirements|duties|provisions|rules)|"
+            r"(?:principal|main|key|core|primary)\s+(?:[\w\-]+\s+){0,3}?(?:obligations|principles|requirements|duties|pillars|components))\b",
             query,
             re.IGNORECASE,
         )
@@ -190,7 +247,7 @@ def is_enumeration_query(query: str) -> bool:
 
 
 def _is_appendix_or_closing_fragment(text: str, citation_label: str = "") -> bool:
-    """Detect closing-section ('PENUTUP') or multi-part appendix table continuation fragments."""
+    """Detect closing-section ('PENUTUP'), general elucidation preamble ('I. UMUM'), or multi-part appendix fragments."""
     if not text:
         return False
     stripped = text.strip()
@@ -199,9 +256,9 @@ def _is_appendix_or_closing_fragment(text: str, citation_label: str = "") -> boo
     body = stripped[header_match.end() :].strip() if header_match else stripped
     label_low = (citation_label or "").lower()
 
-    # 1. Closing / transitional headers ("Romawi X PENUTUP", "BAB XIV KETENTUAN PENUTUP")
+    # 1. Closing / transitional headers ("Romawi X PENUTUP", "BAB XIV KETENTUAN PENUTUP") or general elucidation preambles ("I. UMUM")
     if re.search(
-        r"\b(?:penutup|ketentuan\s+penutup|ketentuan\s+peralihan|romawi\s+x\b)",
+        r"\b(?:penutup|ketentuan\s+penutup|ketentuan\s+peralihan|romawi\s+x\b|i\.\s*umum\b|bagian\s+umum\b)",
         f"{header_low} {label_low}",
     ):
         return True
@@ -290,6 +347,8 @@ def _detect_statutory_role(text: str) -> str:
         r"pihak|direksi|dewan\s+komisaris|pelaku\s+usaha)\s+(?:wajib|harus|dilarang)\b"
         r"|\bwajib\s+(?:menempatkan|memiliki|menerapkan|menyediakan|menyampaikan|memenuhi|"
         r"menggunakan|menjaga|melakukan|memastikan|melaksanakan|menyusun|menindaklanjuti)\b"
+        r"|\b(?:bank\s+penyelenggara\s+layanan\s+digital|pujk|bank(?:\s+umum)?)\s+"
+        r"(?:menerapkan\s+prinsip\s+pelindungan|menyediakan\s+fungsi\s+penanganan|memberikan\s+edukasi\s+kepada\s+nasabah)\b"
     )
     duty_match = re.search(duty_pattern, norm_for_duty)
     has_entity_duty = duty_match is not None
@@ -303,6 +362,8 @@ def _detect_statutory_role(text: str) -> str:
         r"(?:melakukan|mempertimbangkan|menerapkan|menetapkan|menjaga)\s+[^:]{0,60}:\s*[a-z1-9][\.\)]"
         r"|\b(?:penerapan|pelaksanaan|penyelenggaraan)\s+[^:]{3,120}?\b(?:mencakup|meliputi|terdiri\s+atas|paling\s+sedikit)\s+"
         r"(?:\d+\s*\([^)]+\)\s+)?(?:aspek|faktor|pilar|proses|tahap|komponen|prinsip)[^:]*:\s*[a-z1-9][\.\)]"
+        r"|\b(?:pelindungan\s+konsumen|pujk|bank(?:\s+umum)?|ljk|penyelenggara|perusahaan)[^:]{0,60}?"
+        r"\b(?:menerapkan|melaksanakan|memenuhi)\s+prinsip\s*:\s*[a-z1-9][\.\)]"
     )
     has_enum_duty = re.search(enum_duty_pattern, norm) is not None
 
@@ -385,6 +446,7 @@ def score_primary_obligation_alignment(chunk: RetrievedChunk, query: str) -> flo
     body = stripped[header_match.end() :] if header_match else stripped
     norm_body = re.sub(r"\s+", " ", body.lower()).strip()
     norm_query = re.sub(r"\s+", " ", (query or "").lower()).strip()
+    expanded_query = expand_cross_lingual_query_terms(norm_query)
 
     # 0. Institutional Subject Scope Concordance:
     # Exclude obligations binding specialized dispute bodies (e.g. LAPS) when the query asks about regulated financial institutions
@@ -418,16 +480,16 @@ def score_primary_obligation_alignment(chunk: RetrievedChunk, query: str) -> flo
         "ditaati",
     }
     q_action_verbs = set()
-    m_action = re.search(r"\b(?:wajib|harus|dilarang)\s+(\w+)", norm_query)
+    m_action = re.search(r"\b(?:wajib|harus|dilarang)\s+(\w+)", expanded_query)
     if m_action and m_action.group(1) not in generic_meta_verbs:
         q_action_verbs.add(m_action.group(1))
     for m in re.finditer(
         r"\b(?:kewajiban|ketentuan)\s+(?:[\w\s]{1,40}\s+)?(?:dalam|untuk)\s+(\w+)",
-        norm_query,
+        expanded_query,
     ):
         if m.group(1) not in generic_meta_verbs:
             q_action_verbs.add(m.group(1))
-    for m in re.finditer(r"\bdalam\s+(\w+)(?:\s+dan\s+(\w+))?", norm_query):
+    for m in re.finditer(r"\bdalam\s+(\w+)(?:\s+dan\s+(\w+))?", expanded_query):
         if m.group(1) and m.group(1) not in generic_meta_verbs:
             q_action_verbs.add(m.group(1))
         if m.group(2) and m.group(2) not in generic_meta_verbs:
@@ -463,7 +525,7 @@ def score_primary_obligation_alignment(chunk: RetrievedChunk, query: str) -> flo
     )
     has_structured_enum = bool(
         re.search(
-            r"(?:paling\s+sedikit|mencakup|meliputi|terdiri\s+atas|melakukan\s+proses|yaitu)\s*:?\s*[a-z1-9][\.\)]"
+            r"(?:paling\s+sedikit|mencakup|meliputi|terdiri\s+atas|melakukan\s+proses|menerapkan\s+prinsip|yaitu)\s*:?\s*[a-z1-9][\.\)]"
             r"|\ba\.\s+[^;]{3,120};\s*(?:dan\s+)?b\.\s+",
             norm_body,
         )
@@ -484,7 +546,7 @@ def score_primary_obligation_alignment(chunk: RetrievedChunk, query: str) -> flo
         score += 0.5
 
     # 4. Interrogative Target Concordance ("di mana" -> domestic placement vs overseas exception)
-    if ("di mana" in norm_query or "dimana" in norm_query) and (
+    if ("di mana" in norm_query or "dimana" in norm_query or "where" in norm_query) and (
         "di wilayah indonesia" in norm_body or "di indonesia" in norm_body
     ):
         if "di luar wilayah indonesia" not in norm_body:
@@ -545,8 +607,50 @@ def score_primary_obligation_alignment(chunk: RetrievedChunk, query: str) -> flo
         "pilar",
         "diterapkan",
         "dilakukan",
+        # English query tokens (after cross-lingual expansion into Indonesian terms)
+        "what",
+        "are",
+        "the",
+        "for",
+        "under",
+        "rules",
+        "regulation",
+        "regulations",
+        "according",
+        "with",
+        "from",
+        "that",
+        "this",
+        "which",
+        "when",
+        "where",
+        "principal",
+        "principles",
+        "principle",
+        "obligations",
+        "obligation",
+        "requirements",
+        "requirement",
+        "duties",
+        "duty",
+        "mandatory",
+        "must",
+        "shall",
+        "required",
+        "consumer",
+        "consumers",
+        "customer",
+        "customers",
+        "protection",
+        "financial",
+        "services",
+        "banking",
+        "commercial",
+        "minimum",
+        "capital",
+        "core",
     }
-    q_tokens = {t for t in re.findall(r"\b[a-z0-9]{4,}\b", norm_query) if t not in stop_tokens}
+    q_tokens = {t for t in re.findall(r"\b[a-z0-9]{4,}\b", expanded_query) if t not in stop_tokens}
     if q_tokens:
         b_tokens = set(re.findall(r"\b[a-z0-9]{4,}\b", norm_body))
         q_stemmed = {_legal_stem(t) for t in q_tokens}

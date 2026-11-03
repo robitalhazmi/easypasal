@@ -1506,3 +1506,112 @@ def test_strip_appendix_and_ensure_enumeration_completeness() -> None:
     assert "[SEOJK 29/SEOJK.03/2022, Romawi III angka 2]" in realigned4
     ver4 = verify_citations(realigned4, [c_p21_2, c_seojk_iii_2], cites4, question=q)
     assert ver4.is_valid is True
+
+
+def test_english_consumer_protection_digital_services_guardrails() -> None:
+    """Verify cross-lingual English enumeration completeness, preamble rejection, and citation normalization."""
+    from easypasal.guardrails.citation_verifier import (
+        detect_and_realign_inverted_citations,
+        verify_citations,
+    )
+
+    q = "What are the principal consumer protection obligations for digital financial services under OJK rules?"
+
+    c_preamble = _make_chunk(
+        "POJK_22_Tahun_2023_penj_umum",
+        "POJK 22 Tahun 2023",
+        "Penjelasan POJK 22 Tahun 2023, I. Umum",
+        pasal=None,
+        text="[Penjelasan POJK 22 Tahun 2023 | I. UMUM]\nPasal 226, Pasal 233, dan Pasal 234 UU P2SK mengatur penguatan pelindungan konsumen.",
+    )
+    c_pojk21_25 = _make_chunk(
+        "POJK_21_Tahun_2023_pasal_25_ayat_1",
+        "POJK 21 Tahun 2023",
+        "POJK 21 Tahun 2023, Pasal 25 ayat (1)",
+        pasal="25",
+        ayat="1",
+        text="[POJK 21 Tahun 2023 | BAB V PELINDUNGAN KONSUMEN | Pasal 25 ayat (1)]\n(1) Bank penyelenggara Layanan Digital menerapkan prinsip pelindungan konsumen sesuai dengan ketentuan peraturan perundang-undangan mengenai pelindungan konsumen dan masyarakat di sektor jasa keuangan.",
+    )
+    c_pojk22_3_1 = _make_chunk(
+        "POJK_22_Tahun_2023_pasal_3_ayat_1",
+        "POJK 22 Tahun 2023",
+        "POJK 22 Tahun 2023, Pasal 3 ayat (1)",
+        pasal="3",
+        ayat="1",
+        text="[POJK 22 Tahun 2023 | BAB II KETENTUAN UMUM PELINDUNGAN KONSUMEN | Pasal 3 ayat (1)]\n(1) PUJK dalam menyelenggarakan kegiatan usaha wajib menerapkan prinsip Pelindungan Konsumen.",
+    )
+    c_pojk22_3_2 = _make_chunk(
+        "POJK_22_Tahun_2023_pasal_3_ayat_2",
+        "POJK 22 Tahun 2023",
+        "POJK 22 Tahun 2023, Pasal 3 ayat (2)",
+        pasal="3",
+        ayat="2",
+        text=(
+            "[POJK 22 Tahun 2023 | BAB II KETENTUAN UMUM PELINDUNGAN KONSUMEN | Pasal 3 ayat (2)]\n"
+            "(2) Pelindungan Konsumen di sektor jasa keuangan menerapkan prinsip: "
+            "a. edukasi yang memadai; "
+            "b. keterbukaan dan transparansi informasi produk dan/atau layanan; "
+            "c. perlakuan yang adil dan perilaku bisnis yang bertanggung jawab; "
+            "d. pelindungan aset, privasi, dan data Konsumen; "
+            "e. penanganan Pengaduan dan penyelesaian Sengketa yang efektif dan efisien; "
+            "f. penegakan kepatuhan; dan "
+            "g. persaingan yang sehat."
+        ),
+    )
+    c_pojk21_26 = _make_chunk(
+        "POJK_21_Tahun_2023_pasal_26",
+        "POJK 21 Tahun 2023",
+        "POJK 21 Tahun 2023, Pasal 26",
+        pasal="26",
+        text="[POJK 21 Tahun 2023 | BAB V PELINDUNGAN KONSUMEN | Pasal 26]\nBank penyelenggara Layanan Digital menyediakan fungsi penanganan pertanyaan dan/atau pengaduan nasabah yang dapat diakses setiap saat (dua puluh empat jam sehari dan tujuh hari seminggu).",
+    )
+    c_pojk22_19_1 = _make_chunk(
+        "POJK_22_Tahun_2023_pasal_19_ayat_1",
+        "POJK 22 Tahun 2023",
+        "POJK 22 Tahun 2023, Pasal 19 ayat (1)",
+        pasal="19",
+        ayat="1",
+        text="[POJK 22 Tahun 2023 | Pasal 19 ayat (1)]\n(1) PUJK wajib menjaga kerahasiaan dan keamanan data dan/atau informasi Konsumen.",
+    )
+
+    chunks = [c_pojk22_3_2, c_pojk21_25, c_pojk22_3_1, c_pojk21_26, c_pojk22_19_1, c_preamble]
+
+    # Case 1: Baseline answer with fabricated English act names, parenthetical I. Umum citation, and uncited bullets
+    corrupted_baseline = (
+        "Under the Financial Institutions Act (POJK 22 Tahun 2023, I. Umum), the primary consumer protection obligations for digital financial services include:\n\n"
+        "Data Protection: Banks must ensure the confidentiality, integrity, and availability of customer data.\n\n"
+        "Compliance with Consumer Protection Laws: Banks must adhere to the principles of fair treatment and respect for privacy outlined in the Consumer Protection Law (POJK 22 Tahun 2023, I. Umum)."
+    )
+    realigned1, cites1, _ = detect_and_realign_inverted_citations(
+        answer=corrupted_baseline,
+        retrieved_chunks=chunks,
+        question=q,
+    )
+    assert "Financial Institutions Act" not in realigned1
+    assert "Consumer Protection Law" not in realigned1
+    assert "I. Umum" not in realigned1
+    assert "adequate education" in realigned1
+    assert "protection of consumer assets, privacy, and data" in realigned1
+    assert "POJK 22 Tahun 2023, Pasal 3 ayat (2)" in cites1
+    assert "POJK 21 Tahun 2023, Pasal 25 ayat (1)" in cites1
+    ver1 = verify_citations(realigned1, chunks, cites1, question=q)
+    assert ver1.is_valid is True
+
+    # Case 2: GEPA answer with subject-position Penjelasan I. Umum and unretrieved [Pasal 226, Pasal 233, dan Pasal 234 UU P2SK]
+    corrupted_gepa = (
+        "Under the OJK rules, the principal consumer protection obligations for digital financial services include:\n\n"
+        "[Penjelasan POJK 22 Tahun 2023, I. Umum] mandates that OJK shall ensure the development and enhancement of the sector's financial system through the implementation of consumer protection measures. "
+        "Additionally, [Pasal 226, Pasal 233, dan Pasal 234 UU P2SK] outline specific obligations related to consumer protection, including the setting up of seven principles of consumer protection."
+    )
+    realigned2, cites2, _ = detect_and_realign_inverted_citations(
+        answer=corrupted_gepa,
+        retrieved_chunks=chunks,
+        question=q,
+    )
+    assert "I. Umum" not in realigned2
+    assert "UU P2SK" not in realigned2
+    assert "adequate education" in realigned2
+    assert "POJK 22 Tahun 2023, Pasal 3 ayat (2)" in cites2
+    assert "POJK 21 Tahun 2023, Pasal 25 ayat (1)" in cites2
+    ver2 = verify_citations(realigned2, chunks, cites2, question=q)
+    assert ver2.is_valid is True

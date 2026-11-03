@@ -43,9 +43,9 @@ def detect_normative_intent(query: str) -> str:
         return "permission_exemption"
 
     # Obligation / Prohibition queries
-    # e.g. "di mana bank umum wajib menempatkan", "apa kewajiban pujk", "harus dipenuhi"
+    # e.g. "di mana bank umum wajib menempatkan", "apa kewajiban pujk", "harus dipenuhi", "what are the principal obligations"
     if re.search(
-        r"\b(?:wajib|harus|kewajiban|keharusan|dilarang|larangan|must|mandatory|required|shall|prohibited|obligation)\b",
+        r"\b(?:wajib|harus|kewajiban|keharusan|dilarang|larangan|must|mandatory|required|shall|prohibited|obligations?|requirements?|duties|duty|principles?)\b",
         q_low,
     ):
         return "obligation"
@@ -116,7 +116,7 @@ def _compute_normative_salience_boost(query: str, payload: dict[str, Any]) -> fl
     has_cross_ref = "sebagaimana dimaksud dalam pasal" in body_low
     has_structured_enum = bool(
         re.search(
-            r"(?:paling\s+sedikit|mencakup|meliputi|terdiri\s+atas|melakukan\s+proses|yaitu)\s*:?\s*[a-z1-9][\.\)]"
+            r"(?:paling\s+sedikit|mencakup|meliputi|terdiri\s+atas|melakukan\s+proses|menerapkan\s+prinsip|yaitu)\s*:?\s*[a-z1-9][\.\)]"
             r"|\ba\.\s+[^;]{3,120};\s*(?:dan\s+)?b\.\s+",
             body_low,
         )
@@ -130,12 +130,13 @@ def _compute_normative_salience_boost(query: str, payload: dict[str, Any]) -> fl
                 boost += 0.18
             else:
                 boost += 0.05
+        elif role == "[Peran: Penjelasan / Keterangan Tambahan]":
+            boost -= 0.22
         elif role in (
             "[Peran: Wewenang Korektif Otoritas / Sanksi]",
             "[Peran: Opsi Pengecualian / Izin Bersyarat]",
-            "[Peran: Penjelasan / Keterangan Tambahan]",
         ):
-            # Downweight remedial/supervisory/exception/elucidation clauses when user asked about entity obligation
+            # Downweight remedial/supervisory/exception clauses when user asked about entity obligation
             boost -= 0.18
     elif intent == "sanction_enforcement":
         if role == "[Peran: Wewenang Korektif Otoritas / Sanksi]":

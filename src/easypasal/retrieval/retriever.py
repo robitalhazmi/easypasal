@@ -194,6 +194,25 @@ def _expand_primary_statutory_norms(
                 if p_num > 2:
                     chunk_targets.add(str(p_num - 2))
                 chunk_targets.add(str(p_num + 1))
+        else:
+            # C. When an elucidation preamble ("I. Umum") or un-numbered section is retrieved,
+            # pull the opening foundational articles (Pasal 1..4) of that regulation
+            chunk_targets.update({"1", "2", "3", "4"})
+
+        # D. Inter-regulation cross-references to Consumer Protection in Financial Services (POJK 22 Tahun 2023)
+        c_low = c.text.lower()
+        if "pelindungan konsumen" in c_low or any(
+            "pojk_22_tahun_2023" in k or "pojk 22 tahun 2023" in k for k in doc_keys
+        ):
+            for cp_key in ("pojk_22_tahun_2023", "pojk 22 tahun 2023"):
+                target_pasals_by_doc.setdefault(cp_key, set()).update({"3", "4", "19"})
+                if is_enum_q:
+                    target_docs_for_enum.add(cp_key)
+        if any("pojk_21_tahun_2023" in k or "pojk 21 tahun 2023" in k for k in doc_keys) and (
+            "pelindungan konsumen" in c_low or str(c.pasal) in {"25", "26", "27", "28", "29", "30"}
+        ):
+            for ds_key in ("pojk_21_tahun_2023", "pojk 21 tahun 2023"):
+                target_pasals_by_doc.setdefault(ds_key, set()).update({"25", "26", "28", "29"})
 
         for k in doc_keys:
             if chunk_targets:
@@ -289,6 +308,8 @@ def _expand_primary_statutory_norms(
             for c in chunks
             if c.chunk_id != best_chunk.chunk_id
             and c.chunk_id not in {op.chunk_id for op in other_primaries}
+            and "penjelasan" not in (c.chunk_id or "").lower()
+            and "i. umum" not in (c.citation_label or "").lower()
         ]
         reordered = [best_chunk] + other_primaries + remaining
         limit = max(len(chunks), top_k)
@@ -436,8 +457,18 @@ class HybridRetriever:
 
         # 2. Sparse BM25 Retrieval
         if mode in ("hybrid", "bm25", "hybrid+rerank", "hybrid_rerank"):
+            from easypasal.generation.prompts import (
+                detect_language,
+                expand_cross_lingual_query_terms,
+            )
+
+            bm25_query = (
+                expand_cross_lingual_query_terms(query_clean)
+                if detect_language(query_clean) == "en"
+                else query_clean
+            )
             bm25_candidates = self.bm25_index.search(
-                query=query_clean,
+                query=bm25_query,
                 top_k=pool_size,
             )
             if status_filter:

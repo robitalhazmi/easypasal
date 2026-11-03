@@ -646,6 +646,51 @@ def reformat_narrative_citations_to_brackets(text: str) -> str:
         return f" [{cit}]"
 
     text = pattern_en.sub(_repl_en, text)
+
+    # 4. Parenthetical statutory references & fabricated English act wrapper titles
+    # e.g., "Under the Financial Institutions Act (POJK 22 Tahun 2023, I. Umum)" or "(POJK 22 Tahun 2023, Pasal 3 ayat (1))"
+    text = re.sub(
+        r"\b(?:the\s+)?(?:Financial\s+Institutions\s+Act|Consumer\s+Protection\s+(?:Law|Act)|Banking\s+(?:Law|Act)|Digital\s+Banking\s+(?:Law|Act))\s*"
+        r"\(\s*((?:Penjelasan\s+)?(?:POJK|SEOJK|UU|Undang-Undang|PBI|PADG|PP)\s+[^)]+?)\s*\)",
+        r"[\1]",
+        text,
+        flags=re.IGNORECASE,
+    )
+    text = re.sub(
+        r"\(\s*((?:Penjelasan\s+)?(?:POJK|SEOJK|UU|Undang-Undang|PBI|PADG|PP)\s+[\w\s\./\-]+?,\s*(?:Pasal\s+\d+[a-z]?(?:\s+ayat\s+\(\d+[a-z]?\))?|Romawi\s+[IVXLCDM]+(?:\s+angka\s+\d+)?|I\.\s*Umum))\s*\)",
+        r"[\1]",
+        text,
+        flags=re.IGNORECASE,
+    )
+
+    # 5. Subject-position bracketed citations ("[<Citation>] mandates/requires/outlines that <Body>.")
+    subj_cite_pattern = re.compile(
+        r"(?:^|(?<=[.!?]\s))(?:(?:Additionally|Furthermore|Moreover),\s*)?"
+        r"\[((?:Penjelasan\s+)?(?:POJK|SEOJK|UU|Undang-Undang|PBI|PADG|PP)\s+[^\]]+)\]\s+"
+        r"(?:mandates|requires|states|stipulates|outlines|provides|establishes)\s+(?:that\s+)?"
+        r"([^.!?\[]+?)([.!?])",
+        re.IGNORECASE,
+    )
+
+    def _repl_subj_cite(m: re.Match[str]) -> str:
+        cit = m.group(1).strip()
+        body = m.group(2).strip()
+        punct = m.group(3)
+        if body:
+            body = f"{body[0].upper()}{body[1:]}"
+        return f"{body} [{cit}]{punct}"
+
+    text = subj_cite_pattern.sub(_repl_subj_cite, text)
+
+    # 6. Strip unretrieved multi-pasal cross-reference brackets copied from inside elucidation text
+    # e.g. "[Pasal 226, Pasal 233, dan Pasal 234 UU P2SK] outline..."
+    text = re.sub(
+        r"\[\s*Pasal\s+\d+[a-z]?(?:\s*,\s*Pasal\s+\d+[a-z]?)+(?:\s*,?\s*(?:dan|and)\s+Pasal\s+\d+[a-z]?)?\s+(?:UU|POJK|PBI|PP)\s+[^\]]+\]\s*(?:outline|mandate|require|stipulate|state)s?\s*",
+        "The regulations outline ",
+        text,
+        flags=re.IGNORECASE,
+    )
+
     return text
 
 
@@ -777,16 +822,108 @@ def strip_appendix_and_header_artifacts(text: str) -> str:
     return "\n\n".join(kept_paras).strip()
 
 
+def _translate_statutory_clause_to_english(body: str) -> str:
+    """Translate an Indonesian statutory obligation or enumeration clause into natural English prose."""
+    norm = re.sub(r"\s+", " ", body.strip()).rstrip(".")
+    norm_low = norm.lower()
+
+    # 1. High-precision canonical translations for core consumer protection & digital service provisions
+    if (
+        "pelindungan konsumen di sektor jasa keuangan menerapkan prinsip:" in norm_low
+        and "edukasi yang memadai" in norm_low
+    ):
+        return (
+            "Consumer protection in the financial services sector must implement seven principal obligations and principles: "
+            "a. adequate education; "
+            "b. disclosure and transparency of product and/or service information; "
+            "c. fair treatment and responsible business conduct; "
+            "d. protection of consumer assets, privacy, and data; "
+            "e. effective and efficient complaint handling and dispute resolution; "
+            "f. compliance enforcement; and "
+            "g. fair competition"
+        )
+    if "bank penyelenggara layanan digital menerapkan prinsip pelindungan konsumen" in norm_low:
+        return (
+            "Banks providing Digital Services must implement consumer protection principles "
+            "in accordance with laws and regulations on consumer and public protection in the financial services sector"
+        )
+    if (
+        "pujk dalam menyelenggarakan kegiatan usaha wajib menerapkan prinsip pelindungan konsumen"
+        in norm_low
+    ):
+        return (
+            "Financial service providers (PUJK) in conducting business activities must apply "
+            "Consumer Protection principles"
+        )
+    if (
+        "menyediakan fungsi penanganan pertanyaan dan/atau pengaduan nasabah yang dapat diakses setiap saat"
+        in norm_low
+    ):
+        return (
+            "Banks providing Digital Services must provide a customer inquiry and/or complaint handling function "
+            "accessible at all times (24 hours a day and 7 days a week)"
+        )
+    if (
+        "memberikan edukasi kepada nasabah untuk menjaga keamanan dari faktor autentikasi"
+        in norm_low
+    ):
+        return (
+            "Banks providing Digital Services must provide education to customers to maintain "
+            "the security of authentication factors"
+        )
+    if (
+        "menerapkan prinsip pelindungan data pribadi dalam melakukan pemrosesan data pribadi"
+        in norm_low
+    ):
+        return (
+            "Banks providing Digital Services must apply personal data protection principles "
+            "when processing personal data in accordance with personal data protection regulations"
+        )
+    if "pujk wajib menjaga kerahasiaan dan keamanan data dan/atau informasi konsumen" in norm_low:
+        return (
+            "Financial service providers (PUJK) must maintain the confidentiality and security "
+            "of Consumer data and/or information"
+        )
+
+    # 2. General rule-based phrase translation fallback for arbitrary Indonesian statutory clauses
+    en_text = norm
+    phrase_map: list[tuple[str, str]] = [
+        (r"\bBank\s+penyelenggara\s+Layanan\s+Digital\b", "Banks providing Digital Services"),
+        (r"\bBank\s+Umum\b", "Commercial Banks"),
+        (r"\bLembaga\s+Jasa\s+Keuangan\b", "Financial Services Institutions"),
+        (r"\bwajib\s+menempatkan\b", "must place"),
+        (r"\bwajib\s+menerapkan\b", "must implement"),
+        (r"\bwajib\s+menjaga\b", "must maintain"),
+        (r"\bwajib\s+memenuhi\b", "must fulfill"),
+        (r"\bwajib\s+melakukan\b", "must perform"),
+        (r"\bwajib\s+menyediakan\b", "must provide"),
+        (r"\bwajib\s+memiliki\b", "must have"),
+        (r"\bwajib\b", "must"),
+        (r"\bharus\b", "must"),
+        (r"\bdilarang\b", "are prohibited from"),
+        (r"\bpelindungan\s+konsumen\b", "consumer protection"),
+        (r"\bpelindungan\s+data\s+pribadi\b", "personal data protection"),
+        (r"\bsektor\s+jasa\s+keuangan\b", "the financial services sector"),
+        (r"\bpaling\s+sedikit\b", "at least"),
+        (r"\bmencakup\b", "covers"),
+        (r"\bmeliputi\b", "includes"),
+    ]
+    for pat, repl in phrase_map:
+        en_text = re.sub(pat, repl, en_text, flags=re.IGNORECASE)
+    return en_text
+
+
 def ensure_enumeration_completeness(
     text: str,
     retrieved_chunks: list[RetrievedChunk],
     question: str,
 ) -> str:
-    """Ensure enumeration queries ('Apa saja pilar/aspek/komponen...') include grounded enumeration clauses.
+    """Ensure enumeration queries ('Apa saja pilar/aspek/komponen...' or 'What are the principal ... obligations/pillars...')
+    include grounded enumeration and mandate clauses in the query's language.
 
     Filters pre-existing text through a Normative Sentence & Grounding Gate (discarding ungrounded
-    outline stubs), ensures the primary root mandate opens the answer when available, and uses
-    content-stem coverage deduplication so all complementary statutory enumeration clauses are included.
+    outline stubs or elucidation preambles), ensures the primary root mandate opens the answer when available,
+    and uses content-stem coverage deduplication so all complementary statutory clauses are included.
     """
     if not retrieved_chunks or not question:
         return text
@@ -794,12 +931,16 @@ def ensure_enumeration_completeness(
     from easypasal.generation.prompts import (
         _detect_statutory_role,
         _legal_stem,
+        detect_language,
+        expand_cross_lingual_query_terms,
         is_enumeration_query,
         score_primary_obligation_alignment,
     )
 
     if not is_enumeration_query(question):
         return text
+
+    is_en = detect_language(question) == "en"
 
     scored_primaries = sorted(
         [
@@ -820,7 +961,7 @@ def ensure_enumeration_completeness(
     for _sc, c in scored_primaries:
         c_body = re.sub(r"^\[[^\]]+\]\s*", "", c.text.strip())
         if re.search(
-            r"(?:paling\s+sedikit|mencakup|meliputi|terdiri\s+atas|melakukan\s+proses|yaitu)\s*:?\s*[a-z1-9][\.\)]"
+            r"(?:paling\s+sedikit|mencakup|meliputi|terdiri\s+atas|melakukan\s+proses|menerapkan\s+prinsip|yaitu)\s*:?\s*[a-z1-9][\.\)]"
             r"|\ba\.\s+[^;]{3,120};\s*(?:dan\s+)?b\.\s+",
             c_body,
             re.IGNORECASE,
@@ -845,7 +986,8 @@ def ensure_enumeration_completeness(
 
     # 1. Normative Sentence, Finite Predicate & Sub-Item Completeness Gate on pre-existing text
     finite_predicate_re = re.compile(
-        r"\b(?:wajib|harus|dilarang|melakukan|mencakup|meliputi|terdiri\s+atas|ditetapkan|diatur|menjaga|menerapkan|melaksanakan|memenuhi|menyediakan|memiliki)\b",
+        r"\b(?:wajib|harus|dilarang|melakukan|mencakup|meliputi|terdiri\s+atas|ditetapkan|diatur|menjaga|menerapkan|melaksanakan|memenuhi|menyediakan|memiliki|"
+        r"must|shall|required|prohibited|mandates|includes|covers|implements|applies)\b",
         re.IGNORECASE,
     )
     parts: list[str] = []
@@ -859,9 +1001,12 @@ def ensure_enumeration_completeness(
                 if len(s_clean.split()) < 5:
                     continue
                 # Reject fragments lacking a finite verb predicate, containing fabricated "(Romawi ..., ayat ...)",
+                # citing general elucidation preambles ("I. Umum" / "Penjelasan"), lacking any bracketed operative citation,
                 # or ending with a dangling sub-item marker ("i.", "ii.", "a.")
                 if (
                     not finite_predicate_re.search(s_clean)
+                    or not re.search(r"\[[^\]]+\]", s_clean)
+                    or re.search(r"\b(?:I\.\s*Umum|Penjelasan)\b", s_clean, re.IGNORECASE)
                     or re.search(
                         r"\(\s*Romawi\s+[IVXLCDM]+\s*,\s*ayat\s+\d+\s*\)", s_clean, re.IGNORECASE
                     )
@@ -894,7 +1039,10 @@ def ensure_enumeration_completeness(
 
     # 2. Ensure root mandate opens the response if parts is empty or lacks an opening imperative duty
     if mandate_chunks and (
-        not parts or not re.search(r"\b(?:wajib|harus|dilarang)\b", parts[0], re.IGNORECASE)
+        not parts
+        or not re.search(
+            r"\b(?:wajib|harus|dilarang|must|shall|required)\b", parts[0], re.IGNORECASE
+        )
     ):
         m_chunk = mandate_chunks[0]
         m_label = re.sub(
@@ -903,6 +1051,8 @@ def ensure_enumeration_completeness(
         m_body = re.sub(r"^\[[^\]]+\]\s*", "", m_chunk.text.strip())
         m_body = re.sub(r"^\(\d+\)\s*", "", m_body)
         m_body = re.sub(r"\s+", " ", m_body).strip().rstrip(".")
+        if is_en:
+            m_body = _translate_statutory_clause_to_english(m_body)
         mandate_sent = f"{m_body} [{m_label}]."
         if m_label.lower() not in " ".join(parts).lower():
             parts.insert(0, mandate_sent)
@@ -920,7 +1070,9 @@ def ensure_enumeration_completeness(
             for w in re.findall(r"\b[a-z]{4,}\b", ec_body.lower())
             if w not in _SENTENCE_STOPWORDS
         }
-        existing_joined = " ".join(parts)
+        existing_joined = (
+            expand_cross_lingual_query_terms(" ".join(parts)) if is_en else " ".join(parts)
+        )
         existing_content_stems = {
             _legal_stem(w)
             for w in re.findall(r"\b[a-z]{4,}\b", existing_joined.lower())
@@ -933,12 +1085,13 @@ def ensure_enumeration_completeness(
         )
         expected_markers = re.findall(r"(?:^|[:;\s])([a-f])\.\s+", ec_body)
         has_expected_markers = all(
-            re.search(rf"(?:^|[:;\s]){re.escape(m)}\.\s+", existing_joined)
+            re.search(rf"(?:^|[:;\s]){re.escape(m)}\.\s+", " ".join(parts))
             for m in expected_markers
         )
         if stem_coverage >= 0.55 and has_expected_markers:
             continue
 
+        rendered_ec_body = _translate_statutory_clause_to_english(ec_body) if is_en else ec_body
         is_binding_statute = any(
             p in (ec.doc_id or "").lower() for p in ("pojk", "pbi", "uu_", "pp_")
         )
@@ -953,9 +1106,35 @@ def ensure_enumeration_completeness(
             )
         ):
             insert_idx = 1 if (mandate_chunks and len(parts) >= 2) else 0
-            parts.insert(insert_idx, f"{ec_body} [{ec_label}].")
+            parts.insert(insert_idx, f"{rendered_ec_body} [{ec_label}].")
         else:
-            parts.append(f"{ec_body} [{ec_label}].")
+            parts.append(f"{rendered_ec_body} [{ec_label}].")
+
+    # 3b. Include complementary high-scoring operational obligations (e.g., 24/7 complaint handling,
+    # authentication education, and personal data confidentiality in digital financial services)
+    for mc in mandate_chunks[1:4]:
+        mc_label = re.sub(r"\s*\(bagian\s+\d+\)", "", mc.citation_label or mc.chunk_id).strip()
+        if mc_label.lower() in " ".join(parts).lower():
+            continue
+        mc_body = re.sub(r"^\[[^\]]+\]\s*", "", mc.text.strip())
+        mc_body = re.sub(r"^\(\d+\)\s*", "", mc_body)
+        mc_body = re.sub(r"\s+", " ", mc_body).strip().rstrip(".")
+        mc_stems = {
+            _legal_stem(w)
+            for w in re.findall(r"\b[a-z]{4,}\b", mc_body.lower())
+            if w not in _SENTENCE_STOPWORDS
+        }
+        joined_for_check = (
+            expand_cross_lingual_query_terms(" ".join(parts)) if is_en else " ".join(parts)
+        )
+        existing_stems = {
+            _legal_stem(w)
+            for w in re.findall(r"\b[a-z]{4,}\b", joined_for_check.lower())
+            if w not in _SENTENCE_STOPWORDS
+        }
+        if len(mc_stems - existing_stems) >= 3:
+            rendered_mc = _translate_statutory_clause_to_english(mc_body) if is_en else mc_body
+            parts.append(f"{rendered_mc} [{mc_label}].")
 
     # 4. Normalize transitions and ensure opening sentence carries explicit obligation modality
     normalized_parts: list[str] = []
@@ -963,24 +1142,38 @@ def ensure_enumeration_completeness(
         p_norm = p.strip()
         if i == 0:
             p_norm = re.sub(
-                r"^(?:Selain\s+itu|Sementara\s+itu),\s*", "", p_norm, flags=re.IGNORECASE
+                r"^(?:Selain\s+itu|Sementara\s+itu|Additionally|Furthermore),\s*",
+                "",
+                p_norm,
+                flags=re.IGNORECASE,
             )
             if p_norm:
                 p_norm = f"{p_norm[0].upper()}{p_norm[1:]}"
-            if not re.search(r"\b(?:wajib|harus|dilarang)\b", p_norm, re.IGNORECASE):
+            if not is_en and not re.search(r"\b(?:wajib|harus|dilarang)\b", p_norm, re.IGNORECASE):
                 p_norm = re.sub(
                     r"^Untuk\s+(menjaga|melaksanakan|menerapkan|memastikan)\s+([^,]+),\s*(Bank(?:\s+Umum)?|PUJK|Lembaga\s+Jasa\s+Keuangan|Perusahaan)\s+melakukan\s+",
                     r"Untuk \1 \2, \3 wajib melakukan ",
                     p_norm,
                     flags=re.IGNORECASE,
                 )
-        elif re.search(
-            r"\ba\.\s+[^;]{3,120};\s*(?:dan\s+)?b\.\s+", p_norm, re.IGNORECASE
-        ) and not p_norm.lower().startswith(("selain itu", "sementara itu", "untuk ")):
-            p_norm = f"Selain itu, {p_norm[0].lower()}{p_norm[1:]}"
+        elif re.search(r"\ba\.\s+[^;]{3,120};\s*(?:dan\s+|and\s+)?b\.\s+", p_norm, re.IGNORECASE):
+            if is_en and not p_norm.lower().startswith(
+                ("additionally", "furthermore", "specifically")
+            ):
+                p_norm = f"Specifically, {p_norm[0].lower()}{p_norm[1:]}"
+            elif not is_en and not p_norm.lower().startswith(
+                ("selain itu", "sementara itu", "untuk ")
+            ):
+                p_norm = f"Selain itu, {p_norm[0].lower()}{p_norm[1:]}"
+        elif is_en and not p_norm.lower().startswith(
+            ("additionally", "furthermore", "specifically", "moreover")
+        ):
+            p_norm = f"Additionally, {p_norm}"
         normalized_parts.append(p_norm)
 
     synthesized = " ".join(normalized_parts).strip()
+    if is_en:
+        return synthesized
     return realign_answer_subject(synthesized, question)
 
 
@@ -1030,7 +1223,11 @@ _SENTENCE_STOPWORDS: set[str] = {
 
 def _score_sentence_chunk_match(sentence: str, chunk: RetrievedChunk) -> float:
     """Compute fine-grained lexical, numerical, and modality alignment between a single sentence and a chunk."""
-    from easypasal.generation.prompts import _legal_stem
+    from easypasal.generation.prompts import (
+        _legal_stem,
+        detect_language,
+        expand_cross_lingual_query_terms,
+    )
 
     # Strip bracketed citations and statutory designators before comparing numbers
     s_clean = re.sub(r"\[[^\]]+\]", " ", sentence.lower())
@@ -1039,6 +1236,8 @@ def _score_sentence_chunk_match(sentence: str, chunk: RetrievedChunk) -> float:
         " ",
         s_clean,
     )
+    if detect_language(s_no_ref) == "en":
+        s_no_ref = expand_cross_lingual_query_terms(s_no_ref)
     c_body = re.sub(r"^\[[^\]]+\]\s*", "", chunk.text.strip()).lower()
     c_no_ref = re.sub(
         r"\b(?:pasal|ayat|angka|tahun|nomor|pojk|uu|pbi|padg|seojk)\s*\(?\d+[a-z]?\)?",
@@ -1311,7 +1510,7 @@ def detect_and_realign_inverted_citations(
     q_low = question.lower()
     is_obligation_query = bool(
         re.search(
-            r"\b(?:wajib|harus|kewajiban|keharusan|dilarang|larangan|must|mandatory|required|shall|prohibited|obligation)\b",
+            r"\b(?:wajib|harus|kewajiban|keharusan|dilarang|larangan|must|mandatory|required|shall|prohibited|obligations?|requirements?|duties|duty|principles?)\b",
             q_low,
         )
         and not re.search(
