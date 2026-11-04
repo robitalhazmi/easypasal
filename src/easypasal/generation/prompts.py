@@ -246,6 +246,44 @@ def is_enumeration_query(query: str) -> bool:
     )
 
 
+def is_taxonomic_enumeration_clause(text: str) -> bool:
+    """Detect whether a regulatory clause defines a foundational taxonomic enumeration
+    (pillars, principles, aspects, stages, or required core processes) rather than a narrow
+    contractual/documentary item list (e.g., fee disclosures in agreements or application attachments).
+    """
+    if not text:
+        return False
+    stripped = text.strip()
+    header_match = re.match(r"^\[([^\]]+)\]\s*", stripped)
+    body = stripped[header_match.end() :] if header_match else stripped
+    norm = re.sub(r"\s+", " ", body.lower()).strip()
+
+    # Exclude narrow contractual, fee/commission disclosure, or licensing attachment sub-lists
+    intro = norm.split(":", maxsplit=1)[0] if ":" in norm else norm[:160]
+    if re.search(
+        r"\b(?:dalam\s+perjanjian|mencantumkan|melampirkan|surat\s+permohonan|komisi/imbalan|agen\s+pemasar|dokumen\s+persyaratan)\b",
+        intro,
+    ):
+        return False
+
+    # 1. Explicit taxonomic category or core process enumeration introducers
+    if re.search(
+        r"(?:menerapkan\s+prinsip|melakukan\s+proses(?:\s+paling\s+sedikit)?|"
+        r"(?:mencakup|meliputi|terdiri\s+(?:atas|dari))\s+(?:\d+\s*\([^)]+\)\s+)?(?:aspek|faktor|pilar|proses|tahap|tahapan|komponen|prinsip|unsur|kegiatan))\s*[^:]{0,40}:\s*[a-z1-9][\.\)]",
+        norm,
+    ):
+        return True
+
+    # 2. General multi-item enumeration ("paling sedikit:", "meliputi:", "mencakup:") with at least 3 items (a., b., c.)
+    return bool(
+        re.search(
+            r"(?:paling\s+sedikit|mencakup|meliputi|terdiri\s+atas|yaitu)\s*:\s*a[\.\)]",
+            norm,
+        )
+        and re.search(r"(?:^|[:;\s])c[\.\)]\s+", norm)
+    )
+
+
 def _is_appendix_or_closing_fragment(text: str, citation_label: str = "") -> bool:
     """Detect closing-section ('PENUTUP'), general elucidation preamble ('I. UMUM'), or multi-part appendix fragments."""
     if not text:
@@ -465,6 +503,11 @@ def score_primary_obligation_alignment(chunk: RetrievedChunk, query: str) -> flo
 
     # 1. Action Predicate Concordance ("wajib <verb>", "kewajiban ... dalam <verb>", or stem matching)
     generic_meta_verbs = {
+        "wajib",
+        "harus",
+        "dilarang",
+        "kewajiban",
+        "keharusan",
         "diterapkan",
         "menerapkan",
         "dilakukan",
@@ -480,16 +523,16 @@ def score_primary_obligation_alignment(chunk: RetrievedChunk, query: str) -> flo
         "ditaati",
     }
     q_action_verbs = set()
-    m_action = re.search(r"\b(?:wajib|harus|dilarang)\s+(\w+)", expanded_query)
+    m_action = re.search(r"\b(?:wajib|harus|dilarang)\s+(\w+)", norm_query)
     if m_action and m_action.group(1) not in generic_meta_verbs:
         q_action_verbs.add(m_action.group(1))
     for m in re.finditer(
         r"\b(?:kewajiban|ketentuan)\s+(?:[\w\s]{1,40}\s+)?(?:dalam|untuk)\s+(\w+)",
-        expanded_query,
+        norm_query,
     ):
         if m.group(1) not in generic_meta_verbs:
             q_action_verbs.add(m.group(1))
-    for m in re.finditer(r"\bdalam\s+(\w+)(?:\s+dan\s+(\w+))?", expanded_query):
+    for m in re.finditer(r"\bdalam\s+(\w+)(?:\s+dan\s+(\w+))?", norm_query):
         if m.group(1) and m.group(1) not in generic_meta_verbs:
             q_action_verbs.add(m.group(1))
         if m.group(2) and m.group(2) not in generic_meta_verbs:
@@ -523,13 +566,7 @@ def score_primary_obligation_alignment(chunk: RetrievedChunk, query: str) -> flo
             norm_body,
         )
     )
-    has_structured_enum = bool(
-        re.search(
-            r"(?:paling\s+sedikit|mencakup|meliputi|terdiri\s+atas|melakukan\s+proses|menerapkan\s+prinsip|yaitu)\s*:?\s*[a-z1-9][\.\)]"
-            r"|\ba\.\s+[^;]{3,120};\s*(?:dan\s+)?b\.\s+",
-            norm_body,
-        )
-    )
+    has_structured_enum = is_taxonomic_enumeration_clause(chunk.text)
     has_explicit_substance = bool(
         re.search(r"\bpaling\s+(?:lama|lambat)\s+\d+", norm_body)
         or ("di wilayah indonesia" in norm_body and "di luar wilayah" not in norm_body)
@@ -544,6 +581,14 @@ def score_primary_obligation_alignment(chunk: RetrievedChunk, query: str) -> flo
     # 3. Root Clause Structural Priority (ayat (1) or un-numbered single-clause Pasal, or enumeration on enum query)
     if str(chunk.ayat) == "1" or chunk.ayat is None or (is_enum_q and has_structured_enum):
         score += 0.5
+    elif (
+        is_enum_q
+        and chunk.ayat is not None
+        and str(chunk.ayat).isdigit()
+        and int(str(chunk.ayat)) >= 4
+    ):
+        # Penalize deep procedural sub-clauses (ayat (4)+) on high-level enumeration/principle queries
+        score -= 0.8
 
     # 4. Interrogative Target Concordance ("di mana" -> domestic placement vs overseas exception)
     if ("di mana" in norm_query or "dimana" in norm_query or "where" in norm_query) and (

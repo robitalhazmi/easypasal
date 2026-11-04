@@ -822,12 +822,31 @@ def strip_appendix_and_header_artifacts(text: str) -> str:
     return "\n\n".join(kept_paras).strip()
 
 
-def _translate_statutory_clause_to_english(body: str) -> str:
-    """Translate an Indonesian statutory obligation or enumeration clause into natural English prose."""
+_INDONESIAN_PROSE_STOPWORDS_RE = re.compile(
+    r"\b(?:dalam|yang|atau|kepada|oleh|sebagaimana|terhadap|untuk|dengan|pada|dari|"
+    r"wajib|harus|dilarang|perjanjian|mencantumkan|biaya|dibayar|dilakukan|memberikan|"
+    r"mengenai|ketentuan|peraturan|perundang-undangan|penyelenggara|nasabah|konsumen)\b",
+    re.IGNORECASE,
+)
+
+
+def _is_pure_english_prose(text: str) -> bool:
+    """Verify that an English answer sentence contains zero untranslated Indonesian prose words outside '[...]'."""
+    body = re.sub(r"\[[^\]]+\]", " ", text or "").strip()
+    if not body:
+        return False
+    return not bool(_INDONESIAN_PROSE_STOPWORDS_RE.search(body))
+
+
+def _translate_statutory_clause_to_english(body: str) -> str | None:
+    """Translate an Indonesian statutory obligation or enumeration clause into natural, 100% pure English prose.
+
+    Returns None if the clause cannot be rendered into pure English without bilingual code-switching.
+    """
     norm = re.sub(r"\s+", " ", body.strip()).rstrip(".")
     norm_low = norm.lower()
 
-    # 1. High-precision canonical translations for core consumer protection & digital service provisions
+    # High-precision canonical translations for core consumer protection, digital service, and banking provisions
     if (
         "pelindungan konsumen di sektor jasa keuangan menerapkan prinsip:" in norm_low
         and "edukasi yang memadai" in norm_low
@@ -885,32 +904,7 @@ def _translate_statutory_clause_to_english(body: str) -> str:
             "of Consumer data and/or information"
         )
 
-    # 2. General rule-based phrase translation fallback for arbitrary Indonesian statutory clauses
-    en_text = norm
-    phrase_map: list[tuple[str, str]] = [
-        (r"\bBank\s+penyelenggara\s+Layanan\s+Digital\b", "Banks providing Digital Services"),
-        (r"\bBank\s+Umum\b", "Commercial Banks"),
-        (r"\bLembaga\s+Jasa\s+Keuangan\b", "Financial Services Institutions"),
-        (r"\bwajib\s+menempatkan\b", "must place"),
-        (r"\bwajib\s+menerapkan\b", "must implement"),
-        (r"\bwajib\s+menjaga\b", "must maintain"),
-        (r"\bwajib\s+memenuhi\b", "must fulfill"),
-        (r"\bwajib\s+melakukan\b", "must perform"),
-        (r"\bwajib\s+menyediakan\b", "must provide"),
-        (r"\bwajib\s+memiliki\b", "must have"),
-        (r"\bwajib\b", "must"),
-        (r"\bharus\b", "must"),
-        (r"\bdilarang\b", "are prohibited from"),
-        (r"\bpelindungan\s+konsumen\b", "consumer protection"),
-        (r"\bpelindungan\s+data\s+pribadi\b", "personal data protection"),
-        (r"\bsektor\s+jasa\s+keuangan\b", "the financial services sector"),
-        (r"\bpaling\s+sedikit\b", "at least"),
-        (r"\bmencakup\b", "covers"),
-        (r"\bmeliputi\b", "includes"),
-    ]
-    for pat, repl in phrase_map:
-        en_text = re.sub(pat, repl, en_text, flags=re.IGNORECASE)
-    return en_text
+    return None
 
 
 def ensure_enumeration_completeness(
@@ -921,9 +915,9 @@ def ensure_enumeration_completeness(
     """Ensure enumeration queries ('Apa saja pilar/aspek/komponen...' or 'What are the principal ... obligations/pillars...')
     include grounded enumeration and mandate clauses in the query's language.
 
-    Filters pre-existing text through a Normative Sentence & Grounding Gate (discarding ungrounded
-    outline stubs or elucidation preambles), ensures the primary root mandate opens the answer when available,
-    and uses content-stem coverage deduplication so all complementary statutory clauses are included.
+    Filters pre-existing text through a Normative Sentence & Monolingual Purity Gate (discarding ungrounded
+    outline stubs, elucidation preambles, or code-switched fragments), enforces 3-tier normative ordering
+    (Root Mandate -> Taxonomic Enumeration -> Complementary Operational Duties), and deduplicates by content stems.
     """
     if not retrieved_chunks or not question:
         return text
@@ -934,6 +928,7 @@ def ensure_enumeration_completeness(
         detect_language,
         expand_cross_lingual_query_terms,
         is_enumeration_query,
+        is_taxonomic_enumeration_clause,
         score_primary_obligation_alignment,
     )
 
@@ -959,15 +954,9 @@ def ensure_enumeration_completeness(
     enum_chunks: list[RetrievedChunk] = []
     mandate_chunks: list[RetrievedChunk] = []
     for _sc, c in scored_primaries:
-        c_body = re.sub(r"^\[[^\]]+\]\s*", "", c.text.strip())
-        if re.search(
-            r"(?:paling\s+sedikit|mencakup|meliputi|terdiri\s+atas|melakukan\s+proses|menerapkan\s+prinsip|yaitu)\s*:?\s*[a-z1-9][\.\)]"
-            r"|\ba\.\s+[^;]{3,120};\s*(?:dan\s+)?b\.\s+",
-            c_body,
-            re.IGNORECASE,
-        ):
+        if is_taxonomic_enumeration_clause(c.text):
             enum_chunks.append(c)
-        else:
+        elif c.ayat in (None, "", "1"):
             mandate_chunks.append(c)
 
     if not enum_chunks:
@@ -984,7 +973,7 @@ def ensure_enumeration_completeness(
         if len(selected_enums) >= 2:
             break
 
-    # 1. Normative Sentence, Finite Predicate & Sub-Item Completeness Gate on pre-existing text
+    # 1. Normative Sentence, Monolingual Purity, Finite Predicate & Sub-Item Completeness Gate on pre-existing text
     finite_predicate_re = re.compile(
         r"\b(?:wajib|harus|dilarang|melakukan|mencakup|meliputi|terdiri\s+atas|ditetapkan|diatur|menjaga|menerapkan|melaksanakan|memenuhi|menyediakan|memiliki|"
         r"must|shall|required|prohibited|mandates|includes|covers|implements|applies)\b",
@@ -1000,11 +989,12 @@ def ensure_enumeration_completeness(
                 s_clean = sent.strip()
                 if len(s_clean.split()) < 5:
                     continue
-                # Reject fragments lacking a finite verb predicate, containing fabricated "(Romawi ..., ayat ...)",
-                # citing general elucidation preambles ("I. Umum" / "Penjelasan"), lacking any bracketed operative citation,
-                # or ending with a dangling sub-item marker ("i.", "ii.", "a.")
+                # Reject fragments lacking a finite verb predicate, violating English monolingual purity,
+                # containing fabricated "(Romawi ..., ayat ...)", citing general elucidation preambles ("I. Umum" / "Penjelasan"),
+                # lacking any bracketed operative citation, or ending with a dangling sub-item marker ("i.", "ii.", "a.")
                 if (
                     not finite_predicate_re.search(s_clean)
+                    or (is_en and not _is_pure_english_prose(s_clean))
                     or not re.search(r"\[[^\]]+\]", s_clean)
                     or re.search(r"\b(?:I\.\s*Umum|Penjelasan)\b", s_clean, re.IGNORECASE)
                     or re.search(
@@ -1037,27 +1027,33 @@ def ensure_enumeration_completeness(
 
                 parts.append(s_clean if s_clean.endswith((".", "!", "?")) else f"{s_clean}.")
 
-    # 2. Ensure root mandate opens the response if parts is empty or lacks an opening imperative duty
+    # 2. Tier 1 — Ensure root mandate opens the response if parts is empty, lacks an opening imperative duty,
+    # or starts directly with a lettered enumeration instead of the root mandate
     if mandate_chunks and (
         not parts
         or not re.search(
             r"\b(?:wajib|harus|dilarang|must|shall|required)\b", parts[0], re.IGNORECASE
         )
+        or re.search(r"\ba\.\s+[^;]{3,120};\s*(?:dan\s+|and\s+)?b\.\s+", parts[0], re.IGNORECASE)
     ):
-        m_chunk = mandate_chunks[0]
-        m_label = re.sub(
-            r"\s*\(bagian\s+\d+\)", "", m_chunk.citation_label or m_chunk.chunk_id
-        ).strip()
-        m_body = re.sub(r"^\[[^\]]+\]\s*", "", m_chunk.text.strip())
-        m_body = re.sub(r"^\(\d+\)\s*", "", m_body)
-        m_body = re.sub(r"\s+", " ", m_body).strip().rstrip(".")
-        if is_en:
-            m_body = _translate_statutory_clause_to_english(m_body)
-        mandate_sent = f"{m_body} [{m_label}]."
-        if m_label.lower() not in " ".join(parts).lower():
-            parts.insert(0, mandate_sent)
+        for m_chunk in mandate_chunks:
+            m_label = re.sub(
+                r"\s*\(bagian\s+\d+\)", "", m_chunk.citation_label or m_chunk.chunk_id
+            ).strip()
+            m_body = re.sub(r"^\[[^\]]+\]\s*", "", m_chunk.text.strip())
+            m_body = re.sub(r"^\(\d+\)\s*", "", m_body)
+            m_body = re.sub(r"\s+", " ", m_body).strip().rstrip(".")
+            if is_en:
+                m_body_en = _translate_statutory_clause_to_english(m_body)
+                if not m_body_en or not _is_pure_english_prose(m_body_en):
+                    continue
+                m_body = m_body_en
+            mandate_sent = f"{m_body} [{m_label}]."
+            if m_label.lower() not in " ".join(parts).lower():
+                parts.insert(0, mandate_sent)
+            break
 
-    # 3. Content-based & sub-item completeness deduplication across all selected enumeration clauses
+    # 3. Tier 2 — Content-based & sub-item completeness deduplication across all selected enumeration clauses
     for ec in selected_enums:
         ec_label = re.sub(r"\s*\(bagian\s+\d+\)", "", ec.citation_label or ec.chunk_id).strip()
         ec_body = re.sub(r"^\[[^\]]+\]\s*", "", ec.text.strip())
@@ -1091,7 +1087,14 @@ def ensure_enumeration_completeness(
         if stem_coverage >= 0.55 and has_expected_markers:
             continue
 
-        rendered_ec_body = _translate_statutory_clause_to_english(ec_body) if is_en else ec_body
+        if is_en:
+            ec_body_en = _translate_statutory_clause_to_english(ec_body)
+            if not ec_body_en or not _is_pure_english_prose(ec_body_en):
+                continue
+            rendered_ec_body = ec_body_en
+        else:
+            rendered_ec_body = ec_body
+
         is_binding_statute = any(
             p in (ec.doc_id or "").lower() for p in ("pojk", "pbi", "uu_", "pp_")
         )
@@ -1110,7 +1113,7 @@ def ensure_enumeration_completeness(
         else:
             parts.append(f"{rendered_ec_body} [{ec_label}].")
 
-    # 3b. Include complementary high-scoring operational obligations (e.g., 24/7 complaint handling,
+    # 3b. Tier 3 — Include complementary top-level operational obligations (e.g., 24/7 complaint handling,
     # authentication education, and personal data confidentiality in digital financial services)
     for mc in mandate_chunks[1:4]:
         mc_label = re.sub(r"\s*\(bagian\s+\d+\)", "", mc.citation_label or mc.chunk_id).strip()
@@ -1119,6 +1122,13 @@ def ensure_enumeration_completeness(
         mc_body = re.sub(r"^\[[^\]]+\]\s*", "", mc.text.strip())
         mc_body = re.sub(r"^\(\d+\)\s*", "", mc_body)
         mc_body = re.sub(r"\s+", " ", mc_body).strip().rstrip(".")
+        if is_en:
+            mc_body_en = _translate_statutory_clause_to_english(mc_body)
+            if not mc_body_en or not _is_pure_english_prose(mc_body_en):
+                continue
+            rendered_mc = mc_body_en
+        else:
+            rendered_mc = mc_body
         mc_stems = {
             _legal_stem(w)
             for w in re.findall(r"\b[a-z]{4,}\b", mc_body.lower())
@@ -1133,7 +1143,6 @@ def ensure_enumeration_completeness(
             if w not in _SENTENCE_STOPWORDS
         }
         if len(mc_stems - existing_stems) >= 3:
-            rendered_mc = _translate_statutory_clause_to_english(mc_body) if is_en else mc_body
             parts.append(f"{rendered_mc} [{mc_label}].")
 
     # 4. Normalize transitions and ensure opening sentence carries explicit obligation modality
@@ -1142,7 +1151,7 @@ def ensure_enumeration_completeness(
         p_norm = p.strip()
         if i == 0:
             p_norm = re.sub(
-                r"^(?:Selain\s+itu|Sementara\s+itu|Additionally|Furthermore),\s*",
+                r"^(?:Selain\s+itu|Sementara\s+itu|Additionally|Furthermore|Specifically),\s*",
                 "",
                 p_norm,
                 flags=re.IGNORECASE,

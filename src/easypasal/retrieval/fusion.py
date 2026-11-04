@@ -68,6 +68,7 @@ def _compute_normative_salience_boost(query: str, payload: dict[str, Any]) -> fl
         _detect_statutory_role,
         _is_appendix_or_closing_fragment,
         is_enumeration_query,
+        is_taxonomic_enumeration_clause,
     )
 
     q_low = re.sub(r"\s+", " ", query.lower()).strip()
@@ -114,13 +115,7 @@ def _compute_normative_salience_boost(query: str, payload: dict[str, Any]) -> fl
 
     # 2. Intent-Based Normative Primacy Boost / Penalty
     has_cross_ref = "sebagaimana dimaksud dalam pasal" in body_low
-    has_structured_enum = bool(
-        re.search(
-            r"(?:paling\s+sedikit|mencakup|meliputi|terdiri\s+atas|melakukan\s+proses|menerapkan\s+prinsip|yaitu)\s*:?\s*[a-z1-9][\.\)]"
-            r"|\ba\.\s+[^;]{3,120};\s*(?:dan\s+)?b\.\s+",
-            body_low,
-        )
-    )
+    has_structured_enum = is_taxonomic_enumeration_clause(text)
 
     if intent == "obligation":
         if role == "[Peran: Kewajiban Pokok Entitas]":

@@ -1082,6 +1082,7 @@ def test_cross_lingual_query_expansion_and_alignment() -> None:
     from easypasal.generation.prompts import (
         expand_cross_lingual_query_terms,
         is_enumeration_query,
+        is_taxonomic_enumeration_clause,
         score_primary_obligation_alignment,
     )
     from easypasal.retrieval.fusion import detect_normative_intent
@@ -1119,5 +1120,24 @@ def test_cross_lingual_query_expansion_and_alignment() -> None:
     c_p3_a2.pasal = "3"
     c_p3_a2.ayat = "2"
 
+    c_p44_a4 = _make_dummy_chunk(
+        "POJK_22_2023_p44_a4",
+        "POJK 22 Tahun 2023, Pasal 44 ayat (4)",
+        "[POJK 22 Tahun 2023 | Pasal 44 ayat (4)]\n"
+        "(4) Dalam perjanjian produk dan/atau layanan, PUJK wajib mencantumkan: "
+        "a. biaya dari produk dan/atau layanan yang harus dibayar Konsumen; dan "
+        "b. komisi/imbalan kepada agen pemasar/perantara produk dan/atau layanan.",
+        doc_number="POJK 22 Tahun 2023",
+    )
+    c_p44_a4.doc_id = "POJK_22_Tahun_2023"
+    c_p44_a4.pasal = "44"
+    c_p44_a4.ayat = "4"
+
+    assert is_taxonomic_enumeration_clause(c_p3_a2.text) is True
+    assert is_taxonomic_enumeration_clause(c_p44_a4.text) is False
     assert score_primary_obligation_alignment(c_preamble, q_en) == 0.0
     assert score_primary_obligation_alignment(c_p3_a2, q_en) >= 6.0
+    assert (
+        score_primary_obligation_alignment(c_p3_a2, q_en)
+        > score_primary_obligation_alignment(c_p44_a4, q_en) + 3.0
+    )

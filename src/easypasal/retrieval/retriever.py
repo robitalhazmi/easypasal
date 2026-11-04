@@ -153,6 +153,7 @@ def _expand_primary_statutory_norms(
 
     from easypasal.generation.prompts import (
         is_enumeration_query,
+        is_taxonomic_enumeration_clause,
         score_primary_obligation_alignment,
     )
     from easypasal.retrieval.fusion import detect_normative_intent
@@ -264,7 +265,11 @@ def _expand_primary_statutory_norms(
                 min_align = 2.0
             elif is_enum_doc_match:
                 # For enumeration queries on circulars (SEOJK) or sibling governance chapters,
-                # require strong enumeration alignment (>= 4.5)
+                # require a genuine taxonomic enumeration clause in a top-level ayat (1..3)
+                if p_ayat is not None and str(p_ayat) not in ("1", "2", "3"):
+                    continue
+                if not is_taxonomic_enumeration_clause(str(payload.get("text", ""))):
+                    continue
                 min_align = 4.5
             else:
                 continue

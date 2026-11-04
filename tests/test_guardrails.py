@@ -1573,8 +1573,29 @@ def test_english_consumer_protection_digital_services_guardrails() -> None:
         ayat="1",
         text="[POJK 22 Tahun 2023 | Pasal 19 ayat (1)]\n(1) PUJK wajib menjaga kerahasiaan dan keamanan data dan/atau informasi Konsumen.",
     )
+    c_pojk22_44_4 = _make_chunk(
+        "POJK_22_Tahun_2023_pasal_44_ayat_4",
+        "POJK 22 Tahun 2023",
+        "POJK 22 Tahun 2023, Pasal 44 ayat (4)",
+        pasal="44",
+        ayat="4",
+        text=(
+            "[POJK 22 Tahun 2023 | Pasal 44 ayat (4)]\n"
+            "(4) Dalam perjanjian produk dan/atau layanan, PUJK wajib mencantumkan: "
+            "a. biaya dari produk dan/atau layanan yang harus dibayar Konsumen; dan "
+            "b. komisi/imbalan kepada agen pemasar/perantara produk dan/atau layanan yang diperoleh dari pembayaran yang dilakukan oleh Konsumen."
+        ),
+    )
 
-    chunks = [c_pojk22_3_2, c_pojk21_25, c_pojk22_3_1, c_pojk21_26, c_pojk22_19_1, c_preamble]
+    chunks = [
+        c_pojk22_44_4,
+        c_pojk22_3_2,
+        c_pojk21_25,
+        c_pojk22_3_1,
+        c_pojk21_26,
+        c_pojk22_19_1,
+        c_preamble,
+    ]
 
     # Case 1: Baseline answer with fabricated English act names, parenthetical I. Umum citation, and uncited bullets
     corrupted_baseline = (
@@ -1610,8 +1631,37 @@ def test_english_consumer_protection_digital_services_guardrails() -> None:
     )
     assert "I. Umum" not in realigned2
     assert "UU P2SK" not in realigned2
+    assert "Pasal 44" not in realigned2
     assert "adequate education" in realigned2
     assert "POJK 22 Tahun 2023, Pasal 3 ayat (2)" in cites2
     assert "POJK 21 Tahun 2023, Pasal 25 ayat (1)" in cites2
     ver2 = verify_citations(realigned2, chunks, cites2, question=q)
     assert ver2.is_valid is True
+
+    # Case 3: Code-switched "Indlish" answer citing narrow Pasal 44 ayat (4) fee/commission sub-clause
+    corrupted_indlish = (
+        "Dalam perjanjian produk dan/atau layanan, PUJK must mencantumkan: "
+        "a. biaya dari produk dan/atau layanan yang must dibayar Konsumen; dan "
+        "b. komisi/imbalan kepada agen pemasar/perantara produk dan/atau layanan "
+        "[POJK 22 Tahun 2023, Pasal 44 ayat (4)]. "
+        "Specifically, consumer protection in the financial services sector must implement seven principal obligations and principles: "
+        "a. adequate education; b. disclosure and transparency of product and/or service information; "
+        "c. fair treatment and responsible business conduct; d. protection of consumer assets, privacy, and data; "
+        "e. effective and efficient complaint handling and dispute resolution; f. compliance enforcement; and "
+        "g. fair competition [POJK 22 Tahun 2023, Pasal 3 ayat (2)]."
+    )
+    realigned3, cites3, _ = detect_and_realign_inverted_citations(
+        answer=corrupted_indlish,
+        retrieved_chunks=chunks,
+        question=q,
+    )
+    assert "Dalam perjanjian" not in realigned3
+    assert "mencantumkan" not in realigned3
+    assert "Pasal 44" not in realigned3
+    assert realigned3.startswith(
+        "Banks providing Digital Services must implement consumer protection principles"
+    )
+    assert "POJK 21 Tahun 2023, Pasal 25 ayat (1)" in cites3
+    assert "POJK 22 Tahun 2023, Pasal 3 ayat (2)" in cites3
+    ver3 = verify_citations(realigned3, chunks, cites3, question=q)
+    assert ver3.is_valid is True
