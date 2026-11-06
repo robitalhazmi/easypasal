@@ -625,8 +625,8 @@ def reformat_narrative_citations_to_brackets(text: str) -> str:
     pattern_id_inv = re.compile(
         rf",?\s*(?:seperti\s+yang\s+(?:ditetapkan|diatur|tercantum)\s+dalam|"
         rf"sebagaimana\s+(?:ditetapkan|diatur|tercantum|dimaksud)\s+dalam|"
-        rf"sesuai\s+(?:dengan\s+)?(?:ketentuan\s+)?(?:dalam\s+)?|"
-        rf"berdasarkan\s+(?:ketentuan\s+)?|menurut\s+(?:ketentuan\s+)?)\s*"
+        rf"sesuai\s+(?:dengan\s+)?(?:ketentuan\s+(?:terkait\s+|yang\s+berlaku\s+)?)?(?:dalam\s+)?|"
+        rf"berdasarkan\s+(?:ketentuan\s+(?:terkait\s+|yang\s+berlaku\s+)?)?|menurut\s+(?:ketentuan\s+(?:terkait\s+|yang\s+berlaku\s+)?)?)\s*"
         rf"({cit_designator})\s+(?:dari\s+|pada\s+|dalam\s+)?({reg_name_pat})",
         re.IGNORECASE,
     )
@@ -641,8 +641,8 @@ def reformat_narrative_citations_to_brackets(text: str) -> str:
     pattern_id = re.compile(
         rf",?\s*(?:seperti\s+yang\s+(?:ditetapkan|diatur|tercantum)\s+dalam|"
         rf"sebagaimana\s+(?:ditetapkan|diatur|tercantum|dimaksud)\s+dalam|"
-        rf"sesuai\s+(?:dengan\s+)?(?:ketentuan\s+)?(?:dalam\s+)?|"
-        rf"berdasarkan\s+(?:ketentuan\s+)?|menurut\s+(?:ketentuan\s+)?)\s*"
+        rf"sesuai\s+(?:dengan\s+)?(?:ketentuan\s+(?:terkait\s+|yang\s+berlaku\s+)?)?(?:dalam\s+)?|"
+        rf"berdasarkan\s+(?:ketentuan\s+(?:terkait\s+|yang\s+berlaku\s+)?)?|menurut\s+(?:ketentuan\s+(?:terkait\s+|yang\s+berlaku\s+)?)?)\s*"
         rf"([\w\s\./]+?,\s*{cit_designator})",
         re.IGNORECASE,
     )
@@ -725,10 +725,34 @@ def reformat_narrative_citations_to_brackets(text: str) -> str:
         flags=re.IGNORECASE,
     )
 
+    # 7. Strip vacuous narrative attribution fillers immediately preceding a bracketed citation or sentence end
+    # e.g. ", sesuai dengan ketentuan terkait [POJK ...]" -> " [POJK ...]"
+    text = re.sub(
+        r",?\s*(?:sesuai\s+(?:dengan\s+)?|berdasarkan\s+|menurut\s+|sebagaimana\s+(?:diatur|ditetapkan|tercantum|dimaksud)\s+(?:dalam|pada)\s+)"
+        r"(?:ketentuan|peraturan|regulasi|aturan|pasal|ayat)"
+        r"(?:\s+(?:yang\s+(?:berlaku|terkait|ditetapkan|diatur)|terkait|tersebut|ini|ojk|otoritas\s+jasa\s+keuangan|bi|bank\s+indonesia))*"
+        r"(?=\s*\[|[.!?](?:\s|$))",
+        "",
+        text,
+        flags=re.IGNORECASE,
+    )
+    text = re.sub(
+        r",?\s*(?:in\s+accordance\s+with|pursuant\s+to|according\s+to|under|as\s+(?:stipulated|regulated|required)\s+(?:in|by))\s+"
+        r"(?:the\s+)?(?:relevant|applicable|related|prevailing)?\s*(?:regulations?|provisions?|rules?|requirements?)"
+        r"(?=\s*\[|[.!?](?:\s|$))",
+        "",
+        text,
+        flags=re.IGNORECASE,
+    )
+
     return text
 
 
-def simplify_dangling_cross_references(text: str) -> str:
+def simplify_dangling_cross_references(
+    text: str,
+    *,
+    strip_inline_pasal_refs: bool = True,
+) -> str:
     """Replace dangling internal statutory cross-references in generated prose with self-contained descriptions.
 
     Converts phrases like 'dokumen sebagaimana dimaksud dalam Pasal 71 ayat (2) dan/atau ayat (3)'
@@ -765,6 +789,17 @@ def simplify_dangling_cross_references(text: str) -> str:
         text,
         flags=re.IGNORECASE,
     )
+
+    # 4. General inline anaphoric cross-reference qualifying an already-named noun phrase
+    if strip_inline_pasal_refs:
+        text = re.sub(
+            r"\s+sebagaimana\s+dimaksud\s+(?:dalam|pada)\s+Pasal\s+\d+[a-z]?"
+            r"(?:\s+ayat\s+\(\d+[a-z]?\))?"
+            r"(?=\s+(?:menjamin|wajib|harus|dilarang|dapat|merupakan|adalah|meliputi|mencakup|dilakukan|dilaksanakan)\b)",
+            "",
+            text,
+            flags=re.IGNORECASE,
+        )
 
     return text
 
@@ -1292,6 +1327,32 @@ def _score_sentence_chunk_match(sentence: str, chunk: RetrievedChunk) -> float:
     c_nums = set(re.findall(r"\b\d+\b", c_no_ref))
 
     score = 0.0
+
+    # Anti-self-reference constraint: a sentence containing 'sebagaimana dimaksud dalam Pasal X'
+    # cannot be grounded by Pasal X itself (an article never cross-references itself as external).
+    xref_pasals = {
+        m.lower()
+        for m in re.findall(
+            r"\b(?:sebagaimana\s+dimaksud\s+(?:dalam|pada)|referred\s+to\s+in|as\s+stipulated\s+in)\s+pasal\s+(\d+[a-z]?)\b",
+            s_clean,
+            re.IGNORECASE,
+        )
+    }
+    if xref_pasals:
+        c_pasal = str(chunk.pasal or "").lower().strip()
+        c_xrefs = {
+            m.lower()
+            for m in re.findall(
+                r"\bsebagaimana\s+dimaksud\s+(?:dalam|pada)\s+pasal\s+(\d+[a-z]?)\b",
+                c_body,
+                re.IGNORECASE,
+            )
+        }
+        if c_pasal and c_pasal in xref_pasals and c_pasal not in c_xrefs:
+            score -= 10.0
+        elif xref_pasals & c_xrefs:
+            score += 3.0
+
     if s_nums:
         if s_nums <= c_nums:
             score += 3.5
@@ -1617,10 +1678,9 @@ def align_sentence_level_citations(
 
 
 def _strip_unqueried_reporting_sentences(text: str, question: str) -> str:
-    """Strip trailing additive sentences that dump periodic administrative reporting duties
-    ('wajib menyampaikan laporan realisasi...') or post-licensing overseas exception execution clauses
-    ('di luar wilayah Indonesia sebagaimana dimaksud dalam Pasal ... sejak memperoleh izin')
-    when the query does not ask about reporting, licensing, or exceptions.
+    """Strip trailing additive sentences that dump periodic administrative reporting duties,
+    post-licensing overseas exception execution clauses, or non-locational derivative clauses
+    on closed-scope locational queries when the query does not ask about them.
     """
     if not text or not question:
         return text
@@ -1639,6 +1699,11 @@ def _strip_unqueried_reporting_sentences(text: str, question: str) -> str:
             re.IGNORECASE,
         )
     )
+    is_where_query = bool(re.search(r"\b(?:di\s+mana|dimana|where)\b", question, re.IGNORECASE))
+    locational_pat = re.compile(
+        r"\b(?:di\s+(?:wilayah|dalam\s+negeri|indonesia)|berkedudukan\s+di|bertempat\s+di|berlokasi\s+di|in\s+indonesia|within\s+indonesia)\b",
+        re.IGNORECASE,
+    )
 
     sentences = re.split(r"(?<!\s[a-zA-Z0-9]\.)(?<=[.!?])\s+(?=[A-Z\[])", text.strip())
     if len(sentences) <= 1:
@@ -1649,6 +1714,8 @@ def _strip_unqueried_reporting_sentences(text: str, question: str) -> str:
         r"\b(?:wajib|harus|dilarang|must|shall|required)\b", first_sent, re.IGNORECASE
     ) or not re.search(r"\[[^\]]+\]", first_sent):
         return text
+
+    first_has_location = bool(locational_pat.search(first_sent))
 
     kept: list[str] = [first_sent]
     for sent in sentences[1:]:
@@ -1668,6 +1735,20 @@ def _strip_unqueried_reporting_sentences(text: str, question: str) -> str:
                 r"\bdi\s+luar\s+wilayah\s+Indonesia\s+sebagaimana\s+dimaksud\s+dalam\s+Pasal\b",
                 sent,
                 re.IGNORECASE,
+            )
+        ):
+            continue
+        if (
+            is_where_query
+            and not query_asks_exception
+            and first_has_location
+            and (
+                re.search(
+                    r"\b(?:sebagaimana\s+dimaksud\s+(?:dalam|pada)|referred\s+to\s+in)\s+Pasal\b",
+                    sent,
+                    re.IGNORECASE,
+                )
+                or not locational_pat.search(sent)
             )
         ):
             continue
@@ -1699,7 +1780,7 @@ def detect_and_realign_inverted_citations(
     # reformat narrative citations, decouple confabulated causality, strip unqueried reporting dumps,
     # and ensure enumeration completeness
     answer = strip_appendix_and_header_artifacts(answer)
-    answer = simplify_dangling_cross_references(answer)
+    answer = simplify_dangling_cross_references(answer, strip_inline_pasal_refs=False)
     answer = reformat_narrative_citations_to_brackets(answer)
     answer = decouple_confabulated_causality(answer, retrieved_chunks=retrieved_chunks)
     answer = _strip_unqueried_reporting_sentences(answer, question)
@@ -1718,6 +1799,7 @@ def detect_and_realign_inverted_citations(
     )
 
     if not is_obligation_query:
+        answer = simplify_dangling_cross_references(answer, strip_inline_pasal_refs=True)
         cites = extract_citations(answer)
         return answer, cites, {}
 
@@ -1728,6 +1810,7 @@ def detect_and_realign_inverted_citations(
 
     # 0b. Sentence-level claim-to-chunk citation alignment for multi-sentence answers
     answer, sent_replacements = align_sentence_level_citations(answer, retrieved_chunks, question)
+    answer = simplify_dangling_cross_references(answer, strip_inline_pasal_refs=True)
 
     current_cites = extract_citations(answer)
     realigned_text = answer
@@ -1899,6 +1982,8 @@ def detect_and_realign_inverted_citations(
             # Ensure opening BLUF sentence has a bracketed citation
             realigned_text = _attach_bracket_citation_to_opening(realigned_text, clean_new)
 
+            if replacements.get("<uncited_sentence_1>") == f"[{clean_new}]":
+                replacements.pop("<uncited_sentence_1>", None)
             replacements[cite] = f"[{clean_new}]"
             logger.warning(
                 "Inverted legal reasoning detected for query %r: realigned non-primary citation %s -> %s",

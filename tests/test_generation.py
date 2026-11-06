@@ -197,7 +197,8 @@ def test_format_passages_and_prompt_assembly() -> None:
     assert "ATURAN MUTLAK PENJAWABAN" in id_prompt
     assert "POJK 22 Tahun 2023, Pasal 72" in id_prompt
     assert "Berapa hari penanganan pengaduan PUJK?" in id_prompt
-    assert "PUJK wajib memenuhi ketentuan terkait" in id_prompt
+    assert "PUJK wajib ... [POJK 22 Tahun 2023, Pasal 71 ayat (1)]." in id_prompt
+    assert "ketentuan terkait" not in id_prompt
     assert "<Kalimat jawaban" not in id_prompt
 
     # Test dynamic subject mirroring
@@ -206,7 +207,7 @@ def test_format_passages_and_prompt_assembly() -> None:
         chunks=[c1, c2],
         language="id",
     )
-    assert "Bank Umum wajib memenuhi ketentuan terkait" in bank_prompt
+    assert "Bank Umum wajib ... [POJK 22 Tahun 2023, Pasal 71 ayat (1)]." in bank_prompt
 
     # Test English prompt
     en_prompt = build_rag_prompt(
@@ -216,7 +217,7 @@ def test_format_passages_and_prompt_assembly() -> None:
     )
     assert "STRICT ANSWERING RULES" in en_prompt
     assert "How many days are allowed for complaint handling?" in en_prompt
-    assert "Financial institutions must comply with regulatory requirements" in en_prompt
+    assert "Financial institutions must ... [POJK 22 Tahun 2023, Pasal 71 ayat (1)]." in en_prompt
     assert "<Direct substantive" not in en_prompt
 
     # Test empty passages

@@ -1685,6 +1685,14 @@ def test_inverted_narrative_citation_and_unqueried_reporting_pruning() -> None:
         ayat="1",
         text="[POJK 11/POJK.03/2022 | Pasal 35 ayat (1)]\n(1) Bank wajib menempatkan Sistem Elektronik pada Pusat Data dan Pusat Pemulihan Bencana di wilayah Indonesia.",
     )
+    c_p36_1 = _make_chunk(
+        "POJK_11_2022_p36_a1",
+        "POJK 11/POJK.03/2022",
+        "POJK 11/POJK.03/2022, Pasal 36 ayat (1)",
+        pasal="36",
+        ayat="1",
+        text="[POJK 11/POJK.03/2022 | Pasal 36 ayat (1)]\n(1) Bank wajib memastikan Pusat Data dan Pusat Pemulihan Bencana sebagaimana dimaksud dalam Pasal 35 menjamin kelangsungan usaha Bank.",
+    )
     c_p41_1 = _make_chunk(
         "POJK_11_2022_p41_a1",
         "POJK 11/POJK.03/2022",
@@ -1702,7 +1710,7 @@ def test_inverted_narrative_citation_and_unqueried_reporting_pruning() -> None:
         text="[POJK 11/POJK.03/2022 | Pasal 61 ayat (1)]\n(1) Bank wajib menyampaikan laporan realisasi meliputi penempatan Sistem Elektronik pada Pusat Data dan/atau Pusat Pemulihan Bencana di luar wilayah Indonesia.",
     )
 
-    pruned = prune_remedial_distractors([c_p61_1, c_p41_1, c_p35_1], q)
+    pruned = prune_remedial_distractors([c_p61_1, c_p41_1, c_p36_1, c_p35_1], q)
     assert [c.chunk_id for c in pruned] == ["POJK_11_2022_p35_a1"]
 
     raw_baseline = (
@@ -1744,6 +1752,42 @@ def test_inverted_narrative_citation_and_unqueried_reporting_pruning() -> None:
         "[POJK 11/POJK.03/2022, Pasal 35 ayat (1)]."
     )
     assert cites2 == ["POJK 11/POJK.03/2022, Pasal 35 ayat (1)"]
+
+    # Verify pre-bracket filler ', sesuai dengan ketentuan terkait' and non-locational derivative clause are stripped on 'Di mana' query
+    raw_with_filler_and_p36 = (
+        "Bank Umum wajib menempatkan Sistem Elektronik pada Pusat Data dan Pusat Pemulihan Bencana "
+        "di wilayah Indonesia, sesuai dengan ketentuan terkait [POJK 11/POJK.03/2022, Pasal 35 ayat (1)]. "
+        "Selain itu, Bank Umum wajib memastikan Pusat Data dan Pusat Pemulihan Bencana sebagaimana dimaksud "
+        "dalam Pasal 35 menjamin kelangsungan usaha Bank, sesuai dengan ketentuan terkait [POJK 11/POJK.03/2022, Pasal 35 ayat (1)]."
+    )
+    realigned3, cites3, _ = detect_and_realign_inverted_citations(
+        answer=raw_with_filler_and_p36,
+        retrieved_chunks=[c_p35_1, c_p36_1],
+        question=q,
+    )
+    assert realigned3 == (
+        "Bank Umum wajib menempatkan Sistem Elektronik pada Pusat Data dan Pusat Pemulihan Bencana "
+        "di wilayah Indonesia [POJK 11/POJK.03/2022, Pasal 35 ayat (1)]."
+    )
+    assert cites3 == ["POJK 11/POJK.03/2022, Pasal 35 ayat (1)"]
+
+    # Verify on an open-ended obligation query that Pasal 36 ayat (1) is never misattributed to Pasal 35 ayat (1)
+    q_open = "Bagaimana kewajiban Bank Umum terkait Pusat Data dan Pusat Pemulihan Bencana menurut regulasi OJK?"
+    realigned4, cites4, _ = detect_and_realign_inverted_citations(
+        answer=raw_with_filler_and_p36,
+        retrieved_chunks=[c_p35_1, c_p36_1],
+        question=q_open,
+    )
+    assert realigned4 == (
+        "Bank Umum wajib menempatkan Sistem Elektronik pada Pusat Data dan Pusat Pemulihan Bencana "
+        "di wilayah Indonesia [POJK 11/POJK.03/2022, Pasal 35 ayat (1)]. "
+        "Selain itu, Bank Umum wajib memastikan Pusat Data dan Pusat Pemulihan Bencana "
+        "menjamin kelangsungan usaha Bank [POJK 11/POJK.03/2022, Pasal 36 ayat (1)]."
+    )
+    assert cites4 == [
+        "POJK 11/POJK.03/2022, Pasal 35 ayat (1)",
+        "POJK 11/POJK.03/2022, Pasal 36 ayat (1)",
+    ]
 
 
 def test_compound_normative_clause_decomposition_and_citation_alignment() -> None:

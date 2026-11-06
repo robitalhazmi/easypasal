@@ -80,7 +80,7 @@ ATURAN MUTLAK PENJAWABAN:
 6. STATUS REGULASI & KETENTUAN PENGGANTI: Perhatikan catatan status regulasi pada header dokumen (Status: berlaku vs dicabut/diubah). Selalu utamakan dan dasarkan jawaban pada regulasi yang berstatus BERLAKU. Jika regulasi terdahulu telah dicabut oleh regulasi baru yang berlaku, nyatakan secara tegas bahwa ketentuan tersebut telah digantikan.
 7. Jawab dalam bahasa yang sama dengan pertanyaan pengguna (Bahasa Indonesia).
 8. Jangan memberikan nasihat hukum formal atau spekulasi non-yuridis.
-9. STRUKTUR JAWABAN, KEJELASAN LENGKAP & SINTESIS MULTIKONDISI: Tuliskan kalimat jawaban substantif dalam prosa lengkap dan jelas terlebih dahulu yang menjawab pertanyaan, disusul penjelasan ketentuan terkait. DILARANG membuat daftar nomor pasal/romawi kosong tanpa isi kalimat ketentuannya, dan dilarang HANYA menuliskan kurung siku sitasi tanpa kalimat penjelasan jawaban yang utuh. Jika pertanyaan menanyakan kewajiban umum yang memiliki cabang modalitas atau komponen, sajikan seluruh cabang/komponen tersebut secara lengkap disertai sitasi masing-masing pada setiap kalimat/cabang, serta sederhanakan rujukan silang internal (seperti 'dokumen sebagaimana dimaksud dalam Pasal ...' menjadi 'dokumen yang dipersyaratkan')."""
+9. STRUKTUR JAWABAN, KEJELASAN LENGKAP & SINTESIS MULTIKONDISI: Tuliskan kalimat jawaban substantif dalam prosa lengkap dan jelas terlebih dahulu yang menjawab pertanyaan secara langsung. DILARANG membuat daftar nomor pasal/romawi kosong tanpa isi kalimat ketentuannya, dan dilarang HANYA menuliskan kurung siku sitasi tanpa kalimat penjelasan jawaban yang utuh. Jika pertanyaan menanyakan kewajiban umum yang memiliki cabang modalitas atau komponen, sajikan seluruh cabang/komponen tersebut secara lengkap disertai sitasi masing-masing pada setiap kalimat/cabang, serta sederhanakan rujukan silang internal (seperti 'dokumen sebagaimana dimaksud dalam Pasal ...' menjadi 'dokumen yang dipersyaratkan')."""
 
 GEPA_SYSTEM_PROMPT_EN: str = """You are EasyPasal, an Indonesian financial regulatory compliance assistant (covering OJK, Bank Indonesia, and relevant statutes).
 
@@ -623,12 +623,25 @@ def score_primary_obligation_alignment(chunk: RetrievedChunk, query: str) -> flo
         # Penalize deep procedural sub-clauses (ayat (4)+) on high-level enumeration/principle queries
         score -= 0.8
 
-    # 4. Interrogative Target Concordance ("di mana" -> domestic placement vs overseas exception)
+    # 4. Interrogative Target Concordance ("di mana" -> domestic placement vs overseas exception / non-locational derivative)
     if is_where_query:
-        if "di luar wilayah indonesia" in norm_body and not query_asks_exception:
-            score -= 1.5
+        has_locational_complement = bool(
+            re.search(
+                r"\b(?:di\s+(?:wilayah|dalam\s+negeri|luar\s+wilayah|luar\s+negeri|indonesia)|berkedudukan\s+di|bertempat\s+di|berlokasi\s+di)\b",
+                norm_body,
+            )
+        )
+        if not has_locational_complement:
+            if is_dependent_ref or re.search(
+                r"\bsebagaimana\s+dimaksud\s+(?:dalam|pada)\s+pasal\b", norm_body
+            ):
+                score -= 5.0
+            else:
+                score -= 1.5
+        elif "di luar wilayah indonesia" in norm_body and not query_asks_exception:
+            score -= 5.0
         elif "di wilayah indonesia" in norm_body or "di indonesia" in norm_body:
-            score += 0.8
+            score += 1.2
 
     # 5. Concrete Numerical Statutory Deadlines / Time Limits
     if not is_where_query and re.search(
@@ -860,7 +873,7 @@ def build_rag_prompt(
 
 Provide a direct, comprehensive answer in complete prose sentences citing official regulations in square brackets (NEVER copy header metadata tags like [Tentang: ...], [Peran: ...], or (Status: ...)). If the obligation covers multiple modalities or components, present each clearly with its citation.
 Format example:
-{subj_en} must comply with regulatory requirements [{example_cite}].
+{subj_en} must ... [{example_cite}].
 
 Answer:"""
 
@@ -878,6 +891,6 @@ Answer:"""
 
 Jawab secara langsung dan komprehensif dalam kalimat prosa utuh dengan mencantumkan sitasi pasal utama dalam tanda kurung siku (DILARANG menyalin tag header seperti [Tentang: ...], [Peran: ...], (Status: ...), atau membuat daftar nomor pasal kosong). Jika ketentuan mencakup beberapa bentuk/modalitas atau komponen, sebutkan secara terstruktur disertai sitasi masing-masing.
 Contoh format:
-{subj_id} wajib memenuhi ketentuan terkait [{example_cite}].
+{subj_id} wajib ... [{example_cite}].
 
 Jawaban:"""
