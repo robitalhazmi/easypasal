@@ -1842,3 +1842,56 @@ def test_compound_normative_clause_decomposition_and_citation_alignment() -> Non
     ]
     ver = verify_citations(realigned, [c_p74_1, c_p75_1], cites, question=q)
     assert ver.is_valid is True
+
+    # Verify bundled umbrella delegation + consumer dispute remedy (UU 4 Tahun 2023, Pasal 245) is pruned and stripped
+    from easypasal.generation.pipeline import prune_remedial_distractors
+    from easypasal.generation.prompts import format_passages
+
+    c_uu4_p245 = _make_chunk(
+        "UU_4_2023_p245",
+        "UU Nomor 4 Tahun 2023",
+        "UU Nomor 4 Tahun 2023, Pasal 245 ayat (1)",
+        pasal="245",
+        ayat="1",
+        text=(
+            "[UU Nomor 4 Tahun 2023 | Pasal 245]\n"
+            "(1) Pelaku Usaha Sektor Keuangan wajib memiliki dan melaksanakan mekanisme Pelayanan dan Penyelesaian Pengaduan yang disampaikan oleh Konsumen.\n"
+            "(2) Dalam hal tidak terdapat kesepakatan terhadap hasil penanganan pengaduan sebagaimana dimaksud pada ayat (1), Konsumen dapat: "
+            "a. menyampaikan pengaduan kepada otoritas sektor keuangan untuk penanganan pengaduan sesuai dengan kewenangan masing-masing; atau "
+            "b. mengajukan sengketa kepada lembaga atau badan penyelesaian sengketa yang mendapat persetujuan dari otoritas sektor keuangan atau kepada pengadilan.\n"
+            "(3) Ketentuan lebih lanjut mengenai mekanisme Pelayanan dan Penyelesaian Pengaduan diatur dalam peraturan otoritas sektor keuangan."
+        ),
+    )
+    formatted_u = format_passages([c_uu4_p245])
+    assert "Konsumen dapat:" not in formatted_u
+    assert "Ketentuan lebih lanjut" not in formatted_u
+
+    pruned_u = prune_remedial_distractors([c_uu4_p245, c_p74_1, c_p75_1], q)
+    assert [c.chunk_id for c in pruned_u] == ["POJK_22_2023_p74_a1", "POJK_22_2023_p75_a1"]
+
+    baseline_with_u245_remedy = (
+        "Lembaga Jasa Keuangan wajib melakukan tindak lanjut dan menyelesaikan Pengaduan secara lisan "
+        "paling lama 5 (lima) hari kerja sejak Pengaduan diterima Lembaga Jasa Keuangan [POJK 22 Tahun 2023, Pasal 74 ayat (1)]. "
+        "Selain itu, Lembaga Jasa Keuangan wajib melakukan tindak lanjut dan melakukan penyelesaian Pengaduan secara tertulis "
+        "paling lama 10 (sepuluh) hari kerja sejak dokumen yang dipersyaratkan diterima secara lengkap [POJK 22 Tahun 2023, Pasal 75 ayat (1)]. "
+        "Selain itu, Lembaga Jasa Keuangan wajib memiliki dan melaksanakan mekanisme penanganan pengaduan yang disampaikan oleh Konsumen "
+        "[UU Nomor 4 Tahun 2023, Pasal 245 ayat (1)], dan Selain itu, Konsumen dapat: "
+        "a. menyampaikan pengaduan kepada otoritas sektor keuangan untuk penanganan pengaduan sesuai dengan kewenangan masing-masing; atau "
+        "b. mengajukan sengketa kepada lembaga atau badan penyelesaian sengketa yang mendapat persetujuan dari otoritas sektor keuangan atau kepada pengadilan "
+        "[UU Nomor 4 Tahun 2023, Pasal 245 ayat (1)]."
+    )
+    realigned_u, cites_u, _ = detect_and_realign_inverted_citations(
+        answer=baseline_with_u245_remedy,
+        retrieved_chunks=[c_p74_1, c_p75_1, c_uu4_p245],
+        question=q,
+    )
+    assert realigned_u == (
+        "Lembaga Jasa Keuangan wajib melakukan tindak lanjut dan menyelesaikan Pengaduan secara lisan "
+        "paling lama 5 (lima) hari kerja sejak Pengaduan diterima Lembaga Jasa Keuangan [POJK 22 Tahun 2023, Pasal 74 ayat (1)]. "
+        "Selain itu, Lembaga Jasa Keuangan wajib melakukan tindak lanjut dan melakukan penyelesaian Pengaduan secara tertulis "
+        "paling lama 10 (sepuluh) hari kerja sejak dokumen yang dipersyaratkan diterima secara lengkap [POJK 22 Tahun 2023, Pasal 75 ayat (1)]."
+    )
+    assert cites_u == [
+        "POJK 22 Tahun 2023, Pasal 74 ayat (1)",
+        "POJK 22 Tahun 2023, Pasal 75 ayat (1)",
+    ]

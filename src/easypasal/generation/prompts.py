@@ -581,6 +581,28 @@ def score_primary_obligation_alignment(chunk: RetrievedChunk, query: str) -> flo
     if is_reporting_clause and not query_asks_reporting:
         score -= 2.0
 
+    # 1c. Bundled Consumer Remedy / Umbrella Statutory Delegation Gate:
+    # Downweight general umbrella articles that bundle consumer dispute escalation ('Dalam hal tidak terdapat kesepakatan... Konsumen dapat')
+    # or delegate operational rules ('Ketentuan lebih lanjut ... diatur dalam peraturan') when the query does not ask about disputes
+    query_asks_dispute = bool(
+        re.search(
+            r"\b(?:sengketa|laps|pengadilan|tidak\s+(?:terdapat\s+)?kesepakatan|tidak\s+sepakat|keberatan|dispute)\b",
+            norm_query,
+        )
+    )
+    has_bundled_remedy_or_delegation = bool(
+        re.search(
+            r"\bdalam\s+hal\s+tidak\s+terdapat\s+kesepakatan\b[^.]*\b(?:konsumen|nasabah|pengguna)\s+dapat\b",
+            norm_body,
+        )
+        or re.search(
+            r"\bketentuan\s+lebih\s+lanjut\s+mengenai\b[^.]*\bdiatur\s+dalam\s+peraturan\b",
+            norm_body,
+        )
+    )
+    if has_bundled_remedy_or_delegation and not query_asks_dispute:
+        score -= 2.5
+
     # 2. Standalone Root Norm vs. Dependent Cross-Referencing Clause
     is_where_query = bool(re.search(r"\b(?:di\s+mana|dimana|where)\b", norm_query))
     query_asks_exception = bool(
@@ -777,6 +799,20 @@ def format_passages(chunks: list[RetrievedChunk]) -> str:
         body = chunk.text.strip()
         # Strip redundant leading pipe-delimited breadcrumb bracket "[DOC | BAB | Pasal]" from body
         body = re.sub(r"^\[[^\]]*\|[^\]]*\]\s*", "", body).strip()
+        # Strip trailing bundled consumer dispute remedy / statutory delegation sub-clauses in multi-ayat primary obligation chunks
+        if role_note == "[Peran: Kewajiban Pokok Entitas]":
+            body = re.sub(
+                r"\s*\([2-9]\)\s*Dalam\s+hal\s+tidak\s+terdapat\s+kesepakatan\b[\s\S]*$",
+                "",
+                body,
+                flags=re.IGNORECASE,
+            ).strip()
+            body = re.sub(
+                r"\s*\([2-9]\)\s*Ketentuan\s+lebih\s+lanjut\s+mengenai\b[^.]*\bdiatur\s+dalam\s+peraturan\b[\s\S]*$",
+                "",
+                body,
+                flags=re.IGNORECASE,
+            ).strip()
         formatted_blocks.append(f"{header}\n{body}")
 
     return "\n\n".join(formatted_blocks)

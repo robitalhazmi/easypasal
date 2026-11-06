@@ -1408,13 +1408,29 @@ def decouple_confabulated_causality(
     if not text:
         return text
 
-    # 1. Explicit disagreement condition falsely attached to written complaint duty
+    # 1. Explicit disagreement condition falsely attached to written complaint duty or spliced after a citation
     pattern = re.compile(
-        r"\bDalam\s+hal\s+tidak\s+terdapat\s+kesepakatan\s+terhadap\s+hasil\s+penanganan\s+pengaduan\s+yang\s+dilakukan\s+oleh\s+[^,]+,\s*",
+        r"(?:(\])\s*,\s*(?:(?:dan|serta|atau)\s+)?|(,\s*(?:dan|serta|atau)\s+))?"
+        r"\bDalam\s+hal\s+tidak\s+terdapat\s+kesepakatan\s+terhadap\s+hasil\s+penanganan\s+pengaduan\s+"
+        r"(?:sebagaimana\s+dimaksud\s+pada\s+ayat\s+\(\d+\)|yang\s+dilakukan\s+oleh\s+[^,]+),\s*",
         re.IGNORECASE,
     )
+
+    def _repl_disagreement(m: re.Match[str]) -> str:
+        if m.group(1):
+            return "]. Selain itu, "
+        return ". Selain itu, " if m.group(2) else "Selain itu, "
+
     if pattern.search(text):
-        text = pattern.sub("Selain itu, ", text)
+        text = pattern.sub(_repl_disagreement, text)
+
+    # Normalize any pre-existing bracket-comma-conjunction before 'Selain itu,' ("... [UU ...], dan Selain itu, ...")
+    text = re.sub(
+        r"(\])\s*,\s*(?:(?:dan|serta|atau)\s+)?(?=Selain\s+itu\b)",
+        r"\1. ",
+        text,
+        flags=re.IGNORECASE,
+    )
 
     # 2. Self-contradictory "incomplete document" condition attached to a clause requiring complete documents / written resolution
     contradictory_pattern = re.compile(
@@ -1699,11 +1715,29 @@ def _strip_unqueried_reporting_sentences(text: str, question: str) -> str:
             re.IGNORECASE,
         )
     )
+    query_asks_dispute = bool(
+        re.search(
+            r"\b(?:sengketa|laps|pengadilan|tidak\s+(?:terdapat\s+)?kesepakatan|tidak\s+sepakat|hak\s+konsumen|upaya\s+konsumen|dispute)\b",
+            question,
+            re.IGNORECASE,
+        )
+    )
     is_where_query = bool(re.search(r"\b(?:di\s+mana|dimana|where)\b", question, re.IGNORECASE))
     locational_pat = re.compile(
         r"\b(?:di\s+(?:wilayah|dalam\s+negeri|indonesia)|berkedudukan\s+di|bertempat\s+di|berlokasi\s+di|in\s+indonesia|within\s+indonesia)\b",
         re.IGNORECASE,
     )
+
+    # Strip spliced coordinate clauses that switch subject to external consumer dispute escalation
+    if not query_asks_dispute:
+        text = re.sub(
+            r"(\[[^\]]+\])\s*,\s*(?:(?:dan|serta|atau)\s+)?(?:Selain\s+itu,\s*)?"
+            r"(?:Dalam\s+hal\s+tidak\s+terdapat\s+kesepakatan[^,]*,\s*)?"
+            r"(?:Konsumen|Nasabah|Pengguna)\s+dapat\b(?:\s+[a-z0-9]\.(?=\s)|[^.!?])*([.!?])",
+            r"\1\2",
+            text,
+            flags=re.IGNORECASE,
+        )
 
     sentences = re.split(r"(?<!\s[a-zA-Z0-9]\.)(?<=[.!?])\s+(?=[A-Z\[])", text.strip())
     if len(sentences) <= 1:
@@ -1736,6 +1770,27 @@ def _strip_unqueried_reporting_sentences(text: str, question: str) -> str:
                 sent,
                 re.IGNORECASE,
             )
+        ):
+            continue
+        if not query_asks_dispute and re.search(
+            r"\b(?:konsumen|nasabah|pengguna)\s+dapat\s*:?\s*(?:[a-z0-9][\.\)]\s*)?"
+            r"(?:menyampaikan\s+pengaduan\s+kepada\s+otoritas|mengajukan\s+sengketa|memilih\s+upaya)\b",
+            sent,
+            re.IGNORECASE,
+        ):
+            continue
+        if (
+            len(kept) >= 2
+            and all(
+                re.search(r"\b(?:paling\s+(?:lama|lambat)\s+\d+|within\s+\d+)\b", k, re.IGNORECASE)
+                for k in kept
+            )
+            and re.search(
+                r"\bwajib\s+memiliki\s+dan\s+melaksanakan\s+mekanisme\b",
+                sent,
+                re.IGNORECASE,
+            )
+            and not re.search(r"\b\d+\b", re.sub(r"\[[^\]]+\]", "", sent))
         ):
             continue
         if (

@@ -53,18 +53,25 @@ def prune_remedial_distractors(
     query_asks_reporting = bool(
         re.search(r"\b(?:laporan|melaporkan|pelaporan|realisasi|report|reporting)\b", q_low)
     )
+    query_asks_dispute = bool(
+        re.search(
+            r"\b(?:sengketa|laps|pengadilan|tidak\s+(?:terdapat\s+)?kesepakatan|tidak\s+sepakat|keberatan|dispute)\b",
+            q_low,
+        )
+    )
     is_enum_q = is_enumeration_query(q_low)
 
     # Find regulations with at least one in-force primary entity obligation chunk
     regs_with_primary_obligation: set[str] = set()
+    max_primary_score = 0.0
     for c in chunks:
         if c.status and c.status != "berlaku":
             continue
         role = _detect_statutory_role(c.text)
-        if (
-            role == "[Peran: Kewajiban Pokok Entitas]"
-            and score_primary_obligation_alignment(c, query) > 0.0
-        ):
+        c_score = score_primary_obligation_alignment(c, query)
+        if role == "[Peran: Kewajiban Pokok Entitas]" and c_score > 0.0:
+            if c_score > max_primary_score:
+                max_primary_score = c_score
             digits = tuple(sorted(re.findall(r"\d+", c.doc_number or c.doc_id or "")))
             if digits:
                 regs_with_primary_obligation.add(f"{digits}")
@@ -87,6 +94,23 @@ def prune_remedial_distractors(
         ):
             logger.info(
                 "Pruning off-entity primary clause %s (%s) from obligation query context",
+                c.citation_label,
+                c.chunk_id,
+            )
+            continue
+
+        # Prune bundled umbrella delegation/consumer-remedy chunks when concrete implementing obligations exist
+        if (
+            not query_asks_dispute
+            and max_primary_score >= 4.0
+            and re.search(
+                r"\bdalam\s+hal\s+tidak\s+terdapat\s+kesepakatan\b[\s\S]*\b(?:konsumen|nasabah|pengguna)\s+dapat\b",
+                c.text,
+                re.IGNORECASE,
+            )
+        ):
+            logger.info(
+                "Pruning bundled consumer-remedy umbrella clause %s (%s) from obligation query context",
                 c.citation_label,
                 c.chunk_id,
             )
