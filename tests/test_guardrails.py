@@ -1716,3 +1716,57 @@ def test_inverted_narrative_citation_and_unqueried_reporting_pruning() -> None:
     assert cites == ["POJK 11/POJK.03/2022, Pasal 35 ayat (1)"]
     ver = verify_citations(realigned, [c_p35_1, c_p61_1], cites, question=q)
     assert ver.is_valid is True
+
+
+def test_compound_normative_clause_decomposition_and_citation_alignment() -> None:
+    """Verify comma-spliced multi-article obligations split into standalone cited sentences."""
+    from easypasal.guardrails.citation_verifier import (
+        detect_and_realign_inverted_citations,
+        verify_citations,
+    )
+
+    q = "Bagaimana kewajiban Lembaga Jasa Keuangan dalam menangani dan menyelesaikan pengaduan konsumen?"
+
+    c_p74_1 = _make_chunk(
+        "POJK_22_2023_p74_a1",
+        "POJK 22 Tahun 2023",
+        "POJK 22 Tahun 2023, Pasal 74 ayat (1)",
+        pasal="74",
+        ayat="1",
+        text="[POJK 22 Tahun 2023 | Pasal 74 ayat (1)]\n(1) PUJK wajib melakukan tindak lanjut dan menyelesaikan Pengaduan secara lisan paling lama 5 (lima) hari kerja sejak Pengaduan diterima PUJK.",
+    )
+    c_p75_1 = _make_chunk(
+        "POJK_22_2023_p75_a1",
+        "POJK 22 Tahun 2023",
+        "POJK 22 Tahun 2023, Pasal 75 ayat (1)",
+        pasal="75",
+        ayat="1",
+        text="[POJK 22 Tahun 2023 | Pasal 75 ayat (1)]\n(1) PUJK wajib melakukan tindak lanjut dan melakukan penyelesaian Pengaduan secara tertulis paling lama 10 (sepuluh) hari kerja sejak dokumen diterima secara lengkap.",
+    )
+
+    compound_answer = (
+        "Lembaga Jasa Keuangan wajib melakukan tindak lanjut dan menyelesaikan Pengaduan secara lisan "
+        "paling lama 5 (lima) hari kerja sejak Pengaduan diterima Lembaga Jasa Keuangan, "
+        "selain harus melakukan tindak lanjut dan melakukan penyelesaian Pengaduan secara tertulis "
+        "paling lama 10 (sepuluh) hari kerja sejak dokumen yang dipersyaratkan diterima secara lengkap "
+        "[POJK 22 Tahun 2023, Pasal 75 ayat (1)]."
+    )
+    realigned, cites, _ = detect_and_realign_inverted_citations(
+        answer=compound_answer,
+        retrieved_chunks=[c_p74_1, c_p75_1],
+        question=q,
+    )
+    assert realigned == (
+        "Lembaga Jasa Keuangan wajib melakukan tindak lanjut dan menyelesaikan Pengaduan secara lisan "
+        "paling lama 5 (lima) hari kerja sejak Pengaduan diterima Lembaga Jasa Keuangan "
+        "[POJK 22 Tahun 2023, Pasal 74 ayat (1)]. "
+        "Selain itu, Lembaga Jasa Keuangan juga wajib melakukan tindak lanjut dan melakukan penyelesaian Pengaduan secara tertulis "
+        "paling lama 10 (sepuluh) hari kerja sejak dokumen yang dipersyaratkan diterima secara lengkap "
+        "[POJK 22 Tahun 2023, Pasal 75 ayat (1)]."
+    )
+    assert cites == [
+        "POJK 22 Tahun 2023, Pasal 74 ayat (1)",
+        "POJK 22 Tahun 2023, Pasal 75 ayat (1)",
+    ]
+    ver = verify_citations(realigned, [c_p74_1, c_p75_1], cites, question=q)
+    assert ver.is_valid is True

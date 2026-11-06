@@ -1395,6 +1395,97 @@ def decouple_confabulated_causality(
     return text
 
 
+def split_compound_normative_clauses(
+    text: str,
+    retrieved_chunks: list[RetrievedChunk],
+    question: str,
+) -> str:
+    """Decompose comma-spliced compound sentences that fuse two distinct statutory articles
+    (e.g. '<Subjek> wajib ... secara lisan ..., selain harus melakukan ... secara tertulis ... [Pasal 75]')
+    into standalone sentences so each clause receives its own bracketed citation.
+    """
+    if not text or not retrieved_chunks:
+        return text
+
+    from easypasal.generation.prompts import (
+        _detect_statutory_role,
+        extract_query_subject,
+        score_primary_obligation_alignment,
+    )
+
+    primary_candidates = [
+        c
+        for c in retrieved_chunks
+        if _detect_statutory_role(c.text) == "[Peran: Kewajiban Pokok Entitas]"
+        and (not c.status or c.status == "berlaku")
+        and c.citation_label
+        and score_primary_obligation_alignment(c, question) > 0.0
+    ]
+    if len(primary_candidates) < 2:
+        return text
+
+    q_subj = extract_query_subject(question)
+    compound_id_re = re.compile(
+        r"^(?P<clause1>[^.!?\n]+?\b(?:wajib|harus|dilarang)\b[^.!?\n\[]+?),\s*"
+        r"(?P<conn>selain(?:\s+itu)?|serta|dan\s+juga|sedangkan|sementara\s+itu)\s+"
+        r"(?P<subj_opt>(?:(?:Bank(?:\s+Umum|\s+Syariah)?|BPR(?:\s+Syariah)?|PUJK|Lembaga\s+Jasa\s+Keuangan|Perusahaan(?:\s+Efek)?)\s+)?)"
+        r"(?:juga\s+)?(?P<modal>wajib|harus|dilarang)\s+(?P<clause2>.+)$",
+        re.IGNORECASE,
+    )
+
+    paragraphs = text.split("\n\n")
+    new_paragraphs: list[str] = []
+
+    for para in paragraphs:
+        if not para.strip():
+            new_paragraphs.append(para)
+            continue
+
+        sentences = re.split(r"(?<=[.!?])\s+(?=[A-Z0-9\[])", para.strip())
+        expanded_sentences: list[str] = []
+
+        for sent in sentences:
+            m = compound_id_re.match(sent.strip())
+            if not m:
+                expanded_sentences.append(sent)
+                continue
+
+            clause1 = m.group("clause1").strip()
+            subj_opt = (m.group("subj_opt") or "").strip()
+            modal = m.group("modal").strip()
+            clause2 = m.group("clause2").strip()
+
+            scored_c1 = [(_score_sentence_chunk_match(clause1, c), c) for c in primary_candidates]
+            scored_c2 = [(_score_sentence_chunk_match(clause2, c), c) for c in primary_candidates]
+            best_s1, best_c1 = max(scored_c1, key=lambda item: item[0])
+            best_s2, best_c2 = max(scored_c2, key=lambda item: item[0])
+
+            if best_s1 >= 4.0 and best_s2 >= 4.0 and best_c1.chunk_id != best_c2.chunk_id:
+                subj = subj_opt or q_subj
+                if not subj:
+                    subj_match = re.match(
+                        r"^([A-Za-z\s]{3,40}?)\s+(?:wajib|harus|dilarang)\b",
+                        clause1,
+                        re.IGNORECASE,
+                    )
+                    subj = subj_match.group(1).strip() if subj_match else "Entitas Jasa Keuangan"
+                modal_norm = (
+                    "wajib" if "wajib" in clause1.lower() and modal.lower() == "harus" else modal
+                )
+                sent1 = f"{clause1.rstrip('. ')}."
+                sent2 = f"Selain itu, {subj} juga {modal_norm} {clause2}"
+                if not sent2.endswith((".", "!", "?")):
+                    sent2 = f"{sent2}."
+                expanded_sentences.append(sent1)
+                expanded_sentences.append(sent2)
+            else:
+                expanded_sentences.append(sent)
+
+        new_paragraphs.append(" ".join(expanded_sentences))
+
+    return "\n\n".join(new_paragraphs)
+
+
 def align_sentence_level_citations(
     text: str,
     retrieved_chunks: list[RetrievedChunk],
@@ -1410,6 +1501,8 @@ def align_sentence_level_citations(
     """
     if not text or not retrieved_chunks:
         return text, {}
+
+    text = split_compound_normative_clauses(text, retrieved_chunks, question)
 
     from easypasal.generation.prompts import (
         _detect_statutory_role,
