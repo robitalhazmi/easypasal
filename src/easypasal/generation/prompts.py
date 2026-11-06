@@ -258,21 +258,30 @@ def is_taxonomic_enumeration_clause(text: str) -> bool:
     body = stripped[header_match.end() :] if header_match else stripped
     norm = re.sub(r"\s+", " ", body.lower()).strip()
 
-    # Exclude narrow contractual, fee/commission disclosure, or licensing attachment sub-lists
+    # Reject truncated chunks that end mid-enumeration with ';' or ':'
+    if norm.endswith((";", ":")):
+        return False
+
+    # Exclude narrow contractual, fee/commission disclosure, licensing attachment, or maturity assessment sub-lists
     intro = norm.split(":", maxsplit=1)[0] if ":" in norm else norm[:160]
     if re.search(
-        r"\b(?:dalam\s+perjanjian|mencantumkan|melampirkan|surat\s+permohonan|komisi/imbalan|agen\s+pemasar|dokumen\s+persyaratan)\b",
+        r"\b(?:dalam\s+perjanjian|mencantumkan|melampirkan|surat\s+permohonan|komisi/imbalan|agen\s+pemasar|dokumen\s+persyaratan|tata\s+cara\s+penilaian|penilaian\s+tingkat\s+maturitas|penilaian\s+sendiri|self\s+assessment|mempertimbangkan\s+faktor)\b",
         intro,
     ):
         return False
 
     # 1. Explicit taxonomic category or core process enumeration introducers
-    if re.search(
+    m_intro = re.search(
         r"(?:menerapkan\s+prinsip|melakukan\s+proses(?:\s+paling\s+sedikit)?|"
         r"(?:mencakup|meliputi|terdiri\s+(?:atas|dari))\s+(?:\d+\s*\([^)]+\)\s+)?(?:aspek|faktor|pilar|proses|tahap|tahapan|komponen|prinsip|unsur|kegiatan))\s*[^:]{0,40}:\s*[a-z1-9][\.\)]",
         norm,
-    ):
-        return True
+    )
+    if m_intro:
+        tail = norm[m_intro.start() :]
+        if re.search(r"(?:^|[:;\s])[b2][\.\)]\s+", tail) and re.search(
+            r"(?:^|[:;\s])[c3][\.\)]\s+", tail
+        ):
+            return True
 
     # 2. General multi-item enumeration ("paling sedikit:", "meliputi:", "mencakup:") with at least 3 items (a., b., c.)
     return bool(
@@ -280,6 +289,7 @@ def is_taxonomic_enumeration_clause(text: str) -> bool:
             r"(?:paling\s+sedikit|mencakup|meliputi|terdiri\s+atas|yaitu)\s*:\s*a[\.\)]",
             norm,
         )
+        and re.search(r"(?:^|[:;\s])b[\.\)]\s+", norm)
         and re.search(r"(?:^|[:;\s])c[\.\)]\s+", norm)
     )
 
@@ -305,11 +315,13 @@ def _is_appendix_or_closing_fragment(text: str, citation_label: str = "") -> boo
     if re.search(r"\(bagian\s+(?:[2-9]|\d{2,})\)", label_low):
         return True
 
-    # 3. Mid-sentence continuation fragment (starts with lowercase conjunction/word or deep worksheet numbering "3.1.g.")
+    # 3. Mid-sentence continuation fragment (starts with lowercase conjunction/word, deep worksheet numbering "3.1.g.",
+    # or ends mid-enumeration with ";" or ":")
     return bool(
         re.match(r"^(?:maupun|serta|atau|dan|yang|dengan)\b", body, re.IGNORECASE)
         or (body and body[0].islower() and not re.match(r"^[a-z][\.\)]\s", body))
         or re.match(r"^\d+\.\d+\.[a-z][\.\)]\s", body, re.IGNORECASE)
+        or body.endswith((";", ":"))
     )
 
 
@@ -770,7 +782,15 @@ def score_primary_obligation_alignment(chunk: RetrievedChunk, query: str) -> flo
         b_stemmed = {_legal_stem(t) for t in b_tokens}
         overlap = len(q_stemmed & b_stemmed) / len(q_stemmed)
         score += overlap * 2.5
-        if is_enum_q and has_structured_enum and overlap > 0:
+
+        # Penalize chunks that miss a strict domain qualifier from the query (e.g., general IT governance vs. cyber resilience)
+        domain_qualifiers = {"siber", "syariah", "pribadi", "pengaduan", "kliring", "kustodian"}
+        req_qualifiers = q_tokens & domain_qualifiers
+        full_tokens = set(re.findall(r"\b[a-z0-9]{4,}\b", chunk.text.lower()))
+        has_domain_match = not req_qualifiers or (req_qualifiers <= full_tokens)
+        if not has_domain_match:
+            score -= 2.5
+        elif is_enum_q and has_structured_enum and overlap > 0:
             score += 2.5
 
     return round(score, 4)

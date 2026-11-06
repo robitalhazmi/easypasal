@@ -993,6 +993,7 @@ def ensure_enumeration_completeness(
 
     from easypasal.generation.prompts import (
         _detect_statutory_role,
+        _is_appendix_or_closing_fragment,
         _legal_stem,
         detect_language,
         expand_cross_lingual_query_terms,
@@ -1031,14 +1032,27 @@ def ensure_enumeration_completeness(
     if not enum_chunks:
         return text
 
+    # Prioritize binding statutory regulations (POJK, PBI, UU, PP) before circulars (SEOJK, PADG)
+    enum_chunks.sort(
+        key=lambda c: (
+            0 if any(p in (c.doc_id or "").lower() for p in ("pojk", "pbi", "uu_", "pp_")) else 1
+        )
+    )
+    distinct_enum_docs = {c.doc_id for c in enum_chunks if c.doc_id}
+
     selected_enums: list[RetrievedChunk] = []
     covered_stems: set[str] = set()
+    selected_docs: set[str] = set()
     for ec in enum_chunks:
+        if len(distinct_enum_docs) >= 2 and ec.doc_id in selected_docs:
+            continue
         ec_body = re.sub(r"^\[[^\]]+\]\s*", "", ec.text.strip())
         ec_stems = {_legal_stem(w) for w in re.findall(r"\b[a-z]{4,}\b", ec_body.lower())}
         if not selected_enums or len(ec_stems - covered_stems) >= 4:
             selected_enums.append(ec)
             covered_stems.update(ec_stems)
+            if ec.doc_id:
+                selected_docs.add(ec.doc_id)
         if len(selected_enums) >= 2:
             break
 
@@ -1060,11 +1074,14 @@ def ensure_enumeration_completeness(
                     continue
                 # Reject fragments lacking a finite verb predicate, violating English monolingual purity,
                 # containing fabricated "(Romawi ..., ayat ...)", citing general elucidation preambles ("I. Umum" / "Penjelasan"),
-                # lacking any bracketed operative citation, or ending with a dangling sub-item marker ("i.", "ii.", "a.")
+                # lacking any bracketed operative citation, ending mid-list before citation ("; [...]"),
+                # containing nested worksheet sub-item markers ("1)", "2)"), or ending with a dangling sub-item marker ("i.", "ii.", "a.")
                 if (
                     not finite_predicate_re.search(s_clean)
                     or (is_en and not _is_pure_english_prose(s_clean))
                     or not re.search(r"\[[^\]]+\]", s_clean)
+                    or re.search(r"[;:]\s*\[[^\]]+\][.!?]?$", s_clean)
+                    or re.search(r"\b\d+\)\s+", s_clean)
                     or re.search(r"\b(?:I\.\s*Umum|Penjelasan)\b", s_clean, re.IGNORECASE)
                     or re.search(
                         r"\(\s*Romawi\s+[IVXLCDM]+\s*,\s*ayat\s+\d+\s*\)", s_clean, re.IGNORECASE
@@ -1079,7 +1096,11 @@ def ensure_enumeration_completeness(
                 best_match, best_c = max(
                     scored_chunks, key=lambda item: item[0], default=(0.0, None)
                 )
-                if best_match < 2.0 or best_c is None:
+                if (
+                    best_match < 2.0
+                    or best_c is None
+                    or _is_appendix_or_closing_fragment(best_c.text, best_c.citation_label or "")
+                ):
                     continue
 
                 # If this sentence matches an enumeration chunk that defines lettered sub-items (a., b., c...),
@@ -1103,7 +1124,7 @@ def ensure_enumeration_completeness(
         or not re.search(
             r"\b(?:wajib|harus|dilarang|must|shall|required)\b", parts[0], re.IGNORECASE
         )
-        or re.search(r"\ba\.\s+[^;]{3,120};\s*(?:dan\s+|and\s+)?b\.\s+", parts[0], re.IGNORECASE)
+        or re.search(r"\ba\.\s+[^;]{3,450};\s*(?:dan\s+|and\s+)?b\.\s+", parts[0], re.IGNORECASE)
     ):
         for m_chunk in mandate_chunks:
             m_label = re.sub(
@@ -1184,35 +1205,36 @@ def ensure_enumeration_completeness(
 
     # 3b. Tier 3 — Include complementary top-level operational obligations (e.g., 24/7 complaint handling,
     # authentication education, and personal data confidentiality in digital financial services)
-    for mc in mandate_chunks[1:4]:
-        mc_label = re.sub(r"\s*\(bagian\s+\d+\)", "", mc.citation_label or mc.chunk_id).strip()
-        if mc_label.lower() in " ".join(parts).lower():
-            continue
-        mc_body = re.sub(r"^\[[^\]]+\]\s*", "", mc.text.strip())
-        mc_body = re.sub(r"^\(\d+\)\s*", "", mc_body)
-        mc_body = re.sub(r"\s+", " ", mc_body).strip().rstrip(".")
-        if is_en:
-            mc_body_en = _translate_statutory_clause_to_english(mc_body)
-            if not mc_body_en or not _is_pure_english_prose(mc_body_en):
+    if len(selected_enums) < 2:
+        for mc in mandate_chunks[1:4]:
+            mc_label = re.sub(r"\s*\(bagian\s+\d+\)", "", mc.citation_label or mc.chunk_id).strip()
+            if mc_label.lower() in " ".join(parts).lower():
                 continue
-            rendered_mc = mc_body_en
-        else:
-            rendered_mc = mc_body
-        mc_stems = {
-            _legal_stem(w)
-            for w in re.findall(r"\b[a-z]{4,}\b", mc_body.lower())
-            if w not in _SENTENCE_STOPWORDS
-        }
-        joined_for_check = (
-            expand_cross_lingual_query_terms(" ".join(parts)) if is_en else " ".join(parts)
-        )
-        existing_stems = {
-            _legal_stem(w)
-            for w in re.findall(r"\b[a-z]{4,}\b", joined_for_check.lower())
-            if w not in _SENTENCE_STOPWORDS
-        }
-        if len(mc_stems - existing_stems) >= 3:
-            parts.append(f"{rendered_mc} [{mc_label}].")
+            mc_body = re.sub(r"^\[[^\]]+\]\s*", "", mc.text.strip())
+            mc_body = re.sub(r"^\(\d+\)\s*", "", mc_body)
+            mc_body = re.sub(r"\s+", " ", mc_body).strip().rstrip(".")
+            if is_en:
+                mc_body_en = _translate_statutory_clause_to_english(mc_body)
+                if not mc_body_en or not _is_pure_english_prose(mc_body_en):
+                    continue
+                rendered_mc = mc_body_en
+            else:
+                rendered_mc = mc_body
+            mc_stems = {
+                _legal_stem(w)
+                for w in re.findall(r"\b[a-z]{4,}\b", mc_body.lower())
+                if w not in _SENTENCE_STOPWORDS
+            }
+            joined_for_check = (
+                expand_cross_lingual_query_terms(" ".join(parts)) if is_en else " ".join(parts)
+            )
+            existing_stems = {
+                _legal_stem(w)
+                for w in re.findall(r"\b[a-z]{4,}\b", joined_for_check.lower())
+                if w not in _SENTENCE_STOPWORDS
+            }
+            if len(mc_stems - existing_stems) >= 3:
+                parts.append(f"{rendered_mc} [{mc_label}].")
 
     # 4. Normalize transitions and ensure opening sentence carries explicit obligation modality
     normalized_parts: list[str] = []
@@ -1234,7 +1256,7 @@ def ensure_enumeration_completeness(
                     p_norm,
                     flags=re.IGNORECASE,
                 )
-        elif re.search(r"\ba\.\s+[^;]{3,120};\s*(?:dan\s+|and\s+)?b\.\s+", p_norm, re.IGNORECASE):
+        elif re.search(r"\ba\.\s+[^;]{3,450};\s*(?:dan\s+|and\s+)?b\.\s+", p_norm, re.IGNORECASE):
             if is_en and not p_norm.lower().startswith(
                 ("additionally", "furthermore", "specifically")
             ):

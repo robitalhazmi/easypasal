@@ -116,10 +116,17 @@ def _compute_normative_salience_boost(query: str, payload: dict[str, Any]) -> fl
     # 2. Intent-Based Normative Primacy Boost / Penalty
     has_cross_ref = "sebagaimana dimaksud dalam pasal" in body_low
     has_structured_enum = is_taxonomic_enumeration_clause(text)
+    domain_qualifiers = ("siber", "syariah", "pribadi", "pengaduan", "kliring", "kustodian")
+    req_qualifiers = [dq for dq in domain_qualifiers if re.search(rf"\b{dq}\b", q_low)]
+    has_domain_match = not req_qualifiers or all(
+        re.search(rf"\b{dq}\b", t_low) for dq in req_qualifiers
+    )
 
     if intent == "obligation":
         if role == "[Peran: Kewajiban Pokok Entitas]":
-            if is_enum_q and has_structured_enum:
+            if not has_domain_match:
+                boost -= 0.10
+            elif is_enum_q and has_structured_enum:
                 boost += 0.25
             elif not has_cross_ref:
                 boost += 0.18

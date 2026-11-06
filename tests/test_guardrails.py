@@ -1507,6 +1507,90 @@ def test_strip_appendix_and_ensure_enumeration_completeness() -> None:
     ver4 = verify_citations(realigned4, [c_p21_2, c_seojk_iii_2], cites4, question=q)
     assert ver4.is_valid is True
 
+    # Test Case 5: Truncated maturity self-assessment chunk (Romawi V angka 2 ending with ';')
+    # and general IT governance distractor (POJK 11/2022 Pasal 2 ayat (2) lacking 'siber')
+    from easypasal.generation.prompts import (
+        _is_appendix_or_closing_fragment,
+        is_taxonomic_enumeration_clause,
+        score_primary_obligation_alignment,
+    )
+
+    c_seojk_v_2 = _make_chunk(
+        "SEOJK_29_2022_romawi_V_angka_2",
+        "SEOJK 29/SEOJK.03/2022",
+        "SEOJK 29/SEOJK.03/2022, Romawi V angka 2",
+        pasal=None,
+        ayat=None,
+        text=(
+            "[SEOJK 29/SEOJK.03/2022 | Romawi V PENILAIAN TINGKAT MATURITAS KEAMANAN SIBER | Angka 2]\n"
+            "2. Tata Cara Penilaian Tingkat Maturitas Keamanan Siber\n"
+            "a. Bank melakukan penilaian tingkat maturitas keamanan siber. Penilaian tersebut dilakukan secara tahunan untuk posisi akhir bulan Desember. Bank dapat melakukan penginian penilaian tersebut sewaktu-waktu apabila diperlukan.\n"
+            "b. Penilaian tingkat maturitas keamanan siber mencakup penilaian terhadap:\n"
+            "1) kualitas penerapan manajemen risiko terkait keamanan siber, yang meliputi aspek:\n"
+            "a. tata kelola risiko terkait keamanan siber;"
+        ),
+    )
+    c_p2_2 = _make_chunk(
+        "POJK_11_2022_p2_a2",
+        "POJK 11/POJK.03/2022",
+        "POJK 11/POJK.03/2022, Pasal 2 ayat (2)",
+        pasal="2",
+        ayat="2",
+        text=(
+            "[POJK 11/POJK.03/2022 | BAB II TATA KELOLA TEKNOLOGI INFORMASI BANK | Pasal 2 ayat (2)]\n"
+            "(2) Penerapan tata kelola TI sebagaimana dimaksud pada ayat (1) paling sedikit meliputi: "
+            "a. pengawasan aktif Direksi dan Dewan Komisaris; b. kecukupan kebijakan dan prosedur TI; dan "
+            "c. pengelolaan risiko TI."
+        ),
+    )
+    assert is_taxonomic_enumeration_clause(c_seojk_v_2.text) is False
+    assert (
+        _is_appendix_or_closing_fragment(c_seojk_v_2.text, c_seojk_v_2.citation_label or "") is True
+    )
+    assert score_primary_obligation_alignment(c_p21_2, q) > score_primary_obligation_alignment(
+        c_p2_2, q
+    )
+
+    truncated_maturity_dump = (
+        "Penerapan manajemen risiko terkait keamanan siber mencakup 4 (empat) aspek, yaitu: "
+        "a. tata kelola risiko terkait keamanan siber, yang meliputi kecukupan pengawasan aktif oleh Direksi dan Dewan Komisaris, "
+        "perumusan tingkat risiko terkait keamanan siber yang akan diambil (risk appetite) dan toleransi risiko terkait keamanan siber (risk tolerance), "
+        "serta budaya dan kesadaran risiko terkait keamanan siber; "
+        "b. kerangka manajemen risiko terkait keamanan siber, yang meliputi strategi manajemen risiko, kecukupan perangkat organisasi, "
+        "serta kecukupan kebijakan, prosedur, dan penetapan limit risiko, terkait keamanan siber; "
+        "c. proses manajemen risiko, kecukupan sumber daya manusia (SDM), serta kecukupan sistem informasi manajemen risiko, terkait keamanan siber; dan "
+        "d. sistem pengendalian risiko terkait keamanan siber, yang meliputi kecukupan sistem pengendalian intern dan kecukupan kaji ulang "
+        "[SEOJK 29/SEOJK.03/2022, Romawi III angka 2]. "
+        "Tata Cara Penilaian Tingkat Maturitas Keamanan Siber a. Bank melakukan penilaian tingkat maturitas keamanan siber. "
+        "Penilaian tersebut dilakukan secara tahunan untuk posisi akhir bulan Desember. Bank dapat melakukan penginian penilaian tersebut sewaktu-waktu apabila diperlukan. "
+        "b. Penilaian tingkat maturitas keamanan siber mencakup penilaian terhadap: 1) kualitas penerapan manajemen risiko terkait keamanan siber, yang meliputi aspek: "
+        "a. tata kelola risiko terkait keamanan siber; [SEOJK 29/SEOJK.03/2022, Romawi V angka 2]."
+    )
+    all_cyber_chunks = [c_seojk_iii_2, c_seojk_v_2, c_p21_2, c_p2_2, c_p21_1]
+    realigned5, cites5, _ = detect_and_realign_inverted_citations(
+        answer=truncated_maturity_dump,
+        retrieved_chunks=all_cyber_chunks,
+        question=q,
+    )
+    assert "Tata Cara Penilaian Tingkat Maturitas" not in realigned5
+    assert "Romawi V angka 2" not in realigned5
+    assert "Pasal 2 ayat (2)" not in realigned5
+    assert realigned5.startswith(
+        "Bank wajib menjaga ketahanan siber [POJK 11/POJK.03/2022, Pasal 21 ayat (1)]."
+    )
+    assert "identifikasi aset, ancaman, dan kerentanan" in realigned5
+    assert (
+        "Selain itu, penerapan manajemen risiko terkait keamanan siber mencakup 4 (empat) aspek"
+        in realigned5
+    )
+    assert cites5 == [
+        "POJK 11/POJK.03/2022, Pasal 21 ayat (1)",
+        "POJK 11/POJK.03/2022, Pasal 21 ayat (2)",
+        "SEOJK 29/SEOJK.03/2022, Romawi III angka 2",
+    ]
+    ver5 = verify_citations(realigned5, all_cyber_chunks, cites5, question=q)
+    assert ver5.is_valid is True
+
 
 def test_english_consumer_protection_digital_services_guardrails() -> None:
     """Verify cross-lingual English enumeration completeness, preamble rejection, and citation normalization."""
