@@ -1685,6 +1685,14 @@ def test_inverted_narrative_citation_and_unqueried_reporting_pruning() -> None:
         ayat="1",
         text="[POJK 11/POJK.03/2022 | Pasal 35 ayat (1)]\n(1) Bank wajib menempatkan Sistem Elektronik pada Pusat Data dan Pusat Pemulihan Bencana di wilayah Indonesia.",
     )
+    c_p41_1 = _make_chunk(
+        "POJK_11_2022_p41_a1",
+        "POJK 11/POJK.03/2022",
+        "POJK 11/POJK.03/2022, Pasal 41 ayat (1)",
+        pasal="41",
+        ayat="1",
+        text="[POJK 11/POJK.03/2022 | Pasal 41 ayat (1)]\n(1) Bank wajib: a. menempatkan Sistem Elektronik pada Pusat Data dan/atau Pusat Pemulihan Bencana di luar wilayah Indonesia sebagaimana dimaksud dalam Pasal 35 ayat (2); b. mengimplementasikan pemrosesan transaksi berbasis TI oleh pihak penyedia jasa TI di luar wilayah Indonesia sebagaimana dimaksud dalam Pasal 39 ayat (4), paling lama 6 (enam) bulan sejak memperoleh izin dari Otoritas Jasa Keuangan.",
+    )
     c_p61_1 = _make_chunk(
         "POJK_11_2022_p61_a1",
         "POJK 11/POJK.03/2022",
@@ -1692,20 +1700,6 @@ def test_inverted_narrative_citation_and_unqueried_reporting_pruning() -> None:
         pasal="61",
         ayat="1",
         text="[POJK 11/POJK.03/2022 | Pasal 61 ayat (1)]\n(1) Bank wajib menyampaikan laporan realisasi meliputi penempatan Sistem Elektronik pada Pusat Data dan/atau Pusat Pemulihan Bencana di luar wilayah Indonesia.",
-    )
-    c_p41_1 = _make_chunk(
-        "POJK_11_2022_p41_a1",
-        "POJK 11/POJK.03/2022",
-        "POJK 11/POJK.03/2022, Pasal 41 ayat (1)",
-        pasal="41",
-        ayat="1",
-        text=(
-            "[POJK 11/POJK.03/2022 | Pasal 41 ayat (1)]\n"
-            "(1) Bank wajib: a. menempatkan Sistem Elektronik pada Pusat Data dan/atau Pusat Pemulihan Bencana "
-            "di luar wilayah Indonesia sebagaimana dimaksud dalam Pasal 35 ayat (2); dan "
-            "b. mengimplementasikan pemrosesan transaksi berbasis TI oleh pihak penyedia jasa TI di luar wilayah Indonesia "
-            "sebagaimana dimaksud dalam Pasal 39 ayat (4), paling lama 6 (enam) bulan sejak memperoleh izin dari Otoritas Jasa Keuangan."
-        ),
     )
 
     pruned = prune_remedial_distractors([c_p61_1, c_p41_1, c_p35_1], q)
@@ -1720,7 +1714,7 @@ def test_inverted_narrative_citation_and_unqueried_reporting_pruning() -> None:
     )
     realigned, cites, _ = detect_and_realign_inverted_citations(
         answer=raw_baseline,
-        retrieved_chunks=[c_p35_1, c_p61_1, c_p41_1],
+        retrieved_chunks=[c_p35_1, c_p61_1],
         question=q,
     )
     assert realigned == (
@@ -1728,16 +1722,17 @@ def test_inverted_narrative_citation_and_unqueried_reporting_pruning() -> None:
         "[POJK 11/POJK.03/2022, Pasal 35 ayat (1)]."
     )
     assert cites == ["POJK 11/POJK.03/2022, Pasal 35 ayat (1)"]
-    ver = verify_citations(realigned, [c_p35_1, c_p61_1, c_p41_1], cites, question=q)
+    ver = verify_citations(realigned, [c_p35_1, c_p61_1], cites, question=q)
     assert ver.is_valid is True
 
     raw_post_permit = (
         "Bank Umum wajib menempatkan Pusat Data dan Pusat Pemulihan Bencana di wilayah Indonesia "
         "[POJK 11/POJK.03/2022, Pasal 35 ayat (1)]. "
-        "Selain itu, Bank Umum juga wajib: a. Menempatkan Sistem Elektronik pada Pusat Data dan/atau Pusat Pemulihan Bencana "
-        "di luar wilayah Indonesia sebagaimana dimaksud dalam Pasal 35 ayat (2); b. Mengimplementasikan pemrosesan transaksi berbasis TI "
-        "oleh pihak penyedia jasa TI di luar wilayah Indonesia sebagaimana dimaksud dalam Pasal 39 ayat (4), "
-        "paling lama 6 (enam) bulan sejak memperoleh izin dari Otoritas Jasa Keuangan."
+        "Selain itu, Bank Umum juga wajib: a. Menempatkan Sistem Elektronik pada Pusat Data dan/atau "
+        "Pusat Pemulihan Bencana di luar wilayah Indonesia sebagaimana dimaksud dalam Pasal 35 ayat (2); "
+        "b. Mengimplementasikan pemrosesan transaksi berbasis TI oleh pihak penyedia jasa TI di luar "
+        "wilayah Indonesia sebagaimana dimaksud dalam Pasal 39 ayat (4), paling lama 6 (enam) bulan "
+        "sejak memperoleh izin dari Otoritas Jasa Keuangan."
     )
     realigned2, cites2, _ = detect_and_realign_inverted_citations(
         answer=raw_post_permit,

@@ -1441,7 +1441,7 @@ def split_compound_normative_clauses(
             new_paragraphs.append(para)
             continue
 
-        sentences = re.split(r"(?<![\s:(][a-zA-Z]\.)(?<=[.!?])\s+(?=[A-Z0-9\[])", para.strip())
+        sentences = re.split(r"(?<=[.!?])\s+(?=[A-Z0-9\[])", para.strip())
         expanded_sentences: list[str] = []
 
         for sent in sentences:
@@ -1530,9 +1530,7 @@ def align_sentence_level_citations(
     all_sentences: list[str] = []
     for p in paragraphs:
         if p.strip():
-            all_sentences.extend(
-                re.split(r"(?<![\s:(][a-zA-Z]\.)(?<=[.!?])\s+(?=[A-Z0-9\[])", p.strip())
-            )
+            all_sentences.extend(re.split(r"(?<=[.!?])\s+(?=[A-Z0-9\[])", p.strip()))
     normative_count = sum(
         1 for s in all_sentences if normative_re.search(s) and len(s.split()) >= 5
     )
@@ -1551,7 +1549,7 @@ def align_sentence_level_citations(
             new_paragraphs.append(para)
             continue
 
-        sentences = re.split(r"(?<![\s:(][a-zA-Z]\.)(?<=[.!?])\s+(?=[A-Z0-9\[])", para.strip())
+        sentences = re.split(r"(?<=[.!?])\s+(?=[A-Z0-9\[])", para.strip())
         updated_sentences: list[str] = []
 
         for sent in sentences:
@@ -1620,23 +1618,29 @@ def align_sentence_level_citations(
 
 def _strip_unqueried_reporting_sentences(text: str, question: str) -> str:
     """Strip trailing additive sentences that dump periodic administrative reporting duties
-    ('wajib menyampaikan laporan realisasi...') or contradictory post-licensing overseas exception
-    deadlines ('wajib: a. menempatkan ... di luar wilayah Indonesia sebagaimana dimaksud dalam Pasal ... sejak memperoleh izin')
-    when the query does not ask about reporting or overseas licensing exceptions.
+    ('wajib menyampaikan laporan realisasi...') or post-licensing overseas exception execution clauses
+    ('di luar wilayah Indonesia sebagaimana dimaksud dalam Pasal ... sejak memperoleh izin')
+    when the query does not ask about reporting, licensing, or exceptions.
     """
     if not text or not question:
         return text
-    q_low = question.lower()
-    asks_reporting = bool(
-        re.search(r"\b(?:laporan|melaporkan|pelaporan|realisasi|report|reporting)\b", q_low)
-    )
-    asks_overseas_or_permit = bool(
+
+    query_asks_reporting = bool(
         re.search(
-            r"\b(?:luar\s+wilayah|luar\s+negeri|izin|pengecualian|overseas|abroad|permit)\b", q_low
+            r"\b(?:laporan|melaporkan|pelaporan|realisasi|report|reporting)\b",
+            question,
+            re.IGNORECASE,
+        )
+    )
+    query_asks_exception = bool(
+        re.search(
+            r"\b(?:izin|persetujuan|pengecualian|luar\s+wilayah|luar\s+negeri|overseas)\b",
+            question,
+            re.IGNORECASE,
         )
     )
 
-    sentences = re.split(r"(?<![\s:(][a-zA-Z]\.)(?<=[.!?])\s+(?=[A-Z\[])", text.strip())
+    sentences = re.split(r"(?<!\s[a-zA-Z0-9]\.)(?<=[.!?])\s+(?=[A-Z\[])", text.strip())
     if len(sentences) <= 1:
         return text
 
@@ -1646,25 +1650,24 @@ def _strip_unqueried_reporting_sentences(text: str, question: str) -> str:
     ) or not re.search(r"\[[^\]]+\]", first_sent):
         return text
 
-    first_is_domestic = (
-        "di wilayah indonesia" in first_sent.lower() and "di luar wilayah" not in first_sent.lower()
-    )
-
     kept: list[str] = [first_sent]
     for sent in sentences[1:]:
-        sent_low = sent.lower()
-        if not asks_reporting and re.search(
+        if not query_asks_reporting and re.search(
             r"\b(?:wajib|harus|must|shall)\s+(?:juga\s+)?(?:menyampaikan\s+laporan|melaporkan|submit\s+a?\s*report)\b",
-            sent_low,
+            sent,
+            re.IGNORECASE,
         ):
             continue
-        if (
-            not asks_overseas_or_permit
-            and first_is_domestic
-            and "di luar wilayah indonesia" in sent_low
-            and (
-                "sejak memperoleh izin" in sent_low
-                or "sebagaimana dimaksud dalam pasal" in sent_low
+        if not query_asks_exception and (
+            re.search(
+                r"\b(?:sejak|setelah)\s+(?:memperoleh|mendapatkan)\s+(?:izin|persetujuan)\b",
+                sent,
+                re.IGNORECASE,
+            )
+            or re.search(
+                r"\bdi\s+luar\s+wilayah\s+Indonesia\s+sebagaimana\s+dimaksud\s+dalam\s+Pasal\b",
+                sent,
+                re.IGNORECASE,
             )
         ):
             continue

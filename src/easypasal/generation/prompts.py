@@ -416,14 +416,18 @@ def _detect_statutory_role(text: str) -> str:
         return "[Peran: Wewenang Korektif Otoritas / Sanksi]"
 
     # Leading permissive / licensing application clause ("(1) Bank dapat mengajukan permohonan izin...")
-    # or post-licensing conditional exception deadline ("...sebagaimana dimaksud dalam Pasal ... sejak memperoleh izin...")
-    if (
+    # or post-licensing execution window ("Bank wajib: a. menempatkan ... di luar wilayah Indonesia sebagaimana dimaksud dalam Pasal 35 ayat (2) ... sejak memperoleh izin")
+    is_post_permit_execution = bool(
+        re.search(r"\bsebagaimana\s+dimaksud\s+dalam\s+pasal\b", norm)
+        and re.search(
+            r"\b(?:sejak|setelah)\s+(?:memperoleh|mendapatkan|diterbitkannya)\s+(?:izin|persetujuan)\b",
+            norm,
+        )
+    )
+    if is_post_permit_execution or (
         perm_match
         and perm_match.start() < 35
         and (not duty_match or perm_match.start() < duty_match.start())
-    ) or (
-        "sebagaimana dimaksud dalam pasal" in norm
-        and re.search(r"\b(?:sejak|setelah)\s+memperoleh\s+(?:izin|persetujuan)\b", norm)
     ):
         return "[Peran: Opsi Pengecualian / Izin Bersyarat]"
 
@@ -578,8 +582,12 @@ def score_primary_obligation_alignment(chunk: RetrievedChunk, query: str) -> flo
         score -= 2.0
 
     # 2. Standalone Root Norm vs. Dependent Cross-Referencing Clause
-    is_locational_q = bool(
-        "di mana" in norm_query or "dimana" in norm_query or "where" in norm_query
+    is_where_query = bool(re.search(r"\b(?:di\s+mana|dimana|where)\b", norm_query))
+    query_asks_exception = bool(
+        re.search(
+            r"\b(?:izin|persetujuan|pengecualian|luar\s+wilayah|luar\s+negeri|overseas)\b",
+            norm_query,
+        )
     )
     is_dependent_ref = bool(
         re.search(
@@ -587,18 +595,13 @@ def score_primary_obligation_alignment(chunk: RetrievedChunk, query: str) -> flo
             norm_body,
         )
         or re.search(
-            r"\bwajib\s*:?\s*(?:[a-z][\.\)]\s*)?(?:memastikan|memenuhi|melaksanakan|menempatkan|mengimplementasikan)\s+[^.]{1,140}\bsebagaimana\s+dimaksud\s+dalam\s+pasal\b",
+            r"\bwajib\s*:?\s*(?:[a-z][\.\)]\s*)?(?:memastikan|memenuhi|melaksanakan|menempatkan|mengimplementasikan)\s+[^.]{1,120}\bsebagaimana\s+dimaksud\s+dalam\s+pasal\b",
             norm_body,
         )
-        or re.search(r"\b(?:sejak|setelah)\s+memperoleh\s+(?:izin|persetujuan)\b", norm_body)
     )
     has_structured_enum = is_taxonomic_enumeration_clause(chunk.text)
     has_explicit_substance = bool(
-        (
-            not is_locational_q
-            and not is_dependent_ref
-            and re.search(r"\bpaling\s+(?:lama|lambat)\s+\d+", norm_body)
-        )
+        (not is_where_query and re.search(r"\bpaling\s+(?:lama|lambat)\s+\d+", norm_body))
         or ("di wilayah indonesia" in norm_body and "di luar wilayah" not in norm_body)
         or (is_enum_q and has_structured_enum)
     )
@@ -621,17 +624,16 @@ def score_primary_obligation_alignment(chunk: RetrievedChunk, query: str) -> flo
         score -= 0.8
 
     # 4. Interrogative Target Concordance ("di mana" -> domestic placement vs overseas exception)
-    if is_locational_q:
-        if "di wilayah indonesia" in norm_body or "di indonesia" in norm_body:
-            if "di luar wilayah indonesia" not in norm_body:
-                score += 1.5
-            else:
-                score += 0.2
-        elif "di luar wilayah indonesia" in norm_body and "luar" not in norm_query:
-            score -= 2.5
+    if is_where_query:
+        if "di luar wilayah indonesia" in norm_body and not query_asks_exception:
+            score -= 1.5
+        elif "di wilayah indonesia" in norm_body or "di indonesia" in norm_body:
+            score += 0.8
 
     # 5. Concrete Numerical Statutory Deadlines / Time Limits
-    if re.search(r"\bpaling\s+(?:lama|lambat)\s+\d+\s*(?:\([a-z\s]+\)\s*)?hari\b", norm_body):
+    if not is_where_query and re.search(
+        r"\bpaling\s+(?:lama|lambat)\s+\d+\s*(?:\([a-z\s]+\)\s*)?hari\b", norm_body
+    ):
         score += 1.5
 
     # 6. Binding Regulatory Precedence (UU, POJK, PBI, PP over SEOJK circulars)
