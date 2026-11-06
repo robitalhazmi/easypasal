@@ -40,6 +40,7 @@ def prune_remedial_distractors(
 
     from easypasal.generation.prompts import (
         _detect_statutory_role,
+        is_enumeration_query,
         score_primary_obligation_alignment,
     )
     from easypasal.retrieval.fusion import detect_normative_intent
@@ -47,6 +48,12 @@ def prune_remedial_distractors(
     intent = detect_normative_intent(query)
     if intent != "obligation":
         return chunks
+
+    q_low = query.lower()
+    query_asks_reporting = bool(
+        re.search(r"\b(?:laporan|melaporkan|pelaporan|realisasi|report|reporting)\b", q_low)
+    )
+    is_enum_q = is_enumeration_query(q_low)
 
     # Find regulations with at least one in-force primary entity obligation chunk
     regs_with_primary_obligation: set[str] = set()
@@ -76,10 +83,27 @@ def prune_remedial_distractors(
         # Prune off-entity primary obligations (e.g. LAPS duty on an LJK/PUJK query)
         if (
             role == "[Peran: Kewajiban Pokok Entitas]"
-            and score_primary_obligation_alignment(c, query) == 0.0
+            and score_primary_obligation_alignment(c, query) <= 0.0
         ):
             logger.info(
                 "Pruning off-entity primary clause %s (%s) from obligation query context",
+                c.citation_label,
+                c.chunk_id,
+            )
+            continue
+
+        # Prune unqueried administrative reporting clauses when substantive obligations exist
+        if (
+            not query_asks_reporting
+            and doc_key in regs_with_primary_obligation
+            and re.search(
+                r"\b(?:wajib|harus)\s+(?:menyampaikan\s+laporan|melaporkan)\b",
+                c.text,
+                re.IGNORECASE,
+            )
+        ):
+            logger.info(
+                "Pruning unqueried reporting clause %s (%s) from obligation query context",
                 c.citation_label,
                 c.chunk_id,
             )
@@ -119,9 +143,10 @@ def prune_remedial_distractors(
             best_doc_key = (best_c.doc_id or best_c.doc_number or "").lower().strip()
             if best_doc_key:
                 doc_primary_counts[best_doc_key] = 1
+            min_sibling_score = 2.0 if is_enum_q else max(2.0, best_score - 2.5)
             other_primaries: list[RetrievedChunk] = []
             for s, _neg_idx, c in sorted(scored, key=lambda item: (item[0], item[1]), reverse=True):
-                if c.chunk_id == best_c.chunk_id or s < 2.0:
+                if c.chunk_id == best_c.chunk_id or s < min_sibling_score:
                     continue
                 d_key = (c.doc_id or c.doc_number or "").lower().strip()
                 if d_key and doc_primary_counts.get(d_key, 0) >= 3:

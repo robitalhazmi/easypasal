@@ -598,31 +598,51 @@ def reformat_narrative_citations_to_brackets(text: str) -> str:
         r"(?:Pasal\s+\d+[a-z]?(?:\s+(?:ayat\s+\(\d+[a-z]?\)|angka\s+\d+))?|"
         r"Romawi\s+[IVXLCDM]+(?:\s+angka\s+\d+)?)"
     )
+    reg_name_pat = (
+        r"(?:Undang-Undang|UU|POJK|SEOJK|PBI|PADG|PP|Perpu)\s+"
+        r"(?:Nomor\s+)?\w+(?:[\./\-]\w+)*(?:\s+Tahun\s+\d{4})?"
+    )
 
-    # 1. Leading prepositional citation ("Dalam POJK ..., Pasal ..., <body without brackets>.")
+    # 1. Leading prepositional citation ("Dalam POJK ..., Pasal ..., <body without brackets>." or "Dalam Pasal ... POJK ..., <body>.")
     lead_pattern = re.compile(
         rf"(?:^|(?<=[.!?]\s))(?:Dalam|Berdasarkan|Menurut|Sesuai\s+dengan|Merujuk\s+pada|In|Under|Pursuant\s+to|According\s+to)\s+"
-        rf"((?:POJK|SEOJK|UU|Undang-Undang|PBI|PADG|PP)\s+[\w\s\./\-]+?,\s*{cit_designator}),\s*"
+        rf"(?:({reg_name_pat}\s*,\s*{cit_designator})|({cit_designator})\s+(?:dari\s+|pada\s+|dalam\s+|of\s+|in\s+)?({reg_name_pat})),\s*"
         rf"([^.!?\[]+?)([.!?])",
         re.IGNORECASE,
     )
 
     def _repl_lead(m: re.Match[str]) -> str:
-        cit = m.group(1).strip()
-        body = m.group(2).strip()
-        punct = m.group(3)
+        cit = m.group(1).strip() if m.group(1) else f"{m.group(3).strip()}, {m.group(2).strip()}"
+        body = m.group(4).strip()
+        punct = m.group(5)
         if body:
             body = f"{body[0].upper()}{body[1:]}"
         return f"{body} [{cit}]{punct}"
 
     text = lead_pattern.sub(_repl_lead, text)
 
-    # 2. Trailing Indonesian narrative citations
+    # 2. Trailing Indonesian narrative citations (both "<RegName>, <Designator>" and "<Designator> <RegName>")
+    pattern_id_inv = re.compile(
+        rf",?\s*(?:seperti\s+yang\s+(?:ditetapkan|diatur|tercantum)\s+dalam|"
+        rf"sebagaimana\s+(?:ditetapkan|diatur|tercantum|dimaksud)\s+dalam|"
+        rf"sesuai\s+(?:dengan\s+)?(?:ketentuan\s+)?(?:dalam\s+)?|"
+        rf"berdasarkan\s+(?:ketentuan\s+)?|menurut\s+(?:ketentuan\s+)?)\s*"
+        rf"({cit_designator})\s+(?:dari\s+|pada\s+|dalam\s+)?({reg_name_pat})",
+        re.IGNORECASE,
+    )
+
+    def _repl_id_inv(m: re.Match[str]) -> str:
+        desig = m.group(1).strip()
+        reg = m.group(2).strip()
+        return f" [{reg}, {desig}]"
+
+    text = pattern_id_inv.sub(_repl_id_inv, text)
+
     pattern_id = re.compile(
         rf",?\s*(?:seperti\s+yang\s+(?:ditetapkan|diatur|tercantum)\s+dalam|"
         rf"sebagaimana\s+(?:ditetapkan|diatur|tercantum|dimaksud)\s+dalam|"
         rf"sesuai\s+(?:dengan\s+)?(?:ketentuan\s+)?(?:dalam\s+)?|"
-        rf"berdasarkan\s+ketentuan\s+)\s*"
+        rf"berdasarkan\s+(?:ketentuan\s+)?|menurut\s+(?:ketentuan\s+)?)\s*"
         rf"([\w\s\./]+?,\s*{cit_designator})",
         re.IGNORECASE,
     )
@@ -633,7 +653,21 @@ def reformat_narrative_citations_to_brackets(text: str) -> str:
 
     text = pattern_id.sub(_repl_id, text)
 
-    # 3. Trailing English narrative citations
+    # 3. Trailing English narrative citations (both "<RegName>, <Designator>" and "<Designator> <RegName>")
+    pattern_en_inv = re.compile(
+        rf",?\s*(?:as\s+(?:stipulated|stated|specified|regulated|set\s+out)\s+in|"
+        rf"according\s+to|pursuant\s+to|under)\s*"
+        rf"({cit_designator})\s+(?:of\s+|in\s+)?({reg_name_pat})",
+        re.IGNORECASE,
+    )
+
+    def _repl_en_inv(m: re.Match[str]) -> str:
+        desig = m.group(1).strip()
+        reg = m.group(2).strip()
+        return f" [{reg}, {desig}]"
+
+    text = pattern_en_inv.sub(_repl_en_inv, text)
+
     pattern_en = re.compile(
         rf",?\s*(?:as\s+(?:stipulated|stated|specified|regulated|set\s+out)\s+in|"
         rf"according\s+to|pursuant\s+to)\s*"
@@ -1489,6 +1523,42 @@ def align_sentence_level_citations(
     return "\n\n".join(new_paragraphs), replacements
 
 
+def _strip_unqueried_reporting_sentences(text: str, question: str) -> str:
+    """Strip trailing additive sentences that dump periodic administrative reporting duties
+    ('wajib menyampaikan laporan realisasi...') when the query does not ask about reporting.
+    """
+    if not text or not question:
+        return text
+    if re.search(
+        r"\b(?:laporan|melaporkan|pelaporan|realisasi|report|reporting)\b",
+        question,
+        re.IGNORECASE,
+    ):
+        return text
+
+    sentences = re.split(r"(?<=[.!?])\s+(?=[A-Z\[])", text.strip())
+    if len(sentences) <= 1:
+        return text
+
+    first_sent = sentences[0]
+    if not re.search(
+        r"\b(?:wajib|harus|dilarang|must|shall|required)\b", first_sent, re.IGNORECASE
+    ) or not re.search(r"\[[^\]]+\]", first_sent):
+        return text
+
+    kept: list[str] = [first_sent]
+    for sent in sentences[1:]:
+        if re.search(
+            r"\b(?:wajib|harus|must|shall)\s+(?:juga\s+)?(?:menyampaikan\s+laporan|melaporkan|submit\s+a?\s*report)\b",
+            sent,
+            re.IGNORECASE,
+        ):
+            continue
+        kept.append(sent)
+
+    return " ".join(kept).strip()
+
+
 def detect_and_realign_inverted_citations(
     answer: str,
     retrieved_chunks: list[RetrievedChunk],
@@ -1509,11 +1579,13 @@ def detect_and_realign_inverted_citations(
         return answer, [], {}
 
     # 0. Canonical normalization: strip header/appendix artifacts, simplify internal cross-references,
-    # reformat narrative citations, decouple confabulated causality, and ensure enumeration completeness
+    # reformat narrative citations, decouple confabulated causality, strip unqueried reporting dumps,
+    # and ensure enumeration completeness
     answer = strip_appendix_and_header_artifacts(answer)
     answer = simplify_dangling_cross_references(answer)
     answer = reformat_narrative_citations_to_brackets(answer)
     answer = decouple_confabulated_causality(answer, retrieved_chunks=retrieved_chunks)
+    answer = _strip_unqueried_reporting_sentences(answer, question)
     answer = ensure_enumeration_completeness(answer, retrieved_chunks, question)
 
     q_low = question.lower()

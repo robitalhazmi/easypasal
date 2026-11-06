@@ -554,6 +554,24 @@ def score_primary_obligation_alignment(chunk: RetrievedChunk, query: str) -> flo
             norm_body,
         ):
             score += 1.5 if action_verb in generic_meta_verbs else 2.5
+            action_matched = True
+
+    if q_action_verbs and not action_matched and not is_enum_q:
+        score -= 1.0
+
+    # 1b. Administrative Reporting Scope Gate:
+    # Downweight periodic reporting obligations ("wajib menyampaikan laporan") when the query does not ask about reporting
+    query_asks_reporting = bool(
+        re.search(r"\b(?:laporan|melaporkan|pelaporan|realisasi|report|reporting)\b", norm_query)
+    )
+    is_reporting_clause = bool(
+        re.search(
+            r"\b(?:wajib|harus)\s+(?:menyampaikan\s+laporan|melaporkan|menyusun\s+laporan)\b",
+            norm_body,
+        )
+    )
+    if is_reporting_clause and not query_asks_reporting:
+        score -= 2.0
 
     # 2. Standalone Root Norm vs. Dependent Cross-Referencing Clause
     is_dependent_ref = bool(

@@ -1665,3 +1665,54 @@ def test_english_consumer_protection_digital_services_guardrails() -> None:
     assert "POJK 22 Tahun 2023, Pasal 3 ayat (2)" in cites3
     ver3 = verify_citations(realigned3, chunks, cites3, question=q)
     assert ver3.is_valid is True
+
+
+def test_inverted_narrative_citation_and_unqueried_reporting_pruning() -> None:
+    """Verify designator-first narrative citations convert to '[Reg, Pasal]' and unqueried reporting clauses are stripped."""
+    from easypasal.generation.pipeline import prune_remedial_distractors
+    from easypasal.guardrails.citation_verifier import (
+        detect_and_realign_inverted_citations,
+        verify_citations,
+    )
+
+    q = "Di mana Bank Umum wajib menempatkan Pusat Data dan Pusat Pemulihan Bencana menurut regulasi OJK?"
+
+    c_p35_1 = _make_chunk(
+        "POJK_11_2022_p35_a1",
+        "POJK 11/POJK.03/2022",
+        "POJK 11/POJK.03/2022, Pasal 35 ayat (1)",
+        pasal="35",
+        ayat="1",
+        text="[POJK 11/POJK.03/2022 | Pasal 35 ayat (1)]\n(1) Bank wajib menempatkan Sistem Elektronik pada Pusat Data dan Pusat Pemulihan Bencana di wilayah Indonesia.",
+    )
+    c_p61_1 = _make_chunk(
+        "POJK_11_2022_p61_a1",
+        "POJK 11/POJK.03/2022",
+        "POJK 11/POJK.03/2022, Pasal 61 ayat (1)",
+        pasal="61",
+        ayat="1",
+        text="[POJK 11/POJK.03/2022 | Pasal 61 ayat (1)]\n(1) Bank wajib menyampaikan laporan realisasi meliputi penempatan Sistem Elektronik pada Pusat Data dan/atau Pusat Pemulihan Bencana di luar wilayah Indonesia.",
+    )
+
+    pruned = prune_remedial_distractors([c_p61_1, c_p35_1], q)
+    assert [c.chunk_id for c in pruned] == ["POJK_11_2022_p35_a1"]
+
+    raw_baseline = (
+        "Bank Umum wajib menempatkan Pusat Data dan Pusat Pemulihan Bencana di wilayah Indonesia "
+        "sesuai dengan Pasal 35 ayat (1) POJK 11/POJK.03/2022. "
+        "Selain itu, Bank Umum juga wajib menyampaikan laporan realisasi meliputi penempatan Sistem Elektronik "
+        "pada Pusat Data dan/atau Pusat Pemulihan Bencana di luar wilayah Indonesia, pemrosesan transaksi berbasis TI "
+        "di luar wilayah Indonesia, dan kegiatan sebagai penyedia jasa TI sesuai dengan Pasal 61 ayat (1) POJK 11/POJK.03/2022."
+    )
+    realigned, cites, _ = detect_and_realign_inverted_citations(
+        answer=raw_baseline,
+        retrieved_chunks=[c_p35_1, c_p61_1],
+        question=q,
+    )
+    assert realigned == (
+        "Bank Umum wajib menempatkan Pusat Data dan Pusat Pemulihan Bencana di wilayah Indonesia "
+        "[POJK 11/POJK.03/2022, Pasal 35 ayat (1)]."
+    )
+    assert cites == ["POJK 11/POJK.03/2022, Pasal 35 ayat (1)"]
+    ver = verify_citations(realigned, [c_p35_1, c_p61_1], cites, question=q)
+    assert ver.is_valid is True
